@@ -1,42 +1,63 @@
-[package]
-name = "sonare"
-version = "0.12.0-nightly"
+[workspace]
+members = [".", "fsmem"]
+default-members = [".", "fsmem"]
+
+[workspace.package]
+version = "0.12.0-alpha.1"
 authors = ["Dr Maxim Orlovsky <orlovsky@ubideco.org>"]
-description = "Runtime environment for formally-verifiable distributed software"
 repository = "https://github.com/AluVM/sonare"
 homepage = "https://ubideco.org/SONARE"
 keywords = ["state-machines", "distributed-systems", "decentralized", "partially-replicated", "runtime-environment"]
-categories = ["algorithms", "cryptography", "science"]
 readme = "README.md"
 license = "Apache-2.0"
 edition = "2021"
 rust-version = "1.77.0" # Due to `rustfix`
+
+[workspace.dependencies]
+amplify = "~4.8.0"
+strict_encoding = "~2.8.0"
+strict_types = "~2.8.0"
+ultrasonic = "0.12.0-beta.1"
+serde = { version = "1", features = ["derive"] }
+
+[package]
+name = "sonare"
+version.workspace = true
+authors.workspace = true
+description = "Runtime environment for formally-verifiable distributed software"
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories = ["algorithms", "cryptography", "science", "no-std", "no-std::no-alloc"]
+readme.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 exclude = [".github"]
 
 [lib]
 name = "sonare"
 
 [dependencies]
-amplify = "~4.8.0"
-baid64 = "~0.3.0"
-strict_encoding = "~2.8.0"
-strict_types = "~2.8.0" # TODO: Make strict types optional, used only in STL and by persistence dependencies
-aluvm = { version = "~0.12.0-beta.1", features = ["zk-aluvm"] }
-commit_verify = { version = "~0.12.0-alpha.2", features = ["derive"] }
-single_use_seals = "~0.12.0-alpha.2"
-serde = { version = "1", features = ["derive"], optional = true }
+amplify.workspace = true
+baid64 = "0.3.0"
+strict_encoding.workspace = true
+strict_types = { workspace = true, optional = true }
+commit_verify = "0.12.0-alpha.3"
+ultrasonic.workspace = true
+serde = { workspace = true, optional = true }
 
 [features]
 default = []
 all = ["stl", "serde"]
 
-stl = ["commit_verify/stl", "aluvm/stl", "strict_types/armor"]
+stl = ["commit_verify/stl", "ultrasonic/stl", "strict_types/armor"]
 serde = [
     "dep:serde",
     "amplify/serde",
-    "strict_types/serde",
+    "strict_encoding/serde",
     "commit_verify/serde",
-    "aluvm/serde",
+    "ultrasonic/serde"
 ]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

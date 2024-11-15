@@ -21,10 +21,12 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-mod stash;
-mod state;
-mod trace;
+pub struct Trace<T: TraceProvider> {
+    provider: T,
+}
 
-pub use stash::{Stash, StashProvider};
-pub use state::{State, StateProvider};
-pub use trace::{Trace, TraceProvider};
+impl<T: TraceProvider> Trace<T> {
+    pub fn new(provider: T) -> Self { Trace { provider } }
+}
+
+pub trait TraceProvider {}

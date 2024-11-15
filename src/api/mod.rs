@@ -21,10 +21,7 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-mod stash;
-mod state;
-mod trace;
+pub type AppndStateType = u16;
+pub type DestrStateType = u16;
 
-pub use stash::{Stash, StashProvider};
-pub use state::{State, StateProvider};
-pub use trace::{Trace, TraceProvider};
+pub struct Api {}

@@ -1,0 +1,28 @@
+[package]
+name = "sonare-fsmem"
+version.workspace = true
+authors.workspace = true
+description = "Filesystem-based in-memory persistence for SONARE"
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories = ["algorithms", "cryptography", "science", "no-std"]
+readme.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+exclude = [".github"]
+
+[dependencies]
+amplify.workspace = true
+strict_encoding.workspace = true
+strict_types = { workspace = true, optional = true }
+ultrasonic.workspace = true
+sonare = { version = "0.12.0-alpha.1", path = ".." }
+serde = { workspace = true, optional = true }
+
+[features]
+default = ["std"]
+all = ["std"]
+
+std = []

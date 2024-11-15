@@ -21,10 +21,17 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-mod stash;
-mod state;
-mod trace;
+use ultrasonic::{Memory, StateData};
 
-pub use stash::{Stash, StashProvider};
-pub use state::{State, StateProvider};
-pub use trace::{Trace, TraceProvider};
+pub struct State<S: StateProvider> {
+    provider: S,
+}
+
+impl<S: StateProvider> State<S> {
+    pub fn new(provider: S) -> Self { State { provider } }
+}
+
+pub trait StateProvider: Memory {
+    // fn append_only(&self, ty: AppndStateType) -> Option<StateData>;
+    // fn destructivle(&self, ty: DestrStateType) -> Option<StateData>;
+}

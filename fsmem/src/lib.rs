@@ -21,10 +21,20 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-mod stash;
-mod state;
-mod trace;
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![cfg_attr(not(feature = "std"), no_std)]
 
-pub use stash::{Stash, StashProvider};
-pub use state::{State, StateProvider};
-pub use trace::{Trace, TraceProvider};
+extern crate alloc;
+
+#[macro_use]
+extern crate amplify;
+#[macro_use]
+extern crate strict_encoding;
+
+#[cfg(feature = "serde")]
+#[macro_use]
+extern crate serde;
+
+mod state;
+
+pub use state::State;

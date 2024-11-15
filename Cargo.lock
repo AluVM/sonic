@@ -4,9 +4,9 @@ version = 3
 
 [[package]]
 name = "aluvm"
-version = "0.12.0-beta.1"
+version = "0.12.0-beta.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2505dfdc1b6c3455b65b212c50a005ebd6c1bfb057e0536de33172620c6e0635"
+checksum = "4e85ff57b655106477dbd8f8786b3a7a156d66813a39c4918be8f14dbfa7e865"
 dependencies = [
  "amplify",
  "ascii-armor",
@@ -140,9 +140,9 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "cc"
-version = "1.1.34"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67b9470d453346108f93a59222a9a1a5724db32d0a4727b7ab7ace4b4d822dc9"
+checksum = "fd9de9f2205d5ef3fd67e685b0df337994ddd4495e2a28d185500d0e1edfea47"
 dependencies = [
  "shlex",
 ]
@@ -168,9 +168,9 @@ dependencies = [
 
 [[package]]
 name = "commit_verify"
-version = "0.12.0-alpha.2"
+version = "0.12.0-alpha.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e11148a1671ba7da121a145acf4474ae8712e09865d8cf569ac0a496c01e1118"
+checksum = "545fb0e0fedd69e72869d3b2dde6f96af63a38f70f62f148bef2672bef5d32bd"
 dependencies = [
  "amplify",
  "commit_encoding_derive",
@@ -194,9 +194,9 @@ dependencies = [
 
 [[package]]
 name = "cpufeatures"
-version = "0.2.14"
+version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "608697df725056feaccfa42cffdaeeec3fccc4ffc38358ecd19b243e716a78e0"
+checksum = "0ca741a962e1b0bff6d724a1a0958b686406e853bb14061f218562e1896f95e6"
 dependencies = [
  "libc",
 ]
@@ -252,9 +252,9 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.15.0"
+version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e087f84d4f86bf4b218b927129862374b72199ae7d8657835f1e89000eea4fb"
+checksum = "3a9bfc1af68b1726ea47d3d5109de126281def866b33970e10fbab11b5dafab3"
 
 [[package]]
 name = "heck"
@@ -290,9 +290,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.161"
+version = "0.2.162"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e9489c2807c139ffd9c1794f4af0ebe86a828db53ecdc7fea2111d0fed085d1"
+checksum = "18d287de67fe55fd7e1581fe933d965a5a9477b38e949cfa9f8574ef01506398"
 
 [[package]]
 name = "log"
@@ -423,18 +423,18 @@ checksum = "e1cf6437eb19a8f4a6cc0f7dca544973b0b78843adbfeb3683d1a94a0024a294"
 
 [[package]]
 name = "serde"
-version = "1.0.214"
+version = "1.0.215"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f55c3193aca71c12ad7890f1785d2b73e1b9f63a0bbc353c08ef26fe03fc56b5"
+checksum = "6513c1ad0b11a9376da888e3e0baa0077f1aed55c17f50e7b2397136129fb88f"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.214"
+version = "1.0.215"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de523f781f095e28fa605cdce0f8307e451cc0fd14e2eb4cd2e98a355b147766"
+checksum = "ad1e866f866923f252f05c889987993144fb74e722403468a4ebd70c3cd756c0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -503,30 +503,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
-name = "single_use_seals"
-version = "0.12.0-alpha.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14aa388896f4aac3cb63580dee1d5e46cca95e2a99c49eb8e2175ae874add65f"
-dependencies = [
- "amplify_derive",
-]
-
-[[package]]
 name = "sonare"
-version = "0.12.0-nightly"
+version = "0.12.0-alpha.1"
 dependencies = [
- "aluvm",
  "amplify",
  "baid64",
  "commit_verify",
  "getrandom",
  "rand",
  "serde",
- "single_use_seals",
  "strict_encoding",
  "strict_types",
+ "ultrasonic",
  "wasm-bindgen",
  "wasm-bindgen-test",
+]
+
+[[package]]
+name = "sonare-fsmem"
+version = "0.12.0-alpha.1"
+dependencies = [
+ "amplify",
+ "serde",
+ "sonare",
+ "strict_encoding",
+ "strict_types",
+ "ultrasonic",
 ]
 
 [[package]]
@@ -608,18 +610,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.67"
+version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b3c6efbfc763e64eb85c11c25320f0737cb7364c4b6336db90aa9ebe27a0bbd"
+checksum = "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.67"
+version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b607164372e89797d78b8e23a6d67d5d1038c1c65efd52e1389ef8b77caba2a6"
+checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -665,6 +667,22 @@ name = "typenum"
 version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
+
+[[package]]
+name = "ultrasonic"
+version = "0.12.0-beta.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5112e0be85df798ca0739b6e6bbf5308895e4772502e6d02b6f32bbbf012c6bd"
+dependencies = [
+ "amplify",
+ "commit_verify",
+ "getrandom",
+ "serde",
+ "strict_encoding",
+ "strict_types",
+ "wasm-bindgen",
+ "zk-aluvm",
+]
 
 [[package]]
 name = "unicode-ident"
@@ -923,4 +941,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.87",
+]
+
+[[package]]
+name = "zk-aluvm"
+version = "0.12.0-beta.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "491366e2631e4b1a5eb6004f87b3fd4428c7f0eabb97d4d88df74c364728bdd5"
+dependencies = [
+ "aluvm",
+ "amplify",
+ "getrandom",
+ "serde",
+ "strict_encoding",
+ "strict_types",
+ "wasm-bindgen",
 ]
