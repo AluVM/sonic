@@ -37,4 +37,4 @@ extern crate serde;
 
 mod state;
 
-pub use state::State;
+pub use state::MemState;

@@ -1,8 +1,8 @@
 [package]
-name = "sonare-fsmem"
+name = "sonare-inmem"
 version.workspace = true
 authors.workspace = true
-description = "Filesystem-based in-memory persistence for SONARE"
+description = "In-memory persistence for SONARE"
 repository.workspace = true
 homepage.workspace = true
 keywords.workspace = true

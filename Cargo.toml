@@ -1,6 +1,6 @@
 [workspace]
-members = [".", "fsmem"]
-default-members = [".", "fsmem"]
+members = [".", "inmem"]
+default-members = [".", "inmem"]
 
 [workspace.package]
 version = "0.12.0-alpha.1"
@@ -17,6 +17,7 @@ rust-version = "1.77.0" # Due to `rustfix`
 amplify = "~4.8.0"
 strict_encoding = "~2.8.0"
 strict_types = "~2.8.0"
+aluvm = "0.12.0-beta.2"
 ultrasonic = "0.12.0-beta.1"
 serde = { version = "1", features = ["derive"] }
 
@@ -42,8 +43,9 @@ name = "sonare"
 amplify.workspace = true
 baid64 = "0.3.0"
 strict_encoding.workspace = true
-strict_types = { workspace = true, optional = true }
+strict_types.workspace = true
 commit_verify = "0.12.0-alpha.3"
+aluvm.workspace = true
 ultrasonic.workspace = true
 serde = { workspace = true, optional = true }
 

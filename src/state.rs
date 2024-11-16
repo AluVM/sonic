@@ -21,13 +21,19 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use alloc::collections::BTreeMap;
+use aluvm::LibSite;
+use strict_types::StrictVal;
 
-use ultrasonic::{CellAddr, StateCell, StateData};
+pub type StateTy = u128; // TODO: Make it equal to the internal type in used field element
 
-pub struct State {
-    pub append_only: BTreeMap<CellAddr, StateData>,
-    pub destructible: BTreeMap<CellAddr, StateCell>,
+pub struct StructData {
+    pub ty: StateTy,
+    /// Transformed and typefied value extracted from [`ultrasonic::StatData`] by an ApiAdaptor.
+    pub value: StrictVal,
 }
 
-impl State {}
+pub struct DataCell {
+    pub data: StructData,
+    pub seal: u128, // TODO: Use proper type for the seal
+    pub lock: Option<LibSite>,
+}
