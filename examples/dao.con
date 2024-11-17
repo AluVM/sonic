@@ -25,18 +25,31 @@ data Vote: contra | pro
 data Voting: title String,
              text Text
 
+data CastVote: voteId VoteId, partyId PartyId, vote Vote
+
 lock Signer: [U8 ^ 32]
     verify: preimage [U8 ^ 32]
-        hash preimage =?= $ !! invalidPreimage
+        sha256 preimage =?= $ !! invalidPreimage
 
 @issuer(indsc.org)
 contract DAO
-    var parties: { PartyId -> Party }
-
-    var votings: { VoteId -> Voting }
-    var votes: { VoteId -> { PartyId -> Vote } }
-
+    var parties: { @verifiable PartyId -> @associated Party }
+    var votings: { @verifiable VoteId -> @associated Voting }
+    var votes: { @verifiable CastVote }
+    
     var signers: { Signer -> PartyId }
+
+    calc votingCount: () -> U64
+        count $.votings
+    
+    calc totalVotes: vote_id VoteId -> U64
+        count($.votes |> (key, voting) -> key =?= vote_id)
+
+    calc proVotes: vote_id VoteId -> U64
+        count($.votes |> (key, voting) -> key =?= vote_id \/ voting =?= pro)
+
+    calc conterVotes: vote_id VoteId -> U64
+        count($.votes |> (key, voting) -> key =?= vote_id \/ voting =?= counter)
 
     op setup: () -> parties, signers
 

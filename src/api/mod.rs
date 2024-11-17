@@ -25,9 +25,10 @@ mod api;
 pub mod embedded;
 pub mod alu;
 
-pub use api::{Api, ApiId, ApiVm, MethodName, StateApi, StateArithm, StateName};
+pub use api::{Api, ApiId, ApiVm, AppendApi, CollectionType, DestructibleApi, MethodName, StateArithm, StateName};
 
-pub enum ApiVmType {
+#[repr(u8)]
+pub enum VmType {
     Embedded,
     AluVM,
 }

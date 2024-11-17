@@ -39,6 +39,9 @@ exclude = [".github"]
 [lib]
 name = "sonare"
 
+[[example]]
+name = "dao"
+
 [dependencies]
 amplify.workspace = true
 baid64 = "0.4.0"
@@ -74,4 +77,5 @@ wasm-bindgen-test = "0.3"
 features = ["all"]
 
 [patch.crates-io]
+commit_verify = { git = "https://github.com/LNP-BP/client_side_validation", branch = "v0.12" }
 ultrasonic = { git = "https://github.com/AluVM/ultrasonic" }

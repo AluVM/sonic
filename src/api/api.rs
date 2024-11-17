@@ -35,11 +35,12 @@
 
 use amplify::confinement::{TinyOrdMap, TinyString};
 use amplify::Bytes32;
-use strict_encoding::VariantName;
+use strict_encoding::{TypeName, VariantName};
 use strict_types::SemId;
-use ultrasonic::{CallId, ContractId, Ffv};
+use ultrasonic::{CallId, CodexId};
 
-use super::ApiVmType;
+use super::VmType;
+use crate::contract::Ffv;
 use crate::state::StructData;
 
 pub type StateName = VariantName;
@@ -49,29 +50,36 @@ pub type ApiId = Bytes32;
 
 /// API is an interface implementation.
 ///
-/// API should works without requiring runtime to have corresponding interfaces; it should provide
-/// all necessary data even if they are duplicated from the interfaces. Basically one may think of
-/// API as a compiled interface hierarchy applied to a specific contract.
+/// API should work without requiring runtime to have corresponding interfaces; it should provide
+/// all necessary data. Basically one may think of API as a compiled interface hierarchy applied to
+/// a specific codex.
 ///
 /// API doesn't commit to an interface ID, since it can match multiple interfaces in the interface
 /// hierarchy.
 pub struct Api<Vm: ApiVm> {
     pub version: Ffv,
-    pub contract_id: ContractId,
+    pub codex_id: CodexId,
+    /// API name. Each codex must have one (and only one) default
+    pub name: Option<TypeName>,
 
     // TODO: Add developer etc.
     /// Virtual machine used by `state` and `readers`.
     ///
     /// NB: `verifiers` always use VM type defined by the contract itself (currently zk-AluVM).
-    pub vm: ApiVmType,
+    // TODO: Ensure this is equal to Vm::TYPE
+    pub vm: VmType,
 
-    /// State API defines how specific state types (both append-only and destructible) are
-    /// constructed out of (and converted into) UltraSONIC memory cells.
-    pub state: TinyOrdMap<StateName, StateApi<Vm>>,
+    /// State API defines how structured contract state is constructed out of (and converted into)
+    /// UltraSONIC immutable memory cells.
+    pub append_only: TinyOrdMap<StateName, AppendApi<Vm>>,
+
+    /// State API defines how structured contract state is constructed out of (and converted into)
+    /// UltraSONIC destructible memory cells.
+    pub destructible: TinyOrdMap<StateName, DestructibleApi<Vm>>,
 
     /// Readers have access to the converted `state` and can construct a derived state out of it.
     ///
-    /// The typical example when readers are used is to sum individual asset issues and compute the
+    /// The typical examples when readers are used is to sum individual asset issues and compute the
     /// number of totally issued assets.
     pub readers: TinyOrdMap<MethodName, Vm::ReaderSite>,
 
@@ -86,34 +94,52 @@ pub struct Api<Vm: ApiVm> {
     pub errors: TinyOrdMap<u128, TinyString>,
 }
 
-pub struct StateApi<Vm: ApiVm> {
+pub enum CollectionType {
+    Single(SemId),
+    List(SemId),
+    Set(SemId),
+    Map { key: SemId, val: SemId },
+}
+
+pub struct AppendApi<Vm: ApiVm> {
+    pub published: bool,
+
+    pub collection: CollectionType,
+
+    /// Procedures which convert a state made of finite field elements [`StateData`] into a
+    /// structured type [`StructData`].
+    pub adaptor: Vm::AdaptorSite,
+
+    /// Procedures which convert structured type [`StructData`] into a state made of finite field
+    /// elements [`StateData`].
+    pub builder: Vm::AdaptorSite,
+}
+
+pub struct DestructibleApi<Vm: ApiVm> {
     pub sem_id: SemId,
 
     /// State arithmetics engine used in constructing new contract operations.
     pub arithmetics: Vm::Arithm,
 
-    /// Procedures which convert structured type [`StructData`] into a state made of finite field
-    /// elements [`StateData`].
-    pub adaptor: Vm::AdaptorSite,
-
     /// Procedures which convert a state made of finite field elements [`StateData`] into a
     /// structured type [`StructData`].
+    pub adaptor: Vm::AdaptorSite,
+
+    /// Procedures which convert structured type [`StructData`] into a state made of finite field
+    /// elements [`StateData`].
     pub builder: Vm::AdaptorSite,
 }
 
-pub trait CallSite {}
-impl<T> CallSite for T {}
-
 pub trait ApiVm {
-    const TYPE: ApiVmType;
+    const TYPE: VmType;
     type Arithm: StateArithm;
-    type ReaderSite: CallSite;
-    type AdaptorSite: CallSite;
+    type ReaderSite;
+    type AdaptorSite;
 }
 
 // TODO: Use Result's instead of Option
 pub trait StateArithm {
-    type Site: CallSite;
+    type Site;
 
     /// Procedure which converts [`StructData`] corresponding to this type into a weight in range
     /// `0..256` representing how much this specific state fulfills certain state requirement.

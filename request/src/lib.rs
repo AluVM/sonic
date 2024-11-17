@@ -26,6 +26,10 @@
 
 //! _Request_ (or _transaction request_) is a specification on constructing a transaction for a
 //! SONARE contract.
+//!
+//! # URL Representation
+//!
+//! `contract:[//USER@NODE:PORT/]CONTRACT_ID[/API][/METHOD?ARGS]`
 
 mod data;
 

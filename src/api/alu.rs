@@ -23,11 +23,11 @@
 
 use aluvm::LibSite;
 
-use super::{ApiVm, ApiVmType, StateArithm};
+use super::{ApiVm, StateArithm, VmType};
 use crate::state::StructData;
 
 impl ApiVm for aluvm::Vm {
-    const TYPE: ApiVmType = ApiVmType::AluVM;
+    const TYPE: VmType = VmType::AluVM;
     type Arithm = AluVMArithm;
     type ReaderSite = LibSite;
     type AdaptorSite = LibSite;

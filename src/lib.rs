@@ -22,7 +22,13 @@
 // the License.
 
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
-#![no_std]
+
+// TODO: Activate once StrictEncoding will be no_std
+// #![no_std]
+
+#[macro_use]
+extern crate core;
+extern crate alloc;
 
 #[macro_use]
 extern crate amplify;
@@ -38,3 +44,4 @@ extern crate serde;
 pub mod api;
 pub mod persistence;
 pub mod state;
+pub mod contract;

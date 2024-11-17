@@ -21,10 +21,13 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+mod stock;
 mod stash;
 mod state;
 mod trace;
+mod repo;
 
+pub use repo::{Repo, RepoProvider};
 pub use stash::{Stash, StashProvider};
 pub use state::{State, StateProvider};
 pub use trace::{Trace, TraceProvider};

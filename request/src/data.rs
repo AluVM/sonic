@@ -22,8 +22,9 @@
 // the License.
 
 use amplify::confinement::{TinyString, TinyVec};
+use sonare::contract::ProofOfPubl;
 use strict_types::StrictVal;
-use ultrasonic::{ContractId, ProofOfPubl};
+use ultrasonic::ContractId;
 
 pub trait SonareProtocol {
     const URL_SCHEME: &'static str;

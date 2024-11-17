@@ -21,34 +21,41 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use super::{ApiVm, ApiVmType, StateArithm, StateName};
+use strict_types::{SemId, StrictVal};
+
+use super::{ApiVm, StateArithm, StateName, VmType};
 use crate::state::StructData;
 
 pub struct EmbeddedProc;
 
+pub enum Source {
+    FieldElements,
+    AssociatedData,
+}
+
 impl ApiVm for EmbeddedProc {
-    const TYPE: ApiVmType = ApiVmType::Embedded;
+    const TYPE: VmType = VmType::Embedded;
     type Arithm = EmbeddedArithm;
     type ReaderSite = EmbeddedReaders;
     type AdaptorSite = EmbeddedAdaptors;
 }
 
 pub enum EmbeddedReaders {
+    Const(StrictVal),
+    Count(StateName),
     Sum(StateName),
+    /// Count values which strict serialization is prefixed with a strict serialized argument
+    CountPrefixed(StateName, SemId),
 }
 
 pub enum EmbeddedAdaptors {
-    Copy,
+    BytesFrom(Source),
+    Map { key: Source, val: Source },
 }
 
-pub enum StateArithmType {
+pub enum EmbeddedArithm {
     Fungible,
     NonFungible,
-}
-
-pub struct EmbeddedArithm {
-    pub ty: StateArithmType,
-    pub acc: StructData,
 }
 
 impl StateArithm for EmbeddedArithm {

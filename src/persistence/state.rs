@@ -33,5 +33,5 @@ impl<S: StateProvider> State<S> {
 
 pub trait StateProvider: Memory {
     // fn append_only(&self, ty: AppndStateType) -> Option<StateData>;
-    // fn destructivle(&self, ty: DestrStateType) -> Option<StateData>;
+    // fn destructible(&self, ty: DestrStateType) -> Option<StateData>;
 }
