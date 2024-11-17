@@ -1,0 +1,45 @@
+{--
+A smart contract written for SONIC runtime environment
+SONIC stands for "State machine with ownership notation for indeterministic contracts"
+
+A contract calls are URIs and URLS, which may have multiple forms (depending on the backend).
+Here are the examples for the `castVote` call:
+- Using SONARE runtime:
+  `contract:DAO.indsc.org/castVote?voting=id&with=(id,preimage)&next=(id,hash)&vote=pro`
+- Using a server providing SONIC API:
+  `contract://any.sonicapi.node/DAO.indsc.org/castVote?voting=id&with=(id,preimage)&next=(id,hash)&vote=pro`
+- Using a server providing HTTP REST SONIC API:
+  `https://contract@any.sonicapi.node/DAO.indsc.org/castVote?voting=id&with=(id,preimage)&next=(id,hash)&vote=pro`
+- Using a websocket connection:
+  `wws://contract@any.sonicapi.node/DAO.indsc.org/castVote?voting=id&with=(id,preimage)&next=(id,hash)&vote=pro`
+- Using a Storm node server which contains SONARE runtime:
+  `storm://any.storm.node/contract:DAO.indsc.org/castVote?voting=id&with=(id,preimage)&next=(id,hash)&vote=pro`
+--}
+
+data PartyId: U64
+data Party: name String,
+            identity String
+
+data VoteId: U64
+data Vote: contra | pro
+data Voting: title String,
+             text Text
+
+lock Signer: [U8 ^ 32]
+    verify: preimage [U8 ^ 32]
+        hash preimage =?= $ !! invalidPreimage
+
+@issuer(indsc.org)
+contract DAO
+    var parties: { PartyId -> Party }
+
+    var votings: { VoteId -> Voting }
+    var votes: { VoteId -> { PartyId -> Vote } }
+
+    var signers: { Signer -> PartyId }
+
+    op setup: () -> parties, signers
+
+    op proposal: () -> @new @oneOf votings
+
+    op castVote: with @oneOf signers -> @setUnique(votes[with]) vote Vote, next @oneOf signers
