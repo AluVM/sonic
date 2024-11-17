@@ -21,17 +21,24 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use ultrasonic::Memory;
+use amplify::confinement::{TinyString, TinyVec};
+use strict_types::StrictVal;
+use ultrasonic::{ContractId, ProofOfPubl};
 
-pub struct State<S: StateProvider> {
-    provider: S,
+pub trait SonareProtocol {
+    const URL_SCHEME: &'static str;
+    type PoP: ProofOfPubl;
 }
 
-impl<S: StateProvider> State<S> {
-    pub fn new(provider: S) -> Self { State { provider } }
+pub struct Request<S: SonareProtocol> {
+    pub pop: S::PoP,
+    pub contract_id: Option<ContractId>,
+    pub interface: Option<TinyString>,
+    pub method: Option<TinyString>,
+    pub args: TinyVec<RequestArg>,
 }
 
-pub trait StateProvider: Memory {
-    // fn append_only(&self, ty: AppndStateType) -> Option<StateData>;
-    // fn destructivle(&self, ty: DestrStateType) -> Option<StateData>;
+pub struct RequestArg {
+    pub name: TinyString,
+    pub value: StrictVal,
 }

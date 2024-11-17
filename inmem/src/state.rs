@@ -31,11 +31,9 @@
 //! persistence solution adapted for enterprise needs.
 
 use amplify::confinement::{SmallOrdMap, SmallVec, TinyOrdMap};
-use sonare::{StateTy, StructData};
+use sonare::api::ApiId;
+use sonare::state::{StateTy, StructData};
 use ultrasonic::{CellAddr, StateCell, StateData};
-
-// TODO: Remove temporary type
-pub type IfaceId = u128;
 
 /// The state as it is defined in the contract. Accessed during the validation.
 pub struct RawState {
@@ -65,7 +63,7 @@ pub struct MemState {
     ///
     /// When more API adaptors are added, these values are either lazy computed - or computed in a
     /// background task.
-    pub converted: TinyOrdMap<IfaceId, ConvertedState>,
+    pub converted: TinyOrdMap<ApiId, ConvertedState>,
 
     /// Index for resolving state types into values.
     pub index: StateIndex,

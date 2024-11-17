@@ -37,6 +37,4 @@ extern crate serde;
 
 pub mod api;
 pub mod persistence;
-mod state;
-
-pub use state::{StructData, StateTy, DataCell};
+pub mod state;

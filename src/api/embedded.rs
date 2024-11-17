@@ -21,17 +21,44 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use ultrasonic::Memory;
+use super::{ApiVm, ApiVmType, StateArithm, StateName};
+use crate::state::StructData;
 
-pub struct State<S: StateProvider> {
-    provider: S,
+pub struct EmbeddedProc;
+
+impl ApiVm for EmbeddedProc {
+    const TYPE: ApiVmType = ApiVmType::Embedded;
+    type Arithm = EmbeddedArithm;
+    type ReaderSite = EmbeddedReaders;
+    type AdaptorSite = EmbeddedAdaptors;
 }
 
-impl<S: StateProvider> State<S> {
-    pub fn new(provider: S) -> Self { State { provider } }
+pub enum EmbeddedReaders {
+    Sum(StateName),
 }
 
-pub trait StateProvider: Memory {
-    // fn append_only(&self, ty: AppndStateType) -> Option<StateData>;
-    // fn destructivle(&self, ty: DestrStateType) -> Option<StateData>;
+pub enum EmbeddedAdaptors {
+    Copy,
+}
+
+pub enum StateArithmType {
+    Fungible,
+    NonFungible,
+}
+
+pub struct EmbeddedArithm {
+    pub ty: StateArithmType,
+    pub acc: StructData,
+}
+
+impl StateArithm for EmbeddedArithm {
+    type Site = EmbeddedArithm;
+
+    fn measure(&self, state: StructData) -> Option<u8> { todo!() }
+
+    fn accumulate(&mut self, state: StructData) -> Option<()> { todo!() }
+
+    fn lessen(&mut self, state: StructData) -> Option<()> { todo!() }
+
+    fn diff(&self) -> Option<StructData> { todo!() }
 }

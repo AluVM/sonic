@@ -9,8 +9,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e85ff57b655106477dbd8f8786b3a7a156d66813a39c4918be8f14dbfa7e865"
 dependencies = [
  "amplify",
- "ascii-armor",
- "baid64",
+ "ascii-armor 0.8.0",
+ "baid64 0.3.0",
  "commit_verify",
  "getrandom",
  "paste",
@@ -84,7 +84,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ca6f0044fabe840af8db8de7f3bff0c85af2a5c2a173780248c1716e86f5cc1"
 dependencies = [
  "amplify",
- "baid64",
+ "baid64 0.3.0",
+ "base85",
+ "sha2",
+ "strict_encoding",
+]
+
+[[package]]
+name = "ascii-armor"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0269eb842ec952b027df0fc33184b6a0dea5ea473160b36992274eb53758461e"
+dependencies = [
+ "amplify",
+ "baid64 0.4.0",
  "base85",
  "sha2",
  "strict_encoding",
@@ -95,6 +108,18 @@ name = "baid64"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "30acc16368c00c4d3ce4526d0c1528e22d75814534b3dba97e871aa5f8395697"
+dependencies = [
+ "amplify",
+ "base64",
+ "mnemonic",
+ "sha2",
+]
+
+[[package]]
+name = "baid64"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4fbb63215df31f5d0c0db9f820bd298b2480a1e6f466b75af20a8c634e10d8e2"
 dependencies = [
  "amplify",
  "base64",
@@ -290,9 +315,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.162"
+version = "0.2.164"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18d287de67fe55fd7e1581fe933d965a5a9477b38e949cfa9f8574ef01506398"
+checksum = "433bfe06b8c75da9b2e3fbea6e5329ff87748f0b144ef75306e674c3f6f7c13f"
 
 [[package]]
 name = "log"
@@ -443,9 +468,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.132"
+version = "1.0.133"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d726bfaff4b320266d395898905d0eba0345aae23b54aee3a737e260fd46db03"
+checksum = "c7fceb2473b9166b2294ef05efcb65a3db80803f0b03ef86a5fc88a2b85ee377"
 dependencies = [
  "itoa",
  "memchr",
@@ -508,7 +533,7 @@ version = "0.12.0-alpha.1"
 dependencies = [
  "aluvm",
  "amplify",
- "baid64",
+ "baid64 0.4.0",
  "commit_verify",
  "getrandom",
  "rand",
@@ -533,10 +558,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "sonare-request"
+version = "0.12.0-alpha.1"
+dependencies = [
+ "amplify",
+ "serde",
+ "sonare",
+ "strict_encoding",
+ "strict_types",
+ "ultrasonic",
+]
+
+[[package]]
 name = "strict_encoding"
-version = "2.8.0"
+version = "2.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b71b5ba13c289a8b6f0a3ed4abebb92ce2d57b805b1db26e543b4ac26237870"
+checksum = "8fd36b71bb44ca146be0b2185ed6c6deb3684cc0d5c3a94284e97fe7fa6a642f"
 dependencies = [
  "amplify",
  "serde",
@@ -559,13 +596,13 @@ dependencies = [
 
 [[package]]
 name = "strict_types"
-version = "2.8.0"
+version = "2.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef2dcdbb3f239b310f3d07e81e8f4da3b5ffe17da980a360ca029e9bc263f049"
+checksum = "3e208d1bd29a0f70d7ee90a91d76446b8bb7b1b8212d06e031e396d52e2fe891"
 dependencies = [
  "amplify",
- "ascii-armor",
- "baid64",
+ "ascii-armor 0.9.0",
+ "baid64 0.4.0",
  "indexmap",
  "serde",
  "serde_json",
@@ -672,10 +709,10 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 [[package]]
 name = "ultrasonic"
 version = "0.12.0-beta.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5112e0be85df798ca0739b6e6bbf5308895e4772502e6d02b6f32bbbf012c6bd"
+source = "git+https://github.com/AluVM/ultrasonic#c83cebb576d9a6fb29cf6d3046b76be171e8ecea"
 dependencies = [
  "amplify",
+ "baid64 0.3.0",
  "commit_verify",
  "getrandom",
  "serde",

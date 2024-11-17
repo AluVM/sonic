@@ -21,17 +21,12 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use ultrasonic::Memory;
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![cfg_attr(not(feature = "std"), no_std)]
 
-pub struct State<S: StateProvider> {
-    provider: S,
-}
+//! _Request_ (or _transaction request_) is a specification on constructing a transaction for a
+//! SONARE contract.
 
-impl<S: StateProvider> State<S> {
-    pub fn new(provider: S) -> Self { State { provider } }
-}
+mod data;
 
-pub trait StateProvider: Memory {
-    // fn append_only(&self, ty: AppndStateType) -> Option<StateData>;
-    // fn destructivle(&self, ty: DestrStateType) -> Option<StateData>;
-}
+extern crate alloc;

@@ -53,7 +53,7 @@ impl<H: StashProvider> Stash<H> {
         struct Iter<'provider, H: StashProvider, I: Iterator<Item = Opid>> {
             opids: I,
             provider: &'provider H,
-        };
+        }
         impl<'provider, H: StashProvider, I: Iterator<Item = Opid>> Iterator for Iter<'provider, H, I> {
             type Item = &'provider Operation;
             fn next(&mut self) -> Option<Self::Item> {

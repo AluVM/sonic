@@ -21,17 +21,33 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use ultrasonic::Memory;
+use aluvm::LibSite;
 
-pub struct State<S: StateProvider> {
-    provider: S,
+use super::{ApiVm, ApiVmType, StateArithm};
+use crate::state::StructData;
+
+impl ApiVm for aluvm::Vm {
+    const TYPE: ApiVmType = ApiVmType::AluVM;
+    type Arithm = AluVMArithm;
+    type ReaderSite = LibSite;
+    type AdaptorSite = LibSite;
 }
 
-impl<S: StateProvider> State<S> {
-    pub fn new(provider: S) -> Self { State { provider } }
+pub struct AluVMArithm {
+    pub vm: Option<aluvm::Vm>,
+    pub accumulate: LibSite,
+    pub lessen: LibSite,
+    pub diff: LibSite,
 }
 
-pub trait StateProvider: Memory {
-    // fn append_only(&self, ty: AppndStateType) -> Option<StateData>;
-    // fn destructivle(&self, ty: DestrStateType) -> Option<StateData>;
+impl StateArithm for AluVMArithm {
+    type Site = LibSite;
+
+    fn measure(&self, state: StructData) -> Option<u8> { todo!() }
+
+    fn accumulate(&mut self, state: StructData) -> Option<()> { todo!() }
+
+    fn lessen(&mut self, state: StructData) -> Option<()> { todo!() }
+
+    fn diff(&self) -> Option<StructData> { todo!() }
 }

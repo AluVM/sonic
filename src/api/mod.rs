@@ -21,7 +21,13 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-pub type AppndStateType = u16;
-pub type DestrStateType = u16;
+mod api;
+pub mod embedded;
+pub mod alu;
 
-pub struct Api {}
+pub use api::{Api, ApiId, ApiVm, MethodName, StateApi, StateArithm, StateName};
+
+pub enum ApiVmType {
+    Embedded,
+    AluVM,
+}
