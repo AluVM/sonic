@@ -43,5 +43,4 @@ extern crate serde;
 
 pub mod api;
 pub mod persistence;
-pub mod state;
-pub mod contract;
+pub mod containers;

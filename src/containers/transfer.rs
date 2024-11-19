@@ -21,32 +21,18 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use aluvm::LibSite;
+use aluvm::Lib;
+use amplify::confinement::{MediumVec, SmallOrdSet};
+use strict_types::TypeSystem;
+use ultrasonic::Operation;
 
-use super::{ApiVm, StateArithm, VmType};
-use crate::api::state::StructData;
+use crate::api::Api;
+use crate::containers::ContractPrivate;
 
-impl ApiVm for aluvm::Vm {
-    type Arithm = AluVMArithm;
-    type ReaderSite = LibSite;
-    type AdaptorSite = LibSite;
-
-    fn vm_type(&self) -> VmType { VmType::AluVM }
-}
-
-pub struct AluVMArithm {
-    pub vm: Option<aluvm::Vm>,
-    pub accumulate: LibSite,
-    pub lessen: LibSite,
-    pub diff: LibSite,
-}
-
-impl StateArithm for AluVMArithm {
-    fn measure(&self, state: StructData) -> Option<u8> { todo!() }
-
-    fn accumulate(&mut self, state: StructData) -> Option<()> { todo!() }
-
-    fn lessen(&mut self, state: StructData) -> Option<()> { todo!() }
-
-    fn diff(&self) -> Option<StructData> { todo!() }
+pub struct Transfer {
+    pub contract: ContractPrivate,
+    pub operations: MediumVec<Operation>,
+    pub apis: SmallOrdSet<Api>,
+    pub libs: SmallOrdSet<Lib>,
+    pub types: TypeSystem,
 }

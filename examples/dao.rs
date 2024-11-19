@@ -6,9 +6,9 @@ extern crate strict_types;
 use amplify::confinement::{SmallString, TinyString};
 use sonare::api::embedded::{EmbeddedAdaptors, EmbeddedArithm, EmbeddedProc, EmbeddedReaders, Source};
 use sonare::api::{Api, ApiVm, AppendApi, CollectionType, DestructibleApi};
-use sonare::contract::Ffv;
+use sonare::containers::Ffv;
 use strict_types::stl::std_stl;
-use strict_types::{SemId, SymbolicSys, SystemBuilder, TypeLib, TypeSystem};
+use strict_types::{SemId, SymbolicSys, SystemBuilder, TypeSystem};
 use ultrasonic::Codex;
 
 pub struct PartyId(u64);

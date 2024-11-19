@@ -22,10 +22,13 @@
 // the License.
 
 mod api;
+mod state;
 pub mod embedded;
 pub mod alu;
+pub mod uni;
 
 pub use api::{Api, ApiId, ApiVm, AppendApi, CollectionType, DestructibleApi, MethodName, StateArithm, StateName};
+pub use state::{DataCell, StateTy, StructData};
 
 #[repr(u8)]
 pub enum VmType {

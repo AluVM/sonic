@@ -40,8 +40,9 @@ use strict_types::SemId;
 use ultrasonic::{CallId, CodexId};
 
 use super::VmType;
-use crate::contract::Ffv;
-use crate::state::StructData;
+use crate::api::uni::UniVm;
+use crate::api::StructData;
+use crate::containers::Ffv;
 
 pub type StateName = VariantName;
 pub type MethodName = VariantName;
@@ -56,7 +57,7 @@ pub type ApiId = Bytes32;
 ///
 /// API doesn't commit to an interface ID, since it can match multiple interfaces in the interface
 /// hierarchy.
-pub struct Api<Vm: ApiVm> {
+pub struct Api<Vm: ApiVm = UniVm> {
     pub version: Ffv,
     pub codex_id: CodexId,
     /// API name. Each codex must have one (and only one) default
@@ -131,16 +132,15 @@ pub struct DestructibleApi<Vm: ApiVm> {
 }
 
 pub trait ApiVm {
-    const TYPE: VmType;
     type Arithm: StateArithm;
     type ReaderSite;
     type AdaptorSite;
+
+    fn vm_type(&self) -> VmType;
 }
 
 // TODO: Use Result's instead of Option
 pub trait StateArithm {
-    type Site;
-
     /// Procedure which converts [`StructData`] corresponding to this type into a weight in range
     /// `0..256` representing how much this specific state fulfills certain state requirement.
     ///

@@ -22,7 +22,7 @@
 // the License.
 
 use amplify::confinement::{TinyString, TinyVec};
-use sonare::contract::ProofOfPubl;
+use sonare::containers::contract::ProofOfPubl;
 use strict_types::StrictVal;
 use ultrasonic::ContractId;
 

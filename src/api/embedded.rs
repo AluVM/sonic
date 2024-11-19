@@ -24,7 +24,7 @@
 use strict_types::{SemId, StrictVal};
 
 use super::{ApiVm, StateArithm, StateName, VmType};
-use crate::state::StructData;
+use crate::api::state::StructData;
 
 pub struct EmbeddedProc;
 
@@ -34,10 +34,11 @@ pub enum Source {
 }
 
 impl ApiVm for EmbeddedProc {
-    const TYPE: VmType = VmType::Embedded;
     type Arithm = EmbeddedArithm;
     type ReaderSite = EmbeddedReaders;
     type AdaptorSite = EmbeddedAdaptors;
+
+    fn vm_type(&self) -> VmType { VmType::Embedded }
 }
 
 pub enum EmbeddedReaders {
@@ -59,8 +60,6 @@ pub enum EmbeddedArithm {
 }
 
 impl StateArithm for EmbeddedArithm {
-    type Site = EmbeddedArithm;
-
     fn measure(&self, state: StructData) -> Option<u8> { todo!() }
 
     fn accumulate(&mut self, state: StructData) -> Option<()> { todo!() }

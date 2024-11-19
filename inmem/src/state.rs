@@ -31,8 +31,7 @@
 //! persistence solution adapted for enterprise needs.
 
 use amplify::confinement::{SmallOrdMap, SmallVec, TinyOrdMap};
-use sonare::api::ApiId;
-use sonare::state::{StateTy, StructData};
+use sonare::api::{ApiId, StateTy, StructData};
 use ultrasonic::{CellAddr, StateCell, StateData};
 
 /// The state as it is defined in the contract. Accessed during the validation.
