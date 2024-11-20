@@ -37,16 +37,19 @@ edition.workspace = true
 rust-version.workspace = true
 exclude = [".github"]
 
-[[bin]]
+[lib]
 name = "sonic"
-path = "src/main.rs"
 
 [[example]]
 name = "dao"
 
 [dependencies]
 amplify.workspace = true
+baid64 = "0.4.0"
+strict_encoding.workspace = true
 strict_types.workspace = true
+commit_verify = "0.12.0-alpha.3"
+aluvm.workspace = true
 ultrasonic.workspace = true
 sonic-api.workspace = true
 serde = { workspace = true, optional = true }

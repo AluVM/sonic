@@ -298,9 +298,9 @@ dependencies = [
 
 [[package]]
 name = "itoa"
-version = "1.0.11"
+version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
+checksum = "7a73e9fe3c49d7afb2ace819fa181a287ce54a0983eda4e0eb05c22f82ffe534"
 
 [[package]]
 name = "js-sys"
@@ -529,11 +529,15 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 name = "sonic"
 version = "0.12.0-alpha.1"
 dependencies = [
+ "aluvm",
  "amplify",
+ "baid64 0.4.0",
+ "commit_verify",
  "getrandom",
  "rand",
  "serde",
  "sonic-api",
+ "strict_encoding",
  "strict_types",
  "ultrasonic",
  "wasm-bindgen",
@@ -709,7 +713,7 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 [[package]]
 name = "ultrasonic"
 version = "0.12.0-beta.1"
-source = "git+https://github.com/AluVM/ultrasonic#7d6139900d6cae16772b42511442eccb74b7a7cd"
+source = "git+https://github.com/AluVM/ultrasonic#f90a96ecc18bceae95975e182c3eaabbb97e0daf"
 dependencies = [
  "amplify",
  "baid64 0.4.0",

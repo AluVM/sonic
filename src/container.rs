@@ -21,41 +21,31 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+use aluvm::Lib;
+use amplify::confinement::{LargeVec, SmallOrdSet};
+use sonicapi::Api;
+use strict_encoding::TypeName;
+use strict_types::TypeSystem;
+use ultrasonic::{Codex, Operation, ProofOfPubl};
 
-// TODO: Activate once StrictEncoding will be no_std
-// #![no_std]
+use crate::Contract;
 
-#[macro_use]
-extern crate core;
-extern crate alloc;
+pub type CodexContainer = Container<()>;
+pub type ContractContainer<PoP> = Container<ContractExt<PoP>>;
 
-#[macro_use]
-extern crate amplify;
-#[macro_use]
-extern crate strict_types;
-#[macro_use]
-extern crate commit_verify;
+pub struct Container<Ext> {
+    pub codex: Codex,
+    pub apis: SmallOrdSet<Api>,
+    pub libs: SmallOrdSet<Lib>,
+    pub types: TypeSystem,
+    pub ext: Ext,
+}
 
-#[cfg(feature = "serde")]
-#[macro_use]
-extern crate serde;
+impl Container<()> {
+    pub fn issue<PoP: ProofOfPubl>(&self, api: Option<TypeName>) -> Contract<PoP> { todo!() }
+}
 
-mod api;
-mod state;
-pub mod embedded;
-pub mod alu;
-
-pub use api::{
-    Api, ApiId, ApiInner, ApiVm, AppendApi, CollectionType, DestructibleApi, MethodName, StateArithm, StateName,
-};
-pub use state::{DataCell, StateTy, StructData};
-
-pub const LIB_NAME_SONIC: &str = "SONIC";
-
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-#[repr(u8)]
-pub enum VmType {
-    Embedded = 1,
-    AluVM = 2,
+pub struct ContractExt<PoP: ProofOfPubl> {
+    pub contract: Contract<PoP>,
+    pub operations: LargeVec<Operation>,
 }

@@ -21,4 +21,29 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-fn main() { todo!() }
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+
+// TODO: Activate once StrictEncoding will be no_std
+// #![no_std]
+
+#[macro_use]
+extern crate core;
+extern crate alloc;
+
+#[macro_use]
+extern crate amplify;
+#[macro_use]
+extern crate strict_types;
+#[macro_use]
+extern crate commit_verify;
+
+#[cfg(feature = "serde")]
+#[macro_use]
+extern crate serde;
+
+mod contract;
+mod container;
+
+pub use container::{CodexContainer, Container, ContractContainer, ContractExt};
+pub use contract::{Contract, ContractMeta, ContractName, ContractPrivate, Ffv};
+pub use sonicapi::*;

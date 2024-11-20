@@ -14,7 +14,7 @@ rust-version.workspace = true
 exclude = [".github"]
 
 [lib]
-name = "sonic"
+name = "sonicapi"
 
 [dependencies]
 amplify.workspace = true
