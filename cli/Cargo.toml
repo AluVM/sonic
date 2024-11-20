@@ -1,0 +1,17 @@
+[package]
+name = "sonare-cli"
+description = "SONARE command-line interface"
+categories = ["cryptography", "science", "command-line-interface"]
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+readme.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+sonare = { version = "0.12.0-alpha.1", path = ".." }
+clap = { version = "4.5.21", features = ["derive", "env"] }

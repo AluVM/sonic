@@ -21,25 +21,6 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use amplify::confinement::{TinyString, TinyVec};
-use sonare::containers::ProofOfPubl;
-use strict_types::StrictVal;
-use ultrasonic::ContractId;
+mod refs;
 
-pub trait SonareProtocol {
-    const URL_SCHEME: &'static str;
-    type PoP: ProofOfPubl;
-}
-
-pub struct Request<S: SonareProtocol> {
-    pub pop: S::PoP,
-    pub contract_id: Option<ContractId>,
-    pub interface: Option<TinyString>,
-    pub method: Option<TinyString>,
-    pub args: TinyVec<RequestArg>,
-}
-
-pub struct RequestArg {
-    pub name: TinyString,
-    pub value: StrictVal,
-}
+pub use refs::ContractRef;

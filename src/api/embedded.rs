@@ -21,16 +21,25 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use strict_types::{SemId, StrictVal};
+use amplify::confinement::SmallBlob;
+use strict_types::SemId;
 
+use super::state::StructData;
 use super::{ApiVm, StateArithm, StateName, VmType};
-use crate::api::state::StructData;
+use crate::LIB_NAME_SONARE;
 
+#[derive(Clone, Debug)]
 pub struct EmbeddedProc;
 
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONARE, tags = repr, try_from_u8, into_u8)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
+#[repr(u8)]
 pub enum Source {
-    FieldElements,
-    AssociatedData,
+    #[strict_type(dumb)]
+    FieldElements = 1,
+    AssociatedData = 2,
 }
 
 impl ApiVm for EmbeddedProc {
@@ -41,22 +50,46 @@ impl ApiVm for EmbeddedProc {
     fn vm_type(&self) -> VmType { VmType::Embedded }
 }
 
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONARE, tags = custom, dumb = Self::Const(strict_dumb!()))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub enum EmbeddedReaders {
-    Const(StrictVal),
+    #[strict_type(tag = 0)]
+    Const(SmallBlob),
+
+    #[strict_type(tag = 1)]
     Count(StateName),
+
+    #[strict_type(tag = 2)]
     Sum(StateName),
+
     /// Count values which strict serialization is prefixed with a strict serialized argument
+    #[strict_type(tag = 0x10)]
     CountPrefixed(StateName, SemId),
 }
 
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONARE, tags = custom, dumb = Self::BytesFrom(strict_dumb!()))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub enum EmbeddedAdaptors {
+    #[strict_type(tag = 1)]
     BytesFrom(Source),
+
+    #[strict_type(tag = 0x20)]
     Map { key: Source, val: Source },
 }
 
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONARE, tags = repr, try_from_u8, into_u8)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
+#[repr(u8)]
 pub enum EmbeddedArithm {
-    Fungible,
-    NonFungible,
+    #[strict_type(dumb)]
+    NonFungible = 0,
+    Fungible = 1,
 }
 
 impl StateArithm for EmbeddedArithm {

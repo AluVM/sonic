@@ -22,9 +22,11 @@
 // the License.
 
 use aluvm::LibSite;
+use strict_encoding::StrictDumb;
 
+use super::state::StructData;
 use super::{ApiVm, StateArithm, VmType};
-use crate::api::state::StructData;
+use crate::LIB_NAME_SONARE;
 
 impl ApiVm for aluvm::Vm {
     type Arithm = AluVMArithm;
@@ -34,11 +36,28 @@ impl ApiVm for aluvm::Vm {
     fn vm_type(&self) -> VmType { VmType::AluVM }
 }
 
+#[derive(Clone, Debug)]
+#[derive(StrictType, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONARE)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct AluVMArithm {
+    #[strict_type(skip)]
+    #[cfg_attr(feature = "serde", serde(skip))]
     pub vm: Option<aluvm::Vm>,
     pub accumulate: LibSite,
     pub lessen: LibSite,
     pub diff: LibSite,
+}
+
+impl StrictDumb for AluVMArithm {
+    fn strict_dumb() -> Self {
+        Self {
+            vm: None,
+            accumulate: LibSite::strict_dumb(),
+            lessen: LibSite::strict_dumb(),
+            diff: LibSite::strict_dumb(),
+        }
+    }
 }
 
 impl StateArithm for AluVMArithm {

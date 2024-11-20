@@ -21,7 +21,7 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use std::iter;
+use core::iter;
 
 use amplify::confinement::TinyOrdMap;
 use ultrasonic::{CellAddr, Codex, Operation, Opid};

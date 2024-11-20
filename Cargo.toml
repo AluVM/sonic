@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "inmem", "request"]
+members = [".", "cli", "inmem", "request"]
 default-members = [".", "inmem", "request"]
 
 [workspace.package]

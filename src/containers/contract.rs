@@ -26,14 +26,16 @@ use core::fmt::{Debug, Display};
 use amplify::confinement::SmallString;
 use commit_verify::ReservedBytes;
 use strict_encoding::{StrictDecode, StrictDumb, StrictEncode, TypeName};
-use ultrasonic::{Codex, ContractId, Operation, LIB_NAME_ULTRASONIC};
+use ultrasonic::{Codex, ContractId, Operation};
+
+use crate::LIB_NAME_SONARE;
 
 pub trait ProofOfPubl: Copy + Eq + StrictDumb + StrictEncode + StrictDecode + Debug + Display + Into<[u8; 4]> {}
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Display)]
 #[display("~")]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_ULTRASONIC)]
+#[strict_type(lib = LIB_NAME_SONARE)]
 pub struct Private(ReservedBytes<4, 0xFF>);
 impl From<Private> for [u8; 4] {
     fn from(_: Private) -> Self { [0xFF; 4] }
@@ -44,7 +46,7 @@ pub type ContractPrivate = Contract<Private>;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_ULTRASONIC, tags = custom)]
+#[strict_type(lib = LIB_NAME_SONARE, tags = custom)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(untagged))]
 pub enum ContractName {
     #[strict_type(tag = 0, dumb)]
@@ -58,7 +60,7 @@ pub enum ContractName {
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_ULTRASONIC)]
+#[strict_type(lib = LIB_NAME_SONARE)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct ContractMeta<PoP: ProofOfPubl> {
     pub proof_of_publ: PoP,
@@ -76,7 +78,7 @@ pub struct ContractMeta<PoP: ProofOfPubl> {
 #[derive(CommitEncode)]
 #[commit_encode(strategy = strict, id = ContractId)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_ULTRASONIC)]
+#[strict_type(lib = LIB_NAME_SONARE)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct Contract<PoP: ProofOfPubl> {
     pub version: Ffv,
@@ -89,7 +91,7 @@ pub struct Contract<PoP: ProofOfPubl> {
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Default, Debug, Display)]
 #[display("RGB/1.{0}")]
 #[derive(StrictType, StrictEncode)]
-#[strict_type(lib = LIB_NAME_ULTRASONIC)]
+#[strict_type(lib = LIB_NAME_SONARE)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct Ffv(u16);
 

@@ -5,7 +5,7 @@ extern crate strict_types;
 
 use amplify::confinement::{SmallString, TinyString};
 use sonare::api::embedded::{EmbeddedAdaptors, EmbeddedArithm, EmbeddedProc, EmbeddedReaders, Source};
-use sonare::api::{Api, ApiVm, AppendApi, CollectionType, DestructibleApi};
+use sonare::api::{Api, ApiInner, AppendApi, CollectionType, DestructibleApi};
 use sonare::containers::Ffv;
 use strict_types::stl::std_stl;
 use strict_types::{SemId, SymbolicSys, SystemBuilder, TypeSystem};
@@ -87,11 +87,12 @@ fn main() {
         reserved: default!(),
     };
 
-    let api = Api::<EmbeddedProc> {
+    let api = Api::Embedded(ApiInner::<EmbeddedProc> {
         version: Ffv::default(),
         codex_id: codex.codex_id(),
+        api_version: 0,
         name: None,
-        vm: EmbeddedProc::TYPE,
+        developer: tiny_s!("ssi:anonymous"),
         append_only: tiny_bmap! {
             vname!("parties") => AppendApi {
                 published: true,
@@ -138,5 +139,5 @@ fn main() {
             vname!("castVote") => 2,
         },
         errors: Default::default(),
-    };
+    });
 }

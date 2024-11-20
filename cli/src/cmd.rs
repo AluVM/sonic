@@ -21,25 +21,58 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use amplify::confinement::{TinyString, TinyVec};
-use sonare::containers::ProofOfPubl;
-use strict_types::StrictVal;
-use ultrasonic::ContractId;
+use std::path::PathBuf;
 
-pub trait SonareProtocol {
-    const URL_SCHEME: &'static str;
-    type PoP: ProofOfPubl;
-}
+use sonare::util::ContractRef;
 
-pub struct Request<S: SonareProtocol> {
-    pub pop: S::PoP,
-    pub contract_id: Option<ContractId>,
-    pub interface: Option<TinyString>,
-    pub method: Option<TinyString>,
-    pub args: TinyVec<RequestArg>,
-}
+pub enum Command {
+    /// Import kit
+    Import {
+        path: PathBuf,
+    },
 
-pub struct RequestArg {
-    pub name: TinyString,
-    pub value: StrictVal,
+    /// List known objects
+    List,
+
+    /// Issue a new contract
+    Issue {
+        /// Contract information
+        ///
+        /// If not provided, read from the user input.
+        path: Option<PathBuf>,
+    },
+
+    /// Retrieve contract information
+    Info {
+        contract_id: ContractRef,
+    },
+
+    /// Display contract state
+    State {
+        contract_id: ContractRef,
+    },
+
+    /// Call contract read method
+    Read {
+        contract_id: ContractRef,
+    },
+
+    /// Execute contract operation
+    Exec {
+        contract_id: ContractRef,
+    },
+
+    /// Transfer contract state
+    Transfer {
+        contract_id: ContractRef,
+        path: PathBuf,
+    },
+
+    Validate {
+        path: PathBuf,
+    },
+
+    Accept {
+        path: PathBuf,
+    },
 }

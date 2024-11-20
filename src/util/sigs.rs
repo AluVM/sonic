@@ -19,7 +19,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::btree_map;
+use alloc::collections::btree_map;
 
 use amplify::confinement::{NonEmptyBlob, NonEmptyOrdMap};
 use commit_verify::StrictHash;
@@ -33,11 +33,7 @@ use crate::LIB_NAME_RGB_STD;
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, Display, Default)]
 #[derive(StrictType, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_RGB_STD, tags = repr, into_u8, try_from_u8)]
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(crate = "serde_crate", rename_all = "camelCase")
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(crate = "serde_crate", rename_all = "camelCase"))]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum ContainerVer {
@@ -60,11 +56,7 @@ impl SigValidator for DumbValidator {
 #[display(lowercase)]
 #[derive(StrictType, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_RGB_STD, tags = repr, into_u8, try_from_u8)]
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(crate = "serde_crate", rename_all = "camelCase")
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(crate = "serde_crate", rename_all = "camelCase"))]
 #[repr(u8)]
 pub enum TrustLevel {
     Malicious = 0x10,
@@ -84,11 +76,7 @@ impl TrustLevel {
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_RGB_STD, tags = order, dumb = ContentId::Schema(strict_dumb!()))]
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(crate = "serde_crate", rename_all = "camelCase")
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(crate = "serde_crate", rename_all = "camelCase"))]
 pub enum ContentId {
     Schema(SchemaId),
     Genesis(ContractId),
@@ -104,11 +92,7 @@ pub enum ContentId {
 #[strict_type(lib = LIB_NAME_RGB_STD)]
 #[derive(CommitEncode)]
 #[commit_encode(strategy = strict, id = StrictHash)]
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(crate = "serde_crate", transparent)
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(crate = "serde_crate", transparent))]
 pub struct SigBlob(NonEmptyBlob<4096>);
 
 impl Default for SigBlob {
@@ -124,9 +108,7 @@ impl Default for SigBlob {
 pub struct ContentSigs(NonEmptyOrdMap<Identity, SigBlob, 10>);
 
 impl StrictDumb for ContentSigs {
-    fn strict_dumb() -> Self {
-        Self(NonEmptyOrdMap::with_key_value(strict_dumb!(), SigBlob::default()))
-    }
+    fn strict_dumb() -> Self { Self(NonEmptyOrdMap::with_key_value(strict_dumb!(), SigBlob::default())) }
 }
 
 impl IntoIterator for ContentSigs {

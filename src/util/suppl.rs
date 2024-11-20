@@ -19,9 +19,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::fmt;
-use std::fmt::{Display, Formatter};
-use std::str::FromStr;
+use core::fmt;
+use core::fmt::{Display, Formatter};
+use core::str::FromStr;
 
 use amplify::confinement::{SmallBlob, TinyOrdMap};
 use amplify::{ByteArray, Bytes32};
@@ -31,8 +31,7 @@ use commit_verify::{CommitId, CommitmentId, DigestExt, Sha256};
 use rgb::{AssignmentType, ContractId, GlobalStateType, Identity, SchemaId};
 use strict_encoding::stl::{AlphaCaps, AlphaNumDash};
 use strict_encoding::{
-    DeserializeError, FieldName, RString, SerializeError, StrictDeserialize, StrictSerialize,
-    TypeName, VariantName,
+    DeserializeError, FieldName, RString, SerializeError, StrictDeserialize, StrictSerialize, TypeName, VariantName,
 };
 use strict_types::value;
 
@@ -92,11 +91,7 @@ impl SupplId {
 #[display(inner)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_RGB_STD)]
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(crate = "serde_crate", transparent)
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(crate = "serde_crate", transparent))]
 pub struct AnnotationName(RString<AlphaCaps, AlphaNumDash>);
 
 impl From<&'static str> for AnnotationName {
@@ -107,11 +102,7 @@ impl From<&'static str> for AnnotationName {
 #[display(inner)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_RGB_STD, tags = order, dumb = ContentRef::Schema(strict_dumb!()))]
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(crate = "serde_crate", rename_all = "camelCase")
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(crate = "serde_crate", rename_all = "camelCase"))]
 pub enum ContentRef {
     #[from]
     Schema(SchemaId),
@@ -126,11 +117,7 @@ pub enum ContentRef {
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
 #[derive(StrictType, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_RGB_STD, tags = repr, into_u8, try_from_u8)]
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(crate = "serde_crate", rename_all = "camelCase")
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(crate = "serde_crate", rename_all = "camelCase"))]
 #[repr(u8)]
 pub enum SupplSub {
     #[default]
@@ -149,11 +136,7 @@ pub enum SupplSub {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Default)]
 #[derive(StrictType, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_RGB_STD, tags = custom)]
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(crate = "serde_crate", rename_all = "camelCase")
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(crate = "serde_crate", rename_all = "camelCase"))]
 pub enum SupplItem {
     #[default]
     #[strict_type(tag = 0)]
@@ -193,11 +176,7 @@ pub struct Annotations(TinyOrdMap<AnnotationName, SmallBlob>);
 #[strict_type(lib = LIB_NAME_RGB_STD)]
 #[derive(CommitEncode)]
 #[commit_encode(strategy = strict, id = SupplId)]
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(crate = "serde_crate", rename_all = "camelCase")
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(crate = "serde_crate", rename_all = "camelCase"))]
 pub struct Supplement {
     pub content_id: ContentRef,
     pub timestamp: i64,
@@ -221,11 +200,7 @@ impl Supplement {
         }
     }
 
-    pub fn with(
-        content: impl Into<ContentRef>,
-        creator: impl Into<Identity>,
-        timestamp: i64,
-    ) -> Self {
+    pub fn with(content: impl Into<ContentRef>, creator: impl Into<Identity>, timestamp: i64) -> Self {
         Supplement {
             content_id: content.into(),
             timestamp,
@@ -234,11 +209,7 @@ impl Supplement {
         }
     }
 
-    pub fn get_default_opt<T: StrictDeserialize>(
-        &self,
-        sub: SupplSub,
-        name: impl Into<AnnotationName>,
-    ) -> Option<T> {
+    pub fn get_default_opt<T: StrictDeserialize>(&self, sub: SupplSub, name: impl Into<AnnotationName>) -> Option<T> {
         self.get_default(sub, name).transpose().ok().flatten()
     }
 
@@ -308,11 +279,7 @@ impl Supplement {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_RGB_STD, tags = custom)]
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(crate = "serde_crate", rename_all = "camelCase")
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(crate = "serde_crate", rename_all = "camelCase"))]
 pub enum TickerSuppl {
     #[strict_type(tag = 0, dumb)]
     Absent,
@@ -328,11 +295,7 @@ impl StrictDeserialize for TickerSuppl {}
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display, Default)]
 #[derive(StrictType, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_RGB_STD, tags = repr, try_from_u8, into_u8)]
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(crate = "serde_crate", rename_all = "camelCase")
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(crate = "serde_crate", rename_all = "camelCase"))]
 #[display(lowercase)]
 #[repr(u8)]
 pub enum VelocityHint {

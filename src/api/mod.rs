@@ -25,13 +25,15 @@ mod api;
 mod state;
 pub mod embedded;
 pub mod alu;
-pub mod uni;
 
-pub use api::{Api, ApiId, ApiVm, AppendApi, CollectionType, DestructibleApi, MethodName, StateArithm, StateName};
+pub use api::{
+    Api, ApiId, ApiInner, ApiVm, AppendApi, CollectionType, DestructibleApi, MethodName, StateArithm, StateName,
+};
 pub use state::{DataCell, StateTy, StructData};
 
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[repr(u8)]
 pub enum VmType {
-    Embedded,
-    AluVM,
+    Embedded = 1,
+    AluVM = 2,
 }

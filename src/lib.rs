@@ -41,6 +41,10 @@ extern crate commit_verify;
 #[macro_use]
 extern crate serde;
 
+pub use ultrasonic as base;
 pub mod api;
 pub mod persistence;
 pub mod containers;
+pub mod util;
+
+pub const LIB_NAME_SONARE: &str = "SONARE";

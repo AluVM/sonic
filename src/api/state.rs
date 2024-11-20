@@ -26,12 +26,14 @@ use strict_types::StrictVal;
 
 pub type StateTy = u128; // TODO: Make it equal to the internal type in used field element
 
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub struct StructData {
     pub ty: StateTy,
     /// Transformed and typefied value extracted from [`ultrasonic::StatData`] by an ApiAdaptor.
     pub value: StrictVal,
 }
 
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub struct DataCell {
     pub data: StructData,
     pub seal: u128, // TODO: Use proper type for the seal

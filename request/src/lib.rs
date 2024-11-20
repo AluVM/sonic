@@ -30,6 +30,21 @@
 //! # URL Representation
 //!
 //! `contract:[//USER@NODE:PORT/]CONTRACT_ID[/API][/METHOD?ARGS]`
+//!
+//! A contract calls are URIs and URLS, which may have multiple forms (depending on the backend).
+//! Here are the examples for the `castVote` call for the DAO contract from the examples directory:
+//! - Using SONARE runtime:
+//!   `contract:DAO.indsc.org/castVote?voting=id&with=(id,preimage)&next=(id,hash)&vote=pro`
+//! - Using a server providing SONIC API:
+//!   `contract://any.sonicapi.node/DAO.indsc.org/castVote?voting=id&with=(id,preimage)&next=(id,
+//!   hash)&vote=pro`
+//! - Using a server providing HTTP REST SONIC API: `https://contract@any.sonicapi.node/DAO.indsc.org/castVote?voting=id&with=(id,preimage)&next=(id,hash)&vote=pro`
+//! - Using a websocket connection:
+//!   `wws://contract@any.sonicapi.node/DAO.indsc.org/castVote?voting=id&with=(id,preimage)&
+//!   next=(id,hash)&vote=pro`
+//! - Using a Storm node server which contains SONARE runtime:
+//!   `storm://any.storm.node/contract:DAO.indsc.org/castVote?voting=id&with=(id,preimage)&next=(id,
+//!   hash)&vote=pro`
 
 mod data;
 
