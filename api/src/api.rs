@@ -40,7 +40,6 @@ use core::hash::{Hash, Hasher};
 use amplify::confinement::{TinyOrdMap, TinyString};
 use amplify::Bytes32;
 use commit_verify::{CommitId, ReservedBytes};
-use serde::Serialize;
 use strict_types::{SemId, StrictDecode, StrictDumb, StrictEncode, TypeName, VariantName};
 use ultrasonic::{CallId, CodexId, Identity};
 
