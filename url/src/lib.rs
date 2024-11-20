@@ -1,4 +1,4 @@
-// SONARE: Runtime environment for formally-verifiable distributed software
+// SONIC: Toolchain for formally-verifiable distributed contracts
 //
 // SPDX-License-Identifier: Apache-2.0
 //

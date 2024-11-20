@@ -1,4 +1,4 @@
-// SONARE: Runtime environment for formally-verifiable distributed software
+// SONIC: Toolchain for formally-verifiable distributed contracts
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -22,11 +22,9 @@
 // the License.
 
 use aluvm::LibSite;
-use strict_encoding::StrictDumb;
+use strict_types::StrictDumb;
 
-use super::state::StructData;
-use super::{ApiVm, StateArithm, VmType};
-use crate::LIB_NAME_SONARE;
+use crate::{ApiVm, StateArithm, StructData, VmType, LIB_NAME_SONIC};
 
 impl ApiVm for aluvm::Vm {
     type Arithm = AluVMArithm;
@@ -38,7 +36,7 @@ impl ApiVm for aluvm::Vm {
 
 #[derive(Clone, Debug)]
 #[derive(StrictType, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONARE)]
+#[strict_type(lib = LIB_NAME_SONIC)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct AluVMArithm {
     #[strict_type(skip)]

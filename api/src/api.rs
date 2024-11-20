@@ -1,4 +1,4 @@
-// SONARE: Runtime environment for formally-verifiable distributed software
+// SONIC: Toolchain for formally-verifiable distributed contracts
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -39,16 +39,13 @@ use core::hash::{Hash, Hasher};
 
 use amplify::confinement::{TinyOrdMap, TinyString};
 use amplify::Bytes32;
-use commit_verify::CommitId;
-use strict_encoding::{StrictDecode, StrictDumb, StrictEncode, TypeName, VariantName};
-use strict_types::SemId;
+use commit_verify::{CommitId, ReservedBytes};
+use serde::Serialize;
+use strict_types::{SemId, StrictDecode, StrictDumb, StrictEncode, TypeName, VariantName};
 use ultrasonic::{CallId, CodexId};
 
-use super::VmType;
-use crate::api::embedded::EmbeddedProc;
-use crate::api::StructData;
-use crate::containers::Ffv;
-use crate::LIB_NAME_SONARE;
+use crate::embedded::EmbeddedProc;
+use crate::{StructData, VmType, LIB_NAME_SONIC};
 
 pub type StateName = VariantName;
 pub type MethodName = VariantName;
@@ -57,7 +54,7 @@ pub type MethodName = VariantName;
 #[derive(CommitEncode)]
 #[commit_encode(strategy = strict, id = ApiId)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONARE, tags = custom, dumb = Self::Embedded(strict_dumb!()))]
+#[strict_type(lib = LIB_NAME_SONIC, tags = custom, dumb = Self::Embedded(strict_dumb!()))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub enum Api {
     #[from]
@@ -104,11 +101,11 @@ impl Api {
 /// hierarchy.
 #[derive(Clone, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONARE)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
+#[strict_type(lib = LIB_NAME_SONIC)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase", bound = ""))]
 pub struct ApiInner<Vm: ApiVm> {
     /// Version of the API structure.
-    pub version: Ffv,
+    pub version: ReservedBytes<1>,
 
     /// Commitment to the codex under which the API is valid.
     pub codex_id: CodexId,
@@ -150,7 +147,7 @@ pub struct ApiInner<Vm: ApiVm> {
 #[derive(Wrapper, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, From)]
 #[wrapper(Deref, BorrowSlice, Hex, Index, RangeOps)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONARE)]
+#[strict_type(lib = LIB_NAME_SONIC)]
 pub struct ApiId(
     #[from]
     #[from([u8; 32])]
@@ -195,7 +192,7 @@ mod _baid4 {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONARE, tags = custom, dumb = Self::Single(strict_dumb!()))]
+#[strict_type(lib = LIB_NAME_SONIC, tags = custom, dumb = Self::Single(strict_dumb!()))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub enum CollectionType {
     #[strict_type(tag = 1)]
@@ -213,7 +210,7 @@ pub enum CollectionType {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONARE)]
+#[strict_type(lib = LIB_NAME_SONIC)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct AppendApi<Vm: ApiVm> {
     pub published: bool,
@@ -231,7 +228,7 @@ pub struct AppendApi<Vm: ApiVm> {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONARE)]
+#[strict_type(lib = LIB_NAME_SONIC)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct DestructibleApi<Vm: ApiVm> {
     pub sem_id: SemId,
@@ -248,16 +245,27 @@ pub struct DestructibleApi<Vm: ApiVm> {
     pub builder: Vm::AdaptorSite,
 }
 
+#[cfg(not(feature = "serde"))]
+trait Serde {}
+#[cfg(not(feature = "serde"))]
+impl<T> Serde for T {}
+
+#[cfg(feature = "serde")]
+trait Serde: serde::Serialize + for<'de> serde::Deserialize<'de> {}
+#[cfg(feature = "serde")]
+impl<T> Serde for T where T: serde::Serialize + for<'de> serde::Deserialize<'de> {}
+
 pub trait ApiVm {
     type Arithm: StateArithm;
-    type ReaderSite: Clone + Ord + Debug + StrictDumb + StrictEncode + StrictDecode;
-    type AdaptorSite: Clone + Ord + Debug + StrictDumb + StrictEncode + StrictDecode;
+
+    type ReaderSite: Clone + Ord + Debug + StrictDumb + StrictEncode + StrictDecode + Serde;
+    type AdaptorSite: Clone + Ord + Debug + StrictDumb + StrictEncode + StrictDecode + Serde;
 
     fn vm_type(&self) -> VmType;
 }
 
 // TODO: Use Result's instead of Option
-pub trait StateArithm: Clone + Debug + StrictDumb + StrictEncode + StrictDecode {
+pub trait StateArithm: Clone + Debug + StrictDumb + StrictEncode + StrictDecode + Serde {
     /// Procedure which converts [`StructData`] corresponding to this type into a weight in range
     /// `0..256` representing how much this specific state fulfills certain state requirement.
     ///

@@ -1,4 +1,4 @@
-// SONARE: Runtime environment for formally-verifiable distributed software
+// SONIC: Toolchain for formally-verifiable distributed contracts
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -24,16 +24,14 @@
 use amplify::confinement::SmallBlob;
 use strict_types::SemId;
 
-use super::state::StructData;
-use super::{ApiVm, StateArithm, StateName, VmType};
-use crate::LIB_NAME_SONARE;
+use crate::{ApiVm, StateArithm, StateName, StructData, VmType, LIB_NAME_SONIC};
 
 #[derive(Clone, Debug)]
 pub struct EmbeddedProc;
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONARE, tags = repr, try_from_u8, into_u8)]
+#[strict_type(lib = LIB_NAME_SONIC, tags = repr, try_from_u8, into_u8)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 #[repr(u8)]
 pub enum Source {
@@ -52,7 +50,7 @@ impl ApiVm for EmbeddedProc {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONARE, tags = custom, dumb = Self::Const(strict_dumb!()))]
+#[strict_type(lib = LIB_NAME_SONIC, tags = custom, dumb = Self::Const(strict_dumb!()))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub enum EmbeddedReaders {
     #[strict_type(tag = 0)]
@@ -71,7 +69,7 @@ pub enum EmbeddedReaders {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONARE, tags = custom, dumb = Self::BytesFrom(strict_dumb!()))]
+#[strict_type(lib = LIB_NAME_SONIC, tags = custom, dumb = Self::BytesFrom(strict_dumb!()))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub enum EmbeddedAdaptors {
     #[strict_type(tag = 1)]
@@ -83,7 +81,7 @@ pub enum EmbeddedAdaptors {
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONARE, tags = repr, try_from_u8, into_u8)]
+#[strict_type(lib = LIB_NAME_SONIC, tags = repr, try_from_u8, into_u8)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 #[repr(u8)]
 pub enum EmbeddedArithm {

@@ -1,8 +1,8 @@
 [package]
-name = "sonare-inmem"
+name = "sonic-url"
 version.workspace = true
 authors.workspace = true
-description = "In-memory persistence for SONARE"
+description = "URL-based request builders and parsers for SONIC distributed contracts"
 repository.workspace = true
 homepage.workspace = true
 keywords.workspace = true
@@ -16,9 +16,8 @@ exclude = [".github"]
 [dependencies]
 amplify.workspace = true
 strict_encoding.workspace = true
-strict_types = { workspace = true, optional = true }
+strict_types.workspace = true
 ultrasonic.workspace = true
-sonare = { version = "0.12.0-alpha.1", path = ".." }
 serde = { workspace = true, optional = true }
 
 [features]

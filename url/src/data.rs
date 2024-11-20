@@ -1,4 +1,4 @@
-// SONARE: Runtime environment for formally-verifiable distributed software
+// SONIC: Toolchain for formally-verifiable distributed contracts
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -21,13 +21,24 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-mod stock;
-mod stash;
-mod state;
-mod trace;
-mod repo;
+use amplify::confinement::{TinyString, TinyVec};
+use strict_types::StrictVal;
+use ultrasonic::{ContractId, ProofOfPubl};
 
-pub use repo::{Repo, RepoProvider};
-pub use stash::{Stash, StashProvider};
-pub use state::{State, StateProvider};
-pub use trace::{Trace, TraceProvider};
+pub trait SonareProtocol {
+    const URL_SCHEME: &'static str;
+    type PoP: ProofOfPubl;
+}
+
+pub struct Request<S: SonareProtocol> {
+    pub pop: S::PoP,
+    pub contract_id: Option<ContractId>,
+    pub interface: Option<TinyString>,
+    pub method: Option<TinyString>,
+    pub args: TinyVec<RequestArg>,
+}
+
+pub struct RequestArg {
+    pub name: TinyString,
+    pub value: StrictVal,
+}

@@ -4,9 +4,8 @@ extern crate amplify;
 extern crate strict_types;
 
 use amplify::confinement::{SmallString, TinyString};
-use sonare::api::embedded::{EmbeddedAdaptors, EmbeddedArithm, EmbeddedProc, EmbeddedReaders, Source};
-use sonare::api::{Api, ApiInner, AppendApi, CollectionType, DestructibleApi};
-use sonare::containers::Ffv;
+use sonic::embedded::{EmbeddedAdaptors, EmbeddedArithm, EmbeddedProc, EmbeddedReaders, Source};
+use sonic::{Api, ApiInner, AppendApi, CollectionType, DestructibleApi};
 use strict_types::stl::std_stl;
 use strict_types::{SemId, SymbolicSys, SystemBuilder, TypeSystem};
 use ultrasonic::Codex;
@@ -88,7 +87,7 @@ fn main() {
     };
 
     let api = Api::Embedded(ApiInner::<EmbeddedProc> {
-        version: Ffv::default(),
+        version: default!(),
         codex_id: codex.codex_id(),
         api_version: 0,
         name: None,

@@ -1,4 +1,4 @@
-# SONARE: Runtime environment for formally-verifiable distributed software
+# SONIC: Toolchain for formally-verifiable distributed contracts
 
 ![Build](https://github.com/AluVM/sonare/workflows/Build/badge.svg)
 ![Tests](https://github.com/AluVM/sonare/workflows/Tests/badge.svg)

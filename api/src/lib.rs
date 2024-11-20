@@ -1,4 +1,4 @@
-// SONARE: Runtime environment for formally-verifiable distributed software
+// SONIC: Toolchain for formally-verifiable distributed contracts
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -21,25 +21,40 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use amplify::confinement::{TinyString, TinyVec};
-use sonare::containers::ProofOfPubl;
-use strict_types::StrictVal;
-use ultrasonic::ContractId;
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
-pub trait SonareProtocol {
-    const URL_SCHEME: &'static str;
-    type PoP: ProofOfPubl;
-}
+// TODO: Activate once StrictEncoding will be no_std
+// #![no_std]
 
-pub struct Request<S: SonareProtocol> {
-    pub pop: S::PoP,
-    pub contract_id: Option<ContractId>,
-    pub interface: Option<TinyString>,
-    pub method: Option<TinyString>,
-    pub args: TinyVec<RequestArg>,
-}
+#[macro_use]
+extern crate core;
+extern crate alloc;
 
-pub struct RequestArg {
-    pub name: TinyString,
-    pub value: StrictVal,
+#[macro_use]
+extern crate amplify;
+#[macro_use]
+extern crate strict_types;
+#[macro_use]
+extern crate commit_verify;
+
+#[cfg(feature = "serde")]
+#[macro_use]
+extern crate serde;
+mod api;
+mod state;
+pub mod embedded;
+pub mod alu;
+
+pub use api::{
+    Api, ApiId, ApiInner, ApiVm, AppendApi, CollectionType, DestructibleApi, MethodName, StateArithm, StateName,
+};
+pub use state::{DataCell, StateTy, StructData};
+
+pub const LIB_NAME_SONIC: &str = "SONIC";
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[repr(u8)]
+pub enum VmType {
+    Embedded = 1,
+    AluVM = 2,
 }

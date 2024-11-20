@@ -1,0 +1,53 @@
+[package]
+name = "sonic-api"
+version.workspace = true
+authors.workspace = true
+description = "API for formally-verifiable distributed contracts"
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories = ["algorithms", "science", "no-std"]
+readme.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+exclude = [".github"]
+
+[lib]
+name = "sonic"
+
+[dependencies]
+amplify.workspace = true
+baid64 = "0.4.0"
+strict_encoding.workspace = true
+strict_types.workspace = true
+commit_verify = "0.12.0-alpha.3"
+aluvm.workspace = true
+ultrasonic.workspace = true
+serde = { workspace = true, optional = true }
+
+[features]
+default = []
+all = ["stl", "serde"]
+
+stl = ["commit_verify/stl", "ultrasonic/stl", "strict_types/armor"]
+serde = [
+    "dep:serde",
+    "amplify/serde",
+    "strict_encoding/serde",
+    "strict_types/serde",
+    "commit_verify/serde",
+    "aluvm/serde",
+    "ultrasonic/serde",
+]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+rand = { version = "0.8.4", optional = true }
+getrandom = { version = "0.2", features = ["js"] }
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[package.metadata.docs.rs]
+features = ["all"]

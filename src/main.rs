@@ -1,4 +1,4 @@
-// SONARE: Runtime environment for formally-verifiable distributed software
+// SONIC: Toolchain for formally-verifiable distributed contracts
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -21,8 +21,4 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-pub trait RepoProvider {}
-
-pub struct Repo<R: RepoProvider> {
-    provider: R,
-}
+fn main() { todo!() }

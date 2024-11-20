@@ -1,4 +1,4 @@
-// SONARE: Runtime environment for formally-verifiable distributed software
+// SONIC: Toolchain for formally-verifiable distributed contracts
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -21,11 +21,21 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use strict_encoding::TypeName;
-use ultrasonic::ContractId;
+use aluvm::LibSite;
+use strict_types::StrictVal;
 
-pub enum ContractRef {
-    Id(ContractId),
-    Name(TypeName),
-    // Mnemonic(),
+pub type StateTy = u128; // TODO: Make it equal to the internal type in used field element
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct StructData {
+    pub ty: StateTy,
+    /// Transformed and typefied value extracted from [`ultrasonic::StatData`] by an ApiAdaptor.
+    pub value: StrictVal,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct DataCell {
+    pub data: StructData,
+    pub seal: u128, // TODO: Use proper type for the seal
+    pub lock: Option<LibSite>,
 }
