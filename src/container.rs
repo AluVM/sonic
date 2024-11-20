@@ -22,12 +22,14 @@
 // the License.
 
 use aluvm::Lib;
-use amplify::confinement::{LargeVec, SmallOrdSet};
+use amplify::confinement::{LargeVec, SmallOrdMap, SmallOrdSet};
+use commit_verify::ReservedBytes;
 use sonicapi::Api;
 use strict_encoding::TypeName;
 use strict_types::TypeSystem;
 use ultrasonic::{Codex, Operation, ProofOfPubl};
 
+use crate::sigs::ContentSigs;
 use crate::Contract;
 
 pub type CodexContainer = Container<()>;
@@ -35,17 +37,21 @@ pub type ContractContainer<PoP> = Container<ContractExt<PoP>>;
 
 pub struct Container<Ext> {
     pub codex: Codex,
-    pub apis: SmallOrdSet<Api>,
+    pub ext: Ext,
+    pub apis: SmallOrdMap<Api, ContentSigs>,
     pub libs: SmallOrdSet<Lib>,
     pub types: TypeSystem,
-    pub ext: Ext,
-}
-
-impl Container<()> {
-    pub fn issue<PoP: ProofOfPubl>(&self, api: Option<TypeName>) -> Contract<PoP> { todo!() }
+    pub codex_sigs: ContentSigs,
+    // For supplements and signatures
+    pub reserved: ReservedBytes<8>,
 }
 
 pub struct ContractExt<PoP: ProofOfPubl> {
     pub contract: Contract<PoP>,
     pub operations: LargeVec<Operation>,
+    pub contract_sigs: ContentSigs,
+}
+
+impl Container<()> {
+    pub fn issue<PoP: ProofOfPubl>(&self, api: Option<TypeName>) -> Contract<PoP> { todo!() }
 }

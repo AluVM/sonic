@@ -8,7 +8,7 @@ use sonic::embedded::{EmbeddedAdaptors, EmbeddedArithm, EmbeddedProc, EmbeddedRe
 use sonic::{Api, ApiInner, AppendApi, CollectionType, DestructibleApi};
 use strict_types::stl::std_stl;
 use strict_types::{SemId, SymbolicSys, SystemBuilder, TypeSystem};
-use ultrasonic::Codex;
+use ultrasonic::{Codex, Identity};
 
 pub struct PartyId(u64);
 pub struct Party {
@@ -91,7 +91,7 @@ fn main() {
         codex_id: codex.codex_id(),
         api_version: 0,
         name: None,
-        developer: tiny_s!("ssi:anonymous"),
+        developer: Identity::default(),
         append_only: tiny_bmap! {
             vname!("parties") => AppendApi {
                 published: true,

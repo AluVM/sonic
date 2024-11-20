@@ -21,14 +21,40 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use core::fmt::{Debug, Display};
-
-use amplify::confinement::TinyString;
 use commit_verify::ReservedBytes;
 use strict_encoding::{StrictDecode, StrictDumb, StrictEncode, TypeName};
-use ultrasonic::{Codex, ContractId, Operation, ProofOfPubl};
+use ultrasonic::{Codex, ContractId, Identity, Operation, ProofOfPubl};
 
 use crate::LIB_NAME_SONIC;
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(CommitEncode)]
+#[commit_encode(strategy = strict, id = ContractId)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONIC)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
+pub struct Contract<PoP: ProofOfPubl> {
+    pub version: ReservedBytes<2>,
+    pub meta: ContractMeta<PoP>,
+    pub codex: Codex,
+    pub initial: Operation,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONIC)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
+pub struct ContractMeta<PoP: ProofOfPubl> {
+    pub proof_of_publ: PoP,
+    // aligning to 16 byte edge
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub reserved: ReservedBytes<10>,
+    pub salt: u64,
+    pub timestamp: i64,
+    // ^^ above is a fixed-size contract header of 32 bytes
+    pub name: ContractName,
+    pub issuer: Identity,
+}
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Display)]
 #[display("~")]
@@ -56,62 +82,10 @@ pub enum ContractName {
     Named(TypeName),
 }
 
-#[derive(Clone, Eq, PartialEq, Debug)]
-#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONIC)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
-pub struct ContractMeta<PoP: ProofOfPubl> {
-    pub proof_of_publ: PoP,
-    // aligning to 16 byte edge
-    #[cfg_attr(feature = "serde", serde(skip))]
-    pub reserved: ReservedBytes<10>,
-    pub salt: u64,
-    pub timestamp: i64,
-    // ^^ above is a fixed-size contract header of 32 bytes
-    pub name: ContractName,
-    pub issuer: TinyString,
-}
-
-#[derive(Clone, Eq, PartialEq, Debug)]
-#[derive(CommitEncode)]
-#[commit_encode(strategy = strict, id = ContractId)]
-#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONIC)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
-pub struct Contract<PoP: ProofOfPubl> {
-    pub version: Ffv,
-    pub meta: ContractMeta<PoP>,
-    pub codex: Codex,
-    pub initial: Operation,
-}
-
-/// Fast-forward version code
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Default, Debug, Display)]
-#[display("RGB/1.{0}")]
-#[derive(StrictType, StrictEncode)]
-#[strict_type(lib = LIB_NAME_SONIC)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
-pub struct Ffv(u16);
-
-mod _ffv {
-    use alloc::string::{String, ToString};
-
-    use strict_encoding::{DecodeError, ReadTuple, StrictDecode, TypedRead};
-
-    use super::Ffv;
-
-    impl StrictDecode for Ffv {
-        fn strict_decode(reader: &mut impl TypedRead) -> Result<Self, DecodeError> {
-            let ffv = reader.read_tuple(|r| r.read_field().map(Self))?;
-            if ffv != Ffv::default() {
-                let mut err = s!("unsupported fast-forward version code belonging to a future version. Please update \
-                                  your software, or, if the problem persists, contact your vendor providing the \
-                                  following version information: ");
-                err.push_str(&ffv.to_string());
-                Err(DecodeError::DataIntegrityError(err))
-            } else {
-                Ok(ffv)
-            }
-        }
-    }
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
+#[display(inner)]
+pub enum ContractRef {
+    Id(ContractId),
+    Name(TypeName),
+    // Mnemonic(),
 }

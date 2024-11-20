@@ -42,7 +42,7 @@ use amplify::Bytes32;
 use commit_verify::{CommitId, ReservedBytes};
 use serde::Serialize;
 use strict_types::{SemId, StrictDecode, StrictDumb, StrictEncode, TypeName, VariantName};
-use ultrasonic::{CallId, CodexId};
+use ultrasonic::{CallId, CodexId, Identity};
 
 use crate::embedded::EmbeddedProc;
 use crate::{StructData, VmType, LIB_NAME_SONIC};
@@ -117,7 +117,7 @@ pub struct ApiInner<Vm: ApiVm> {
     pub name: Option<TypeName>,
 
     /// Developer identity string.
-    pub developer: TinyString,
+    pub developer: Identity,
 
     /// State API defines how structured contract state is constructed out of (and converted into)
     /// UltraSONIC immutable memory cells.

@@ -41,9 +41,11 @@ extern crate commit_verify;
 #[macro_use]
 extern crate serde;
 
+pub use sonicapi::*;
+
 mod contract;
 mod container;
+pub mod sigs;
 
 pub use container::{CodexContainer, Container, ContractContainer, ContractExt};
-pub use contract::{Contract, ContractMeta, ContractName, ContractPrivate, Ffv};
-pub use sonicapi::*;
+pub use contract::{Contract, ContractMeta, ContractName, ContractPrivate, ContractRef};
