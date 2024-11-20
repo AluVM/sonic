@@ -1,18 +1,18 @@
 # SONIC: Toolchain for formally-verifiable distributed contracts
 
-![Build](https://github.com/AluVM/sonare/workflows/Build/badge.svg)
-![Tests](https://github.com/AluVM/sonare/workflows/Tests/badge.svg)
-[![codecov](https://codecov.io/gh/AluVM/sonare/branch/master/graph/badge.svg)](https://codecov.io/gh/AluVM/sonare)
+![Build](https://github.com/AluVM/sonic/workflows/Build/badge.svg)
+![Tests](https://github.com/AluVM/sonic/workflows/Tests/badge.svg)
+[![codecov](https://codecov.io/gh/AluVM/sonic/branch/master/graph/badge.svg)](https://codecov.io/gh/AluVM/sonic)
 
-[![crates.io](https://img.shields.io/crates/v/sonare)](https://crates.io/crates/sonare)
-[![Docs](https://docs.rs/sonare/badge.svg)](https://docs.rs/sonare)
-[![License](https://img.shields.io/crates/l/sonare)](./LICENSE)
+[![crates.io](https://img.shields.io/crates/v/sonic)](https://crates.io/crates/sonic)
+[![Docs](https://docs.rs/sonic/badge.svg)](https://docs.rs/sonic)
+[![License](https://img.shields.io/crates/l/sonic)](./LICENSE)
 
 ## What is it
 
-**SONARE** allows to build are partially-replicated state machines with capability-based memory
-access, and whose history execution trace can be compressed with recursive zk-STARKs (i.e. they have
-a fixed-length computational integrity proofs).
+**SONIC** is a toolchain for building partially-replicated state machines with capability-based
+memory access, whose history execution trace can be compressed with recursive zk-STARKs (i.e. they
+have a fixed-length computational integrity proofs).
 
 What is capability-based memory access (or capability-addressable memory, **CAM**)? The computers we
 all used to are random memory access machines (RAM), where a software accesses freely-addressable
@@ -20,28 +20,22 @@ global memory. This had opened a door for the all the vulnerabilities and hacks 
 computer systems across the world for the past decades... CAM model instead, divides all memory into
 parts (called *words*) addressable only with some access token (called *capability*). You may think
 of this as of a memory where each part is "owned" by certain party, and can be accessed or modified
-only given a proof of ownership. This is [**UltraSONIC**], the underlying layer for SONARE.
+only given a proof of ownership. This is [**UltraSONIC**], the underlying layer for SONIC.
 
 Now, you can put this into a distributed context, such that the memory is accessible by multiple
 parties with different permissions, and the state of the computation (*state machine*) is replicable
 across all the parties - so you get CAM upgraded into a *partially-replicated state machine*
-(**PRISM**). SONARE takes such PRISM computers and enhances them with zk-STARKS, such that the cost
+(**PRISM**). SONIC takes such PRISM computers and enhances them with zk-STARKS, such that the cost
 of replication becomes fixed, independently of how long the system is run for. With that, you have
 a programs which can be formally (i.e. mathematically) verified to be safe, and at the same time
 run over a computer network in a trustless manner, with the same efficiency no matter how long they
 run.
 
-What does "runtime environment" mean? If you think of other platforms, then it plays the same role
-for distributed apps as NodeJS for JavaScript server apps, or JRE (Java Runtime Environment) for
-Java apps. However, this repository does not provide executables, and is a library, which may be
-used to host runtime in both third-party applications - or to write server-side daemons, executables
-and desktop apps.
-
 ## What I can build
 
-One of the main current applications for SONARE are smart contracts made with client-side
+One of the main current applications for SONIC are smart contracts made with client-side
 validation, abstracted from a specific underlying blockchain or other consensus mechanism; however,
-as you can see, the number of applications for SONARE can be significantly larger. Using SONARE, one
+as you can see, the number of applications for SONIC can be significantly larger. Using SONIC, one
 may build distributed software with capability-based access to the memory, including:
 
 - a replicable database with formal safety guarantees;
@@ -53,7 +47,7 @@ may build distributed software with capability-based access to the memory, inclu
 
 ## Ecosystem
 
-SONARE is a part of a larger ecosystem used to build safe distributed software, which includes:
+SONIC is a part of a larger ecosystem used to build safe distributed software, which includes:
 
 - [Strict types]: strong type system made with [generalized algebraic data types][GADT] (*GADT*) and
   [dependent types];
@@ -61,6 +55,7 @@ SONARE is a part of a larger ecosystem used to build safe distributed software, 
   uses a zk-STARK-compatible subset of its instruction set architecture (called zk-AluVM);
 - [UltraSONIC]: a transactional execution layer with capability-based memory access on top of
   zk-AluVM;
+- [SONARE]: runtime environment for SONIC software;
 - [Cation]: a general-purpose high-level programming language made with category theory, which
   features strict types, termination analysis and can be formally verified;
 - [Contractum]: a domain-specific version of Cation for writing programs for SONARE.

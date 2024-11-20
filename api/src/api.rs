@@ -105,7 +105,7 @@ impl Api {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase", bound = ""))]
 pub struct ApiInner<Vm: ApiVm> {
     /// Version of the API structure.
-    pub version: ReservedBytes<1>,
+    pub version: ReservedBytes<2>,
 
     /// Commitment to the codex under which the API is valid.
     pub codex_id: CodexId,
