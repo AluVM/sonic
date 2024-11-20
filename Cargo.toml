@@ -56,11 +56,15 @@ serde = { workspace = true, optional = true }
 
 [features]
 default = []
-all = ["serde"]
+all = ["stl", "serde"]
 
+stl = ["commit_verify/stl", "ultrasonic/stl", "strict_types/armor"]
 serde = [
     "dep:serde",
     "amplify/serde",
+    "strict_encoding/serde",
+    "commit_verify/serde",
+    "ultrasonic/serde"
 ]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
