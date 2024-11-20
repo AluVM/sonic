@@ -46,6 +46,7 @@ pub use sonicapi::*;
 mod contract;
 mod container;
 pub mod sigs;
+pub mod annotations;
 
 pub use container::{CodexContainer, Container, ContractContainer, ContractExt};
 pub use contract::{Contract, ContractMeta, ContractName, ContractPrivate, ContractRef};

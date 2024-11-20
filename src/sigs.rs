@@ -74,7 +74,7 @@ impl Default for SigBlob {
     fn default() -> Self { SigBlob(NonEmptyBlob::with(0)) }
 }
 
-#[derive(Wrapper, WrapperMut, Clone, PartialEq, Eq, Hash, Debug, From)]
+#[derive(Wrapper, WrapperMut, Clone, PartialEq, Eq, Ord, PartialOrd, Hash, Debug, From)]
 #[wrapper(Deref)]
 #[wrapper_mut(DerefMut)]
 #[derive(StrictType, StrictEncode, StrictDecode)]

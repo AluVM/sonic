@@ -21,38 +21,31 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use aluvm::Lib;
-use amplify::confinement::{LargeVec, SmallOrdMap, SmallOrdSet, TinyOrdMap};
-use commit_verify::ReservedBytes;
-use sonicapi::Api;
-use strict_encoding::TypeName;
-use strict_types::TypeSystem;
-use ultrasonic::{Codex, Operation, ProofOfPubl};
+use amplify::confinement::{SmallBlob, TinyOrdMap};
+use commit_verify::StrictHash;
+use strict_encoding::stl::{AlphaCaps, AlphaNumDash};
+use strict_encoding::RString;
 
-use crate::annotations::Annotations;
-use crate::sigs::ContentSigs;
-use crate::Contract;
+use crate::LIB_NAME_SONIC;
 
-pub type CodexContainer = Container<()>;
-pub type ContractContainer<PoP> = Container<ContractExt<PoP>>;
+#[derive(Wrapper, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, From, Display)]
+#[wrapper(Deref, FromStr)]
+#[display(inner)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONIC)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(transparent))]
+pub struct AnnotationName(RString<AlphaCaps, AlphaNumDash>);
 
-pub struct Container<Ext> {
-    pub codex: Codex,
-    pub ext: Ext,
-    pub apis: SmallOrdMap<Api, ContentSigs>,
-    pub libs: SmallOrdSet<Lib>,
-    pub types: TypeSystem,
-    pub codex_sigs: ContentSigs,
-    pub annotations: TinyOrdMap<Annotations, ContentSigs>,
-    pub reserved: ReservedBytes<8>,
+impl From<&'static str> for AnnotationName {
+    fn from(s: &'static str) -> Self { Self(RString::from(s)) }
 }
 
-pub struct ContractExt<PoP: ProofOfPubl> {
-    pub contract: Contract<PoP>,
-    pub operations: LargeVec<Operation>,
-    pub contract_sigs: ContentSigs,
-}
-
-impl Container<()> {
-    pub fn issue<PoP: ProofOfPubl>(&self, api: Option<TypeName>) -> Contract<PoP> { todo!() }
-}
+#[derive(Wrapper, WrapperMut, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default, From)]
+#[wrapper(Deref)]
+#[wrapper_mut(DerefMut)]
+#[derive(CommitEncode)]
+#[commit_encode(strategy = strict, id = StrictHash)]
+#[derive(StrictType, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONIC)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct Annotations(TinyOrdMap<AnnotationName, SmallBlob>);
