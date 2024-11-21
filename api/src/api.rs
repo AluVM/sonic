@@ -40,8 +40,8 @@ use core::hash::{Hash, Hasher};
 use amplify::confinement::{TinyOrdMap, TinyString};
 use amplify::Bytes32;
 use commit_verify::{CommitId, ReservedBytes};
-use strict_types::{SemId, StrictDecode, StrictDumb, StrictEncode, TypeName, VariantName};
-use ultrasonic::{CallId, CodexId, Identity};
+use strict_types::{SemId, StrictDecode, StrictDumb, StrictEncode, StrictVal, TypeName, TypeSystem, VariantName};
+use ultrasonic::{CallId, CodexId, Identity, StateData, StateValue};
 
 use crate::embedded::EmbeddedProc;
 use crate::{StructData, VmType, LIB_NAME_SONIC};
@@ -73,7 +73,13 @@ impl PartialOrd for Api {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
 }
 impl Ord for Api {
-    fn cmp(&self, other: &Self) -> Ordering { self.api_id().cmp(&other.api_id()) }
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.api_id() == other.api_id() {
+            Ordering::Equal
+        } else {
+            self.timestamp().cmp(&other.timestamp())
+        }
+    }
 }
 impl Hash for Api {
     fn hash<H: Hasher>(&self, state: &mut H) { self.api_id().hash(state); }
@@ -86,6 +92,65 @@ impl Api {
         match self {
             Api::Embedded(_) => VmType::Embedded,
             Api::Alu(_) => VmType::AluVM,
+        }
+    }
+
+    pub fn codex_id(&self) -> CodexId {
+        match self {
+            Api::Embedded(api) => api.codex_id,
+            Api::Alu(api) => api.codex_id,
+        }
+    }
+
+    pub fn timestamp(&self) -> i64 {
+        match self {
+            Api::Embedded(api) => api.timestamp,
+            Api::Alu(api) => api.timestamp,
+        }
+    }
+
+    pub fn name(&self) -> Option<&TypeName> {
+        match self {
+            Api::Embedded(api) => api.name.as_ref(),
+            Api::Alu(api) => api.name.as_ref(),
+        }
+    }
+
+    pub fn developer(&self) -> &Identity {
+        match self {
+            Api::Embedded(api) => &api.developer,
+            Api::Alu(api) => &api.developer,
+        }
+    }
+
+    pub fn verifier(&self, method: impl Into<MethodName>) -> Option<CallId> {
+        let method = method.into();
+        match self {
+            Api::Embedded(api) => api.verifiers.get(&method),
+            Api::Alu(api) => api.verifiers.get(&method),
+        }
+        .copied()
+    }
+
+    pub fn build_immutable(
+        &self,
+        name: impl Into<StateName>,
+        data: StrictVal,
+        raw: Option<StrictVal>,
+        sys: &TypeSystem,
+    ) -> StateData {
+        let name = name.into();
+        match self {
+            Api::Embedded(api) => api
+                .append_only
+                .get(&name)
+                .expect("state name is unknown for the API")
+                .build(data, raw, sys),
+            Api::Alu(api) => api
+                .append_only
+                .get(&name)
+                .expect("state name is unknown for the API")
+                .build(data, raw, sys),
         }
     }
 }
@@ -109,8 +174,8 @@ pub struct ApiInner<Vm: ApiVm> {
     /// Commitment to the codex under which the API is valid.
     pub codex_id: CodexId,
 
-    /// Incremental version number for the API.
-    pub api_version: u16,
+    /// Timestamp which is used for versioning (later APIs have priority over new ones).
+    pub timestamp: i64,
 
     /// API name. Each codex must have a default API with no name.
     pub name: Option<TypeName>,
@@ -126,11 +191,12 @@ pub struct ApiInner<Vm: ApiVm> {
     /// UltraSONIC destructible memory cells.
     pub destructible: TinyOrdMap<StateName, DestructibleApi<Vm>>,
 
-    /// Readers have access to the converted `state` and can construct a derived state out of it.
+    /// Readers have access to the converted global `state` and can construct a derived state out of
+    /// it.
     ///
     /// The typical examples when readers are used is to sum individual asset issues and compute the
     /// number of totally issued assets.
-    pub readers: TinyOrdMap<MethodName, Vm::ReaderSite>,
+    pub readers: TinyOrdMap<MethodName, Vm::Reader>,
 
     /// Links between named transaction methods defined in the interface - and corresponding
     /// verifier call ids defined by the contract.
@@ -191,38 +257,23 @@ mod _baid4 {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONIC, tags = custom, dumb = Self::Single(strict_dumb!()))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
-pub enum CollectionType {
-    #[strict_type(tag = 1)]
-    Single(SemId),
-
-    #[strict_type(tag = 0x10)]
-    List(SemId),
-
-    #[strict_type(tag = 0x11)]
-    Set(SemId),
-
-    #[strict_type(tag = 0x20)]
-    Map { key: SemId, val: SemId },
-}
-
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_SONIC)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct AppendApi<Vm: ApiVm> {
+    pub sem_id: SemId,
     pub published: bool,
-
-    pub collection: CollectionType,
-
     /// Procedures which convert a state made of finite field elements [`StateData`] into a
-    /// structured type [`StructData`].
-    pub adaptor: Vm::AdaptorSite,
+    /// structured type [`StructData`] and vice verse.
+    pub adaptor: Vm::Adaptor,
+}
 
-    /// Procedures which convert structured type [`StructData`] into a state made of finite field
-    /// elements [`StateData`].
-    pub builder: Vm::AdaptorSite,
+impl<Vm: ApiVm> AppendApi<Vm> {
+    pub fn convert(&self, data: &StateData, sys: &TypeSystem) -> Option<StrictVal> {
+        self.adaptor.convert_immutable(self.sem_id, data, sys)
+    }
+    pub fn build(&self, value: StrictVal, raw: Option<StrictVal>, sys: &TypeSystem) -> StateData {
+        self.adaptor.build_immutable(self.sem_id, value, raw, sys)
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -236,12 +287,17 @@ pub struct DestructibleApi<Vm: ApiVm> {
     pub arithmetics: Vm::Arithm,
 
     /// Procedures which convert a state made of finite field elements [`StateData`] into a
-    /// structured type [`StructData`].
-    pub adaptor: Vm::AdaptorSite,
+    /// structured type [`StructData`] and vice verse.
+    pub adaptor: Vm::Adaptor,
+}
 
-    /// Procedures which convert structured type [`StructData`] into a state made of finite field
-    /// elements [`StateData`].
-    pub builder: Vm::AdaptorSite,
+impl<Vm: ApiVm> DestructibleApi<Vm> {
+    pub fn convert(&self, value: StateValue, sys: &TypeSystem) -> Option<StrictVal> {
+        self.adaptor.convert_destructible(self.sem_id, value, sys)
+    }
+    pub fn build(&self, data: StrictVal, sys: &TypeSystem) -> StateValue {
+        self.adaptor.build_destructible(self.sem_id, data, sys)
+    }
 }
 
 #[cfg(not(feature = "serde"))]
@@ -256,11 +312,18 @@ impl<T> Serde for T where T: serde::Serialize + for<'de> serde::Deserialize<'de>
 
 pub trait ApiVm {
     type Arithm: StateArithm;
-
-    type ReaderSite: Clone + Ord + Debug + StrictDumb + StrictEncode + StrictDecode + Serde;
-    type AdaptorSite: Clone + Ord + Debug + StrictDumb + StrictEncode + StrictDecode + Serde;
+    type Reader: Clone + Ord + Debug + StrictDumb + StrictEncode + StrictDecode + Serde;
+    type Adaptor: StateAdaptor;
 
     fn vm_type(&self) -> VmType;
+}
+
+/// Adaptors convert field elements into structured data and vise verse.
+pub trait StateAdaptor: Clone + Ord + Debug + StrictDumb + StrictEncode + StrictDecode + Serde {
+    fn convert_immutable(&self, sem_id: SemId, data: &StateData, sys: &TypeSystem) -> Option<StrictVal>;
+    fn convert_destructible(&self, sem_id: SemId, value: StateValue, sys: &TypeSystem) -> Option<StrictVal>;
+    fn build_immutable(&self, sem_id: SemId, value: StrictVal, raw: Option<StrictVal>, sys: &TypeSystem) -> StateData;
+    fn build_destructible(&self, sem_id: SemId, value: StrictVal, sys: &TypeSystem) -> StateValue;
 }
 
 // TODO: Use Result's instead of Option

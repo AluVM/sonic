@@ -47,7 +47,7 @@ pub mod embedded;
 pub mod alu;
 
 pub use api::{
-    Api, ApiId, ApiInner, ApiVm, AppendApi, CollectionType, DestructibleApi, MethodName, StateArithm, StateName,
+    Api, ApiId, ApiInner, ApiVm, AppendApi, DestructibleApi, MethodName, StateAdaptor, StateArithm, StateName,
 };
 pub use state::{DataCell, StateTy, StructData};
 

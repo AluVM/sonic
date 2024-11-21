@@ -22,16 +22,38 @@
 // the License.
 
 use aluvm::LibSite;
-use strict_types::StrictDumb;
+use strict_types::{SemId, StrictDumb, StrictVal, TypeSystem};
+use ultrasonic::{StateData, StateValue};
 
-use crate::{ApiVm, StateArithm, StructData, VmType, LIB_NAME_SONIC};
+use crate::{ApiVm, StateAdaptor, StateArithm, StructData, VmType, LIB_NAME_SONIC};
 
 impl ApiVm for aluvm::Vm {
     type Arithm = AluVMArithm;
-    type ReaderSite = LibSite;
-    type AdaptorSite = LibSite;
+    type Reader = LibSite;
+    type Adaptor = AluAdaptor;
 
     fn vm_type(&self) -> VmType { VmType::AluVM }
+}
+
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONIC)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
+pub struct AluAdaptor {
+    pub converter: LibSite,
+    pub builder: LibSite,
+}
+
+impl StateAdaptor for AluAdaptor {
+    fn convert_immutable(&self, sem_id: SemId, data: &StateData, sys: &TypeSystem) -> Option<StrictVal> { todo!() }
+
+    fn convert_destructible(&self, sem_id: SemId, value: StateValue, sys: &TypeSystem) -> Option<StrictVal> { todo!() }
+
+    fn build_immutable(&self, sem_id: SemId, data: StrictVal, raw: Option<StrictVal>, sys: &TypeSystem) -> StateData {
+        todo!()
+    }
+
+    fn build_destructible(&self, sem_id: SemId, data: StrictVal, sys: &TypeSystem) -> StateValue { todo!() }
 }
 
 #[derive(Clone, Debug)]

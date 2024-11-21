@@ -46,6 +46,8 @@
 //!   `storm://any.storm.node/contract:DAO.indsc.org/castVote?voting=id&with=(id,preimage)&next=(id,
 //!   hash)&vote=pro`
 
+extern crate alloc;
+
 mod data;
 
-extern crate alloc;
+pub use data::{Request, RequestArg, SonareProtocol};

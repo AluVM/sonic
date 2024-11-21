@@ -4,8 +4,8 @@ extern crate amplify;
 extern crate strict_types;
 
 use amplify::confinement::{SmallString, TinyString};
-use sonic::embedded::{EmbeddedAdaptors, EmbeddedArithm, EmbeddedProc, EmbeddedReaders, Source};
-use sonic::{Api, ApiInner, AppendApi, CollectionType, DestructibleApi};
+use sonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc, EmbeddedReaders};
+use sonic::{Api, ApiInner, AppendApi, DestructibleApi, Issuer, Private};
 use strict_types::stl::std_stl;
 use strict_types::{SemId, SymbolicSys, SystemBuilder, TypeSystem};
 use ultrasonic::{Codex, Identity};
@@ -89,44 +89,45 @@ fn main() {
     let api = Api::Embedded(ApiInner::<EmbeddedProc> {
         version: default!(),
         codex_id: codex.codex_id(),
-        api_version: 0,
+        timestamp: chrono::Utc::now().timestamp(),
         name: None,
         developer: Identity::default(),
         append_only: tiny_bmap! {
-            vname!("parties") => AppendApi {
+            vname!("_parties") => AppendApi {
+                sem_id: types.get("PartyPair"),
                 published: true,
-                collection: CollectionType::Map {
-                    key: types.get("PartyId"),
-                    val: types.get("Party"),
-                },
-                adaptor: EmbeddedAdaptors::Map { key: Source::FieldElements, val: Source::AssociatedData },
-                builder: EmbeddedAdaptors::Map { key: Source::FieldElements, val: Source::AssociatedData },
+                adaptor: EmbeddedImmutable(0),
             },
-            vname!("votings") => AppendApi {
+            vname!("_votings") => AppendApi {
+                sem_id: types.get("VotingPair"),
                 published: true,
-                collection: CollectionType::Map {
-                    key: types.get("VoteId"),
-                    val: types.get("Voting"),
-                },
-                adaptor: EmbeddedAdaptors::Map { key: Source::FieldElements, val: Source::AssociatedData },
-                builder: EmbeddedAdaptors::Map { key: Source::FieldElements, val: Source::AssociatedData },
+                adaptor: EmbeddedImmutable(1),
             },
-            vname!("votes") => AppendApi {
+            vname!("_votes") => AppendApi {
+                sem_id: types.get("CastVote"),
                 published: true,
-                collection: CollectionType::Set(types.get("CastVote")),
-                adaptor: EmbeddedAdaptors::BytesFrom(Source::FieldElements),
-                builder: EmbeddedAdaptors::BytesFrom(Source::FieldElements),
+                adaptor: EmbeddedImmutable(2),
             },
         },
         destructible: tiny_bmap! {
             vname!("signers") => DestructibleApi {
                 sem_id: types.get("PartyId"),
                 arithmetics: EmbeddedArithm::NonFungible,
-                adaptor: EmbeddedAdaptors::BytesFrom(Source::FieldElements),
-                builder: EmbeddedAdaptors::BytesFrom(Source::FieldElements),
+                adaptor: EmbeddedImmutable(0),
             }
         },
         readers: tiny_bmap! {
+            vname!("parties") => EmbeddedReaders::Map {
+                name: vname!("_parties"),
+                key: types.get("PartyId"),
+                val: types.get("Party"),
+            },
+            vname!("votings") => EmbeddedReaders::Map {
+                name: vname!("_votings"),
+                key: types.get("VoteId"),
+                val: types.get("Voting"),
+            },
+            vname!("votes") => EmbeddedReaders::Set(vname!("_votes"), types.get("CastVote")),
             vname!("votingCount") => EmbeddedReaders::Count(vname!("votings")),
             vname!("totalVotes") => EmbeddedReaders::CountPrefixed(vname!("votings"), types.get("VoteId")),
             vname!("proVotes") => EmbeddedReaders::CountPrefixed(vname!("votings"), types.get("VoteProQuery")),
@@ -139,4 +140,10 @@ fn main() {
         },
         errors: Default::default(),
     });
+
+    let issuer = Issuer::new(codex, api, [], types.type_system());
+    // TODO: Save the issuer
+
+    let deeds = issuer.start_issue("setup").finish::<Private>("ExampleDAO");
+    // TODO: Save the deeds
 }

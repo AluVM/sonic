@@ -47,6 +47,8 @@ mod contract;
 mod container;
 pub mod sigs;
 pub mod annotations;
+mod builders;
 
-pub use container::{CodexContainer, Container, ContractContainer, ContractExt};
-pub use contract::{Contract, ContractMeta, ContractName, ContractPrivate, ContractRef};
+pub use builders::{Builder, BuilderRef, OpBuilder};
+pub use container::{Container, ContractDeeds, Deeds, Issuer};
+pub use contract::{Contract, ContractMeta, ContractName, ContractPrivate, ContractRef, Private};

@@ -23,7 +23,7 @@
 
 use commit_verify::ReservedBytes;
 use strict_encoding::{StrictDecode, StrictDumb, StrictEncode, TypeName};
-use ultrasonic::{Codex, ContractId, Identity, Operation, ProofOfPubl};
+use ultrasonic::{Codex, ContractId, Genesis, Identity, ProofOfPubl};
 
 use crate::LIB_NAME_SONIC;
 
@@ -37,7 +37,7 @@ pub struct Contract<PoP: ProofOfPubl> {
     pub version: ReservedBytes<2>,
     pub meta: ContractMeta<PoP>,
     pub codex: Codex,
-    pub initial: Operation,
+    pub genesis: Genesis,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -56,9 +56,9 @@ pub struct ContractMeta<PoP: ProofOfPubl> {
     pub issuer: Identity,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Display)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Display, Default)]
 #[display("~")]
-#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[derive(StrictType, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_SONIC)]
 pub struct Private(ReservedBytes<4, 0xFF>);
 impl From<Private> for [u8; 4] {

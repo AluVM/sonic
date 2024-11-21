@@ -23,9 +23,8 @@
 
 use alloc::collections::btree_map;
 
-use amplify::confinement::{NonEmptyBlob, NonEmptyOrdMap};
+use amplify::confinement::{ConfinedOrdMap, NonEmptyBlob};
 use commit_verify::StrictHash;
-use strict_encoding::StrictDumb;
 use ultrasonic::Identity;
 
 use crate::LIB_NAME_SONIC;
@@ -74,17 +73,13 @@ impl Default for SigBlob {
     fn default() -> Self { SigBlob(NonEmptyBlob::with(0)) }
 }
 
-#[derive(Wrapper, WrapperMut, Clone, PartialEq, Eq, Ord, PartialOrd, Hash, Debug, From)]
+#[derive(Wrapper, WrapperMut, Clone, PartialEq, Eq, Ord, PartialOrd, Hash, Debug, Default, From)]
 #[wrapper(Deref)]
 #[wrapper_mut(DerefMut)]
 #[derive(StrictType, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_SONIC)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct ContentSigs(NonEmptyOrdMap<Identity, SigBlob, 10>);
-
-impl StrictDumb for ContentSigs {
-    fn strict_dumb() -> Self { Self(NonEmptyOrdMap::with_key_value(strict_dumb!(), SigBlob::default())) }
-}
+pub struct ContentSigs(ConfinedOrdMap<Identity, SigBlob, 0, 10>);
 
 impl IntoIterator for ContentSigs {
     type Item = (Identity, SigBlob);
