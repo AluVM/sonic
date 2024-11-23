@@ -24,7 +24,7 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 // TODO: Activate once StrictEncoding will be no_std
-// #![no_std]
+// #![cfg_attr(not(feature = "std"), no_std)]
 
 #[macro_use]
 extern crate core;
@@ -50,5 +50,5 @@ pub mod annotations;
 mod builders;
 
 pub use builders::{Builder, BuilderRef, OpBuilder};
-pub use container::{Container, ContractDeeds, Deeds, Issuer};
+pub use container::{Container, ContainerPayload, ContractDeeds, Deeds, Issuer};
 pub use contract::{Contract, ContractMeta, ContractName, ContractPrivate, ContractRef, Private};

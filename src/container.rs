@@ -21,24 +21,33 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+use core::fmt::Debug;
+
 use aluvm::{Lib, LibSite};
 use amplify::confinement::{LargeVec, SmallOrdMap, SmallOrdSet, TinyOrdMap};
 use commit_verify::ReservedBytes;
 use sonicapi::{Api, MethodName, StateName};
-use strict_encoding::TypeName;
+use strict_encoding::{StrictDecode, StrictDeserialize, StrictDumb, StrictEncode, StrictSerialize, TypeName};
 use strict_types::{StrictVal, TypeSystem};
 use ultrasonic::{fe128, Codex, Identity, Operation, ProofOfPubl};
 
 use crate::annotations::Annotations;
 use crate::sigs::ContentSigs;
-use crate::{Builder, Contract, ContractMeta, ContractName};
+use crate::{Builder, Contract, ContractMeta, ContractName, LIB_NAME_SONIC};
 
 pub type Issuer = Container<()>;
 pub type Deeds<PoP> = Container<ContractDeeds<PoP>>;
 
-pub struct Container<Ext> {
+pub trait ContainerPayload: Clone + Eq + Debug + StrictDumb + StrictEncode + StrictDecode {}
+impl ContainerPayload for () {}
+impl<PoP: ProofOfPubl> ContainerPayload for ContractDeeds<PoP> {}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONIC)]
+pub struct Container<D: ContainerPayload> {
     pub codex: Codex,
-    pub ext: Ext,
+    pub payload: D,
     pub default_api: Api,
     pub default_api_sigs: ContentSigs,
     pub custom_apis: SmallOrdMap<Api, ContentSigs>,
@@ -49,6 +58,12 @@ pub struct Container<Ext> {
     pub reserved: ReservedBytes<8>,
 }
 
+impl<D: ContainerPayload> StrictSerialize for Container<D> {}
+impl<D: ContainerPayload> StrictDeserialize for Container<D> {}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONIC)]
 pub struct ContractDeeds<PoP: ProofOfPubl> {
     pub contract: Contract<PoP>,
     pub operations: LargeVec<Operation>,
@@ -60,7 +75,7 @@ impl Issuer {
         // TODO: Ensure default API is unnamed?
         Issuer {
             codex,
-            ext: (),
+            payload: (),
             default_api: api,
             default_api_sigs: none!(),
             custom_apis: none!(),
@@ -126,7 +141,7 @@ impl BuildingIssuer {
         };
         Deeds {
             codex: self.issuer.codex,
-            ext: ContractDeeds { contract, operations: none!(), contract_sigs: none!() },
+            payload: ContractDeeds { contract, operations: none!(), contract_sigs: none!() },
             default_api: self.issuer.default_api,
             default_api_sigs: self.issuer.default_api_sigs,
             custom_apis: self.issuer.custom_apis,
@@ -135,6 +150,21 @@ impl BuildingIssuer {
             codex_sigs: self.issuer.codex_sigs,
             annotations: self.issuer.annotations,
             reserved: self.issuer.reserved,
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+mod _fs {
+    use std::path::Path;
+
+    use strict_encoding::{SerializeError, StrictSerialize};
+
+    use crate::{Container, ContainerPayload};
+
+    impl<D: ContainerPayload> Container<D> {
+        pub fn save(&self, path: impl AsRef<Path>) -> Result<(), SerializeError> {
+            self.strict_serialize_to_file::<{ usize::MAX }>(path)
         }
     }
 }

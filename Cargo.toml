@@ -42,6 +42,7 @@ name = "sonic"
 
 [[example]]
 name = "dao"
+required-features = ["std"]
 
 [dependencies]
 amplify.workspace = true
@@ -57,9 +58,10 @@ rand = "0.8.5"
 serde = { workspace = true, optional = true }
 
 [features]
-default = []
-all = ["stl", "serde"]
+default = ["std"]
+all = ["stl", "std", "serde"]
 
+std = []
 stl = ["commit_verify/stl", "ultrasonic/stl", "strict_types/armor"]
 serde = [
     "dep:serde",
@@ -81,5 +83,6 @@ wasm-bindgen-test = "0.3"
 features = ["all"]
 
 [patch.crates-io]
+strict_types = { git = "https://github.com/strict-types/strict-types", branch = "develop" }
 commit_verify = { git = "https://github.com/LNP-BP/client_side_validation", branch = "v0.12" }
 ultrasonic = { git = "https://github.com/AluVM/ultrasonic" }
