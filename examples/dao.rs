@@ -7,7 +7,7 @@ use amplify::confinement::{SmallString, TinyString};
 use sonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc, EmbeddedReaders};
 use sonic::{Api, ApiInner, AppendApi, DestructibleApi, Issuer, Private};
 use strict_types::stl::std_stl;
-use strict_types::{SemId, SymbolicSys, SystemBuilder, TypeSystem};
+use strict_types::{SemId, StrictVal, SymbolicSys, SystemBuilder, TypeSystem};
 use ultrasonic::{Codex, Identity};
 
 pub struct PartyId(u64);
@@ -94,17 +94,20 @@ fn main() {
         developer: Identity::default(),
         append_only: tiny_bmap! {
             vname!("_parties") => AppendApi {
-                sem_id: types.get("PartyPair"),
+                sem_id: types.get("PartyId"),
+                raw_sem_id: types.get("Party"),
                 published: true,
                 adaptor: EmbeddedImmutable(0),
             },
             vname!("_votings") => AppendApi {
-                sem_id: types.get("VotingPair"),
+                sem_id: types.get("VoteId"),
+                raw_sem_id: types.get("Voting"),
                 published: true,
                 adaptor: EmbeddedImmutable(1),
             },
             vname!("_votes") => AppendApi {
                 sem_id: types.get("CastVote"),
+                raw_sem_id: SemId::unit(),
                 published: true,
                 adaptor: EmbeddedImmutable(2),
             },
@@ -143,7 +146,12 @@ fn main() {
 
     let issuer = Issuer::new(codex, api, [], types.type_system());
     // TODO: Save the issuer
+    //issuer.save("ExampleDAO.cnt");
 
-    let deeds = issuer.start_issue("setup").finish::<Private>("ExampleDAO");
+    let deeds = issuer
+        .start_issue("setup")
+        .add_immutable("_parties", svnum!(0), Some(ston!("me", "My Own Name")))
+        .finish::<Private>("ExampleDAO");
     // TODO: Save the deeds
+    //deeds.save("ExampleDAO.cnt");
 }

@@ -22,9 +22,11 @@
 // the License.
 
 use aluvm::LibSite;
+use amplify::confinement::ConfinedBlob;
 use strict_types::{SemId, StrictDumb, StrictVal, TypeSystem};
 use ultrasonic::{StateData, StateValue};
 
+use crate::api::TOTAL_BYTES;
 use crate::{ApiVm, StateAdaptor, StateArithm, StructData, VmType, LIB_NAME_SONIC};
 
 impl ApiVm for aluvm::Vm {
@@ -49,11 +51,9 @@ impl StateAdaptor for AluAdaptor {
 
     fn convert_destructible(&self, sem_id: SemId, value: StateValue, sys: &TypeSystem) -> Option<StrictVal> { todo!() }
 
-    fn build_immutable(&self, sem_id: SemId, data: StrictVal, raw: Option<StrictVal>, sys: &TypeSystem) -> StateData {
-        todo!()
-    }
+    fn build_immutable(&self, value: ConfinedBlob<0, TOTAL_BYTES>) -> StateValue { todo!() }
 
-    fn build_destructible(&self, sem_id: SemId, data: StrictVal, sys: &TypeSystem) -> StateValue { todo!() }
+    fn build_destructible(&self, value: ConfinedBlob<0, TOTAL_BYTES>) -> StateValue { todo!() }
 }
 
 #[derive(Clone, Debug)]

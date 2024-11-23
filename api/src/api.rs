@@ -37,7 +37,7 @@ use core::cmp::Ordering;
 use core::fmt::Debug;
 use core::hash::{Hash, Hasher};
 
-use amplify::confinement::{TinyOrdMap, TinyString};
+use amplify::confinement::{ConfinedBlob, TinyOrdMap, TinyString, U16 as U16MAX};
 use amplify::Bytes32;
 use commit_verify::{CommitId, ReservedBytes};
 use strict_types::{SemId, StrictDecode, StrictDumb, StrictEncode, StrictVal, TypeName, TypeSystem, VariantName};
@@ -45,6 +45,9 @@ use ultrasonic::{CallId, CodexId, Identity, StateData, StateValue};
 
 use crate::embedded::EmbeddedProc;
 use crate::{StructData, VmType, LIB_NAME_SONIC};
+
+pub(super) const USED_FIEL_BYTES: usize = u128::BITS as usize / 8 - 1;
+pub(super) const TOTAL_BYTES: usize = USED_FIEL_BYTES * 3;
 
 pub type StateName = VariantName;
 pub type MethodName = VariantName;
@@ -255,12 +258,20 @@ mod _baid4 {
     }
 }
 
+/// API for append-only state.
+///
+/// API covers two main functions: taking structured data from the user input and _building_ a valid
+/// state included into a new contract operation - and taking contract state and _converting_ it
+/// into a user-friendly form, as a structured data (which may be lately used by _readers_
+/// performing aggregation of state into a collection-type objects).
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_SONIC)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct AppendApi<Vm: ApiVm> {
     pub sem_id: SemId,
+    pub raw_sem_id: SemId,
+
     pub published: bool,
     /// Procedures which convert a state made of finite field elements [`StateData`] into a
     /// structured type [`StructData`] and vice verse.
@@ -271,8 +282,23 @@ impl<Vm: ApiVm> AppendApi<Vm> {
     pub fn convert(&self, data: &StateData, sys: &TypeSystem) -> Option<StrictVal> {
         self.adaptor.convert_immutable(self.sem_id, data, sys)
     }
+
+    /// Build an immutable memory cell out of structured state.
+    ///
+    /// Since append-only state includes both field elements (verifiable part of the state) and
+    /// optional structured data (non-verifiable, non-compressible part of the state) it takes
+    /// two inputs of a structured state data, leaving the raw part unchanged.
     pub fn build(&self, value: StrictVal, raw: Option<StrictVal>, sys: &TypeSystem) -> StateData {
-        self.adaptor.build_immutable(self.sem_id, value, raw, sys)
+        let raw = raw.map(|raw| {
+            let typed = sys
+                .typify(raw, self.raw_sem_id)
+                .expect("invalid strict value not matching semantic type information");
+            sys.strict_serialize_value::<U16MAX>(&typed)
+                .expect("strict value is too large")
+                .into()
+        });
+        let value = self.adaptor.build_state(self.sem_id, value, sys);
+        StateData { value, raw }
     }
 }
 
@@ -295,8 +321,8 @@ impl<Vm: ApiVm> DestructibleApi<Vm> {
     pub fn convert(&self, value: StateValue, sys: &TypeSystem) -> Option<StrictVal> {
         self.adaptor.convert_destructible(self.sem_id, value, sys)
     }
-    pub fn build(&self, data: StrictVal, sys: &TypeSystem) -> StateValue {
-        self.adaptor.build_destructible(self.sem_id, data, sys)
+    pub fn build(&self, value: StrictVal, sys: &TypeSystem) -> StateValue {
+        self.adaptor.build_state(self.sem_id, value, sys)
     }
 }
 
@@ -322,8 +348,19 @@ pub trait ApiVm {
 pub trait StateAdaptor: Clone + Ord + Debug + StrictDumb + StrictEncode + StrictDecode + Serde {
     fn convert_immutable(&self, sem_id: SemId, data: &StateData, sys: &TypeSystem) -> Option<StrictVal>;
     fn convert_destructible(&self, sem_id: SemId, value: StateValue, sys: &TypeSystem) -> Option<StrictVal>;
-    fn build_immutable(&self, sem_id: SemId, value: StrictVal, raw: Option<StrictVal>, sys: &TypeSystem) -> StateData;
-    fn build_destructible(&self, sem_id: SemId, value: StrictVal, sys: &TypeSystem) -> StateValue;
+
+    fn build_immutable(&self, value: ConfinedBlob<0, TOTAL_BYTES>) -> StateValue;
+    fn build_destructible(&self, value: ConfinedBlob<0, TOTAL_BYTES>) -> StateValue;
+
+    fn build_state(&self, sem_id: SemId, value: StrictVal, sys: &TypeSystem) -> StateValue {
+        let typed = sys
+            .typify(value, sem_id)
+            .expect("invalid strict value not matching semantic type information");
+        let ser = sys
+            .strict_serialize_value::<TOTAL_BYTES>(&typed)
+            .expect("strict value is too large");
+        self.build_immutable(ser)
+    }
 }
 
 // TODO: Use Result's instead of Option

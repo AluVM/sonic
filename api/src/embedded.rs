@@ -21,11 +21,12 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use amplify::confinement::{SmallBlob, U16 as U16MAX};
+use amplify::confinement::{ConfinedBlob, SmallBlob};
 use strict_encoding::{StrictDecode, StrictEncode};
 use strict_types::{SemId, StrictVal, TypeSystem};
 use ultrasonic::{StateData, StateValue};
 
+use crate::api::{TOTAL_BYTES, USED_FIEL_BYTES};
 use crate::{ApiVm, StateAdaptor, StateArithm, StateName, StateTy, StructData, VmType, LIB_NAME_SONIC};
 
 #[derive(Clone, Debug)]
@@ -74,9 +75,6 @@ pub enum EmbeddedReaders {
 pub struct EmbeddedImmutable(pub StateTy);
 
 impl EmbeddedImmutable {
-    const USED_FIEL_BYTES: usize = u128::BITS as usize / 8 - 1;
-    const TOTAL_BYTES: usize = Self::USED_FIEL_BYTES * 3;
-
     fn convert_value(&self, sem_id: SemId, value: StateValue, sys: &TypeSystem) -> Option<StrictVal> {
         // State type doesn't match
         let ty = value.get(0)?.0;
@@ -84,11 +82,11 @@ impl EmbeddedImmutable {
             return None;
         }
 
-        let mut buf = [0u8; Self::TOTAL_BYTES];
+        let mut buf = [0u8; TOTAL_BYTES];
         let mut i = 1u8;
         while let Some(el) = value.get(i) {
-            let from = Self::USED_FIEL_BYTES * i as usize;
-            let to = from + Self::USED_FIEL_BYTES;
+            let from = USED_FIEL_BYTES * i as usize;
+            let to = from + USED_FIEL_BYTES;
             buf[from..to].copy_from_slice(&el.0.to_le_bytes());
             i += 1;
         }
@@ -98,18 +96,10 @@ impl EmbeddedImmutable {
         Some(val.unbox())
     }
 
-    fn build_value(&self, sem_id: SemId, value: StrictVal, sys: &TypeSystem) -> StateValue {
-        let typed = sys
-            .typify(value, sem_id)
-            .expect("invalid strict value not matching semantic type information");
-        let ser = sys
-            .strict_serialize_value::<{ Self::TOTAL_BYTES }>(&typed)
-            .expect("strict value is too large")
-            .release();
-
+    fn build_value(&self, ser: ConfinedBlob<0, TOTAL_BYTES>) -> StateValue {
         let mut elems = Vec::with_capacity(4);
         elems.push(self.0);
-        for chunk in ser.chunks(Self::USED_FIEL_BYTES) {
+        for chunk in ser.chunks(USED_FIEL_BYTES) {
             let mut buf = [0u8; u128::BITS as usize / 8];
             buf[..chunk.len()].copy_from_slice(chunk);
             elems.push(u128::from_le_bytes(buf));
@@ -129,22 +119,9 @@ impl StateAdaptor for EmbeddedImmutable {
         self.convert_value(sem_id, value, sys)
     }
 
-    fn build_immutable(&self, sem_id: SemId, value: StrictVal, raw: Option<StrictVal>, sys: &TypeSystem) -> StateData {
-        let value = self.build_value(sem_id, value, sys);
-        let raw = raw.map(|raw| {
-            let typed = sys
-                .typify(raw, sem_id)
-                .expect("invalid strict value not matching semantic type information");
-            sys.strict_serialize_value::<U16MAX>(&typed)
-                .expect("strict value is too large")
-                .into()
-        });
-        StateData { value, raw }
-    }
+    fn build_immutable(&self, value: ConfinedBlob<0, TOTAL_BYTES>) -> StateValue { self.build_value(value) }
 
-    fn build_destructible(&self, sem_id: SemId, value: StrictVal, sys: &TypeSystem) -> StateValue {
-        self.build_value(sem_id, value, sys)
-    }
+    fn build_destructible(&self, value: ConfinedBlob<0, TOTAL_BYTES>) -> StateValue { self.build_value(value) }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
