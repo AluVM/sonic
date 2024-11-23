@@ -6,7 +6,7 @@ extern crate strict_types;
 use sonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc, EmbeddedReaders};
 use sonic::{Api, ApiInner, AppendApi, DestructibleApi, Issuer, Private};
 use strict_types::SemId;
-use ultrasonic::{fe128, Codex, Identity};
+use ultrasonic::{fe128, CellAddr, Codex, Identity};
 
 mod dao {
     use amplify::confinement::{SmallString, TinyString};
@@ -246,7 +246,7 @@ fn main() {
         .expect("unable to save issuer to a file");
 
     // Proposing vote
-    deeds
+    let votings = deeds
         .start_deed("proposal")
         .append(
             "_votings",
@@ -259,6 +259,7 @@ fn main() {
     deeds
         .start_deed("castVote")
         .using(fe128(0), svnum!(0u64))
+        .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(0u8), partyId 0u64), None)
         .assign("signers", fe128(10), svnum!(0u64), None)
         .commit();
@@ -267,12 +268,14 @@ fn main() {
     deeds
         .start_deed("castVote")
         .using(fe128(1), svnum!(1u64))
+        .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 0u64), None)
         .assign("signers", fe128(11), svnum!(1u64), None)
         .commit();
     deeds
         .start_deed("castVote")
         .using(fe128(2), svnum!(2u64))
+        .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 0u64), None)
         .assign("signers", fe128(12), svnum!(2u64), None)
         .commit();

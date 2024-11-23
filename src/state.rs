@@ -44,7 +44,7 @@ impl RawState {
     pub fn seal_addr(&self, seal: fe128) -> CellAddr { *self.seals.get(&seal).expect("undefined seal") }
 
     pub fn apply(&mut self, op: Operation) {
-        let opid = op.commit_id();
+        let opid = op.opid();
         for input in op.destroying {
             let res = self.owned.remove(&input.addr).expect("unknown input");
             self.seals.shift_remove(&res.seal);

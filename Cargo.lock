@@ -787,7 +787,7 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 [[package]]
 name = "ultrasonic"
 version = "0.12.0-beta.1"
-source = "git+https://github.com/AluVM/ultrasonic#aa2d8cadec273e21f755320e33a96d9a7725d774"
+source = "git+https://github.com/AluVM/ultrasonic#89b6811b0dfc48cae92943a0d6113f6cf829af17"
 dependencies = [
  "amplify",
  "baid64 0.4.0",

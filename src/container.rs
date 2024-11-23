@@ -25,11 +25,11 @@ use core::fmt::Debug;
 
 use aluvm::{Lib, LibId, LibSite};
 use amplify::confinement::{LargeVec, SmallOrdMap, SmallOrdSet, TinyOrdMap};
-use commit_verify::ReservedBytes;
+use commit_verify::{CommitId, ReservedBytes};
 use sonicapi::{Api, MethodName, StateName};
 use strict_encoding::{StrictDecode, StrictDeserialize, StrictDumb, StrictEncode, StrictSerialize, TypeName};
 use strict_types::{StrictVal, TypeSystem};
-use ultrasonic::{fe128, CallId, CellAddr, Codex, Identity, Input, LibRepo, Operation, ProofOfPubl};
+use ultrasonic::{fe128, CallId, CellAddr, Codex, Identity, Input, LibRepo, Operation, Opid, ProofOfPubl};
 
 use crate::annotations::Annotations;
 use crate::sigs::ContentSigs;
@@ -231,6 +231,11 @@ pub struct DeedBuilder<'c> {
 }
 
 impl<'c> DeedBuilder<'c> {
+    pub fn reading(mut self, addr: CellAddr) -> Self {
+        self.builder = self.builder.access(addr);
+        self
+    }
+
     pub fn using(mut self, seal: fe128, witness: StrictVal) -> Self {
         let addr = self.state.seal_addr(seal);
         self.builder = self.builder.destroy(addr, witness);
@@ -247,13 +252,15 @@ impl<'c> DeedBuilder<'c> {
         self
     }
 
-    pub fn commit(self) {
+    pub fn commit(self) -> Opid {
         let deed = self.builder.finalize();
+        let opid = deed.opid();
         // TODO: Verify state
         self.state.apply(deed.clone());
         self.deeds
             .push(deed)
             .expect("more than 4 billions of deeds are not supported");
+        opid
     }
 }
 
