@@ -156,6 +156,22 @@ impl Api {
                 .build(data, raw, sys),
         }
     }
+
+    pub fn build_destructible(&self, name: impl Into<StateName>, data: StrictVal, sys: &TypeSystem) -> StateValue {
+        let name = name.into();
+        match self {
+            Api::Embedded(api) => api
+                .destructible
+                .get(&name)
+                .expect("state name is unknown for the API")
+                .build(data, sys),
+            Api::Alu(api) => api
+                .destructible
+                .get(&name)
+                .expect("state name is unknown for the API")
+                .build(data, sys),
+        }
+    }
 }
 
 /// API is an interface implementation.

@@ -64,8 +64,9 @@ pub enum EmbeddedReaders {
     #[strict_type(tag = 0x21)]
     Set(StateName, SemId),
 
+    /// Map from field-based element state to a non-verifiable structured state
     #[strict_type(tag = 0x22)]
-    Map { name: StateName, key: SemId, val: SemId },
+    MapF2S { name: StateName, key: SemId, val: SemId },
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]

@@ -8,7 +8,7 @@ use sonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc, EmbeddedR
 use sonic::{Api, ApiInner, AppendApi, DestructibleApi, Issuer, Private};
 use strict_types::stl::std_stl;
 use strict_types::{SemId, StrictVal, SymbolicSys, SystemBuilder, TypeSystem};
-use ultrasonic::{Codex, Identity};
+use ultrasonic::{fe128, Codex, Identity};
 
 pub struct PartyId(u64);
 pub struct Party {
@@ -120,12 +120,12 @@ fn main() {
             }
         },
         readers: tiny_bmap! {
-            vname!("parties") => EmbeddedReaders::Map {
+            vname!("parties") => EmbeddedReaders::MapF2S {
                 name: vname!("_parties"),
                 key: types.get("PartyId"),
                 val: types.get("Party"),
             },
-            vname!("votings") => EmbeddedReaders::Map {
+            vname!("votings") => EmbeddedReaders::MapF2S {
                 name: vname!("_votings"),
                 key: types.get("VoteId"),
                 val: types.get("Voting"),
@@ -151,6 +151,7 @@ fn main() {
     let deeds = issuer
         .start_issue("setup")
         .add_immutable("_parties", svnum!(0), Some(ston!("me", "My Own Name")))
+        .add_destructible("signers", fe128(0), svnum!(0), None)
         .finish::<Private>("ExampleDAO");
     // TODO: Save the deeds
     //deeds.save("ExampleDAO.cnt");

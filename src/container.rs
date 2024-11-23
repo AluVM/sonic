@@ -21,13 +21,13 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use aluvm::Lib;
+use aluvm::{Lib, LibSite};
 use amplify::confinement::{LargeVec, SmallOrdMap, SmallOrdSet, TinyOrdMap};
 use commit_verify::ReservedBytes;
 use sonicapi::{Api, MethodName, StateName};
 use strict_encoding::TypeName;
 use strict_types::{StrictVal, TypeSystem};
-use ultrasonic::{Codex, Identity, Operation, ProofOfPubl};
+use ultrasonic::{fe128, Codex, Identity, Operation, ProofOfPubl};
 
 use crate::annotations::Annotations;
 use crate::sigs::ContentSigs;
@@ -92,6 +92,19 @@ impl BuildingIssuer {
         self.builder = self
             .builder
             .add_immutable(name, data, raw, &self.issuer.default_api, &self.issuer.types);
+        self
+    }
+
+    pub fn add_destructible(
+        mut self,
+        name: impl Into<StateName>,
+        seal: fe128,
+        data: StrictVal,
+        lock: Option<LibSite>,
+    ) -> Self {
+        self.builder =
+            self.builder
+                .add_destructible(name, seal, data, lock, &self.issuer.default_api, &self.issuer.types);
         self
     }
 

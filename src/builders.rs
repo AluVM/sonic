@@ -21,10 +21,11 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+use aluvm::LibSite;
 use amplify::confinement::SmallVec;
 use sonicapi::{Api, StateName};
 use strict_types::{StrictVal, TypeSystem};
-use ultrasonic::{CallId, CellAddr, Codex, ContractId, Genesis, Input, Operation, StateCell, StateData};
+use ultrasonic::{fe128, CallId, CellAddr, Codex, ContractId, Genesis, Input, Operation, StateCell, StateData};
 
 pub struct Builder {
     call_id: CallId,
@@ -45,6 +46,23 @@ impl Builder {
     ) -> Self {
         let data = api.build_immutable(name, data, raw, sys);
         self.immutable.push(data).expect("too many state elements");
+        self
+    }
+
+    pub fn add_destructible(
+        mut self,
+        name: impl Into<StateName>,
+        seal: fe128,
+        data: StrictVal,
+        lock: Option<LibSite>,
+        api: &Api,
+        sys: &TypeSystem,
+    ) -> Self {
+        let data = api.build_destructible(name, data, sys);
+        let cell = StateCell { data, seal, lock };
+        self.destructible
+            .push(cell)
+            .expect("too many state elements");
         self
     }
 
@@ -78,6 +96,19 @@ impl<'c> BuilderRef<'c> {
         self
     }
 
+    pub fn add_destructible(
+        mut self,
+        name: impl Into<StateName>,
+        seal: fe128,
+        data: StrictVal,
+        lock: Option<LibSite>,
+    ) -> Self {
+        self.inner = self
+            .inner
+            .add_destructible(name, seal, data, lock, self.api, self.type_system);
+        self
+    }
+
     pub fn issue_genesis(self) -> Genesis { self.inner.issue_genesis(&self.codex) }
 }
 
@@ -91,6 +122,17 @@ pub struct OpBuilder<'c> {
 impl<'c> OpBuilder<'c> {
     pub fn add_immutable(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
         self.inner = self.inner.add_immutable(name, data, raw);
+        self
+    }
+
+    pub fn add_destructible(
+        mut self,
+        name: impl Into<StateName>,
+        seal: fe128,
+        data: StrictVal,
+        lock: Option<LibSite>,
+    ) -> Self {
+        self.inner = self.inner.add_destructible(name, seal, data, lock);
         self
     }
 
