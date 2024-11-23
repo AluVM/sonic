@@ -21,7 +21,7 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use commit_verify::ReservedBytes;
+use commit_verify::{CommitId, ReservedBytes};
 use strict_encoding::{StrictDecode, StrictDumb, StrictEncode, TypeName};
 use ultrasonic::{Codex, ContractId, Genesis, Identity, ProofOfPubl};
 
@@ -38,6 +38,10 @@ pub struct Contract<PoP: ProofOfPubl> {
     pub meta: ContractMeta<PoP>,
     pub codex: Codex,
     pub genesis: Genesis,
+}
+
+impl<PoP: ProofOfPubl> Contract<PoP> {
+    pub fn contract_id(&self) -> ContractId { self.commit_id() }
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]

@@ -221,19 +221,64 @@ fn main() {
         errors: Default::default(),
     });
 
+    // Creating DAO with three participants
     let issuer = Issuer::new(codex, api, [], types.type_system());
-    // TODO: Save the issuer
     issuer
-        .save("examples/dao.cdx")
+        .save("examples/dao.codex")
         .expect("unable to save issuer to a file");
 
-    let deeds = issuer
+    let mut deeds = issuer
         .start_issue("setup")
-        .add_immutable("_parties", svnum!(0u64), Some(ston!(name "me", identity "My Own Name")))
-        .add_destructible("signers", fe128(0), svnum!(0u128), None)
-        .finish::<Private>("ExampleDAO");
-    // TODO: Save the deeds
+        // Alice
+        .append("_parties", svnum!(0u64), Some(ston!(name "alice", identity "Alice Wonderland")))
+        .assign("signers", fe128(0), svnum!(0u64), None)
+        // Bob
+        .append("_parties", svnum!(1u64), Some(ston!(name "bob", identity "Bob Capricorn")))
+        .assign("signers", fe128(1), svnum!(1u64), None)
+        // Carol
+        .append("_parties", svnum!(2u64), Some(ston!(name "carol", identity "Carol Caterpillar")))
+        .assign("signers", fe128(2), svnum!(2u64), None)
+
+        .finish::<Private>("WonderlandDAO");
+
     deeds
-        .save("examples/dao.deed")
+        .save("examples/dao.contract")
+        .expect("unable to save issuer to a file");
+
+    // Proposing vote
+    deeds
+        .start_deed("proposal")
+        .append(
+            "_votings",
+            svnum!(100u64),
+            Some(ston!(title "Is Alice on duty today?", text "Vote 'pro' if Alice should be on duty today")),
+        )
+        .commit();
+
+    // Alice vote against her being on duty today
+    deeds
+        .start_deed("castVote")
+        .using(fe128(0), svnum!(0u64))
+        .append("_votes", ston!(voteId 100u64, vote svenum!(0u8), partyId 0u64), None)
+        .assign("signers", fe128(10), svnum!(0u64), None)
+        .commit();
+
+    // Bob and Carol vote for Alice being on duty today
+    deeds
+        .start_deed("castVote")
+        .using(fe128(1), svnum!(1u64))
+        .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 0u64), None)
+        .assign("signers", fe128(11), svnum!(1u64), None)
+        .commit();
+    deeds
+        .start_deed("castVote")
+        .using(fe128(2), svnum!(2u64))
+        .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 0u64), None)
+        .assign("signers", fe128(12), svnum!(2u64), None)
+        .commit();
+
+    // Now anybody accessing this file can figure out who is on duty today, by the decision of DAO.
+    deeds
+        .save("examples/dao.deeds")
         .expect("unable to save issuer to a file");
 }

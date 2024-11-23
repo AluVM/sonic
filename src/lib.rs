@@ -48,7 +48,9 @@ mod container;
 pub mod sigs;
 pub mod annotations;
 mod builders;
+mod state;
 
-pub use builders::{Builder, BuilderRef, OpBuilder};
+pub use builders::{Builder, BuilderRef, OpBuilderRef};
 pub use container::{Container, ContainerPayload, ContractDeeds, Deeds, Issuer};
 pub use contract::{Contract, ContractMeta, ContractName, ContractPrivate, ContractRef, Private};
+pub use state::{RawState, State};

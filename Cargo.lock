@@ -608,6 +608,7 @@ dependencies = [
  "chrono",
  "commit_verify",
  "getrandom",
+ "indexmap",
  "rand",
  "serde",
  "sonic-api",
@@ -786,7 +787,7 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 [[package]]
 name = "ultrasonic"
 version = "0.12.0-beta.1"
-source = "git+https://github.com/AluVM/ultrasonic#bb136efab0286081811ea2125647546223c2731f"
+source = "git+https://github.com/AluVM/ultrasonic#aa2d8cadec273e21f755320e33a96d9a7725d774"
 dependencies = [
  "amplify",
  "baid64 0.4.0",
@@ -1070,8 +1071,7 @@ dependencies = [
 [[package]]
 name = "zk-aluvm"
 version = "0.12.0-beta.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "491366e2631e4b1a5eb6004f87b3fd4428c7f0eabb97d4d88df74c364728bdd5"
+source = "git+https://github.com/AluVM/zk-aluvm#9f186b6c38e4ed6e707a239b19a457e2da38ed92"
 dependencies = [
  "aluvm",
  "amplify",

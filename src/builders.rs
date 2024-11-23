@@ -25,7 +25,9 @@ use aluvm::LibSite;
 use amplify::confinement::SmallVec;
 use sonicapi::{Api, StateName};
 use strict_types::{StrictVal, TypeSystem};
-use ultrasonic::{fe128, CallId, CellAddr, Codex, ContractId, Genesis, Input, Operation, StateCell, StateData};
+use ultrasonic::{
+    fe128, CallId, CellAddr, CodexId, ContractId, Genesis, Input, Operation, StateCell, StateData, StateValue,
+};
 
 pub struct Builder {
     call_id: CallId,
@@ -66,9 +68,9 @@ impl Builder {
         self
     }
 
-    pub fn issue_genesis(self, codex: &Codex) -> Genesis {
+    pub fn issue_genesis(self, codex_id: CodexId) -> Genesis {
         Genesis {
-            codex_id: codex.codex_id(),
+            codex_id,
             call_id: self.call_id,
             destructible: self.destructible,
             immutable: self.immutable,
@@ -80,13 +82,12 @@ impl Builder {
 pub struct BuilderRef<'c> {
     type_system: &'c TypeSystem,
     api: &'c Api,
-    codex: &'c Codex,
     inner: Builder,
 }
 
 impl<'c> BuilderRef<'c> {
-    pub fn new(api: &'c Api, codex: &'c Codex, call_id: CallId, sys: &'c TypeSystem) -> Self {
-        BuilderRef { type_system: sys, api, codex, inner: Builder::new(call_id) }
+    pub fn new(api: &'c Api, call_id: CallId, sys: &'c TypeSystem) -> Self {
+        BuilderRef { type_system: sys, api, inner: Builder::new(call_id) }
     }
 
     pub fn add_immutable(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
@@ -109,17 +110,22 @@ impl<'c> BuilderRef<'c> {
         self
     }
 
-    pub fn issue_genesis(self) -> Genesis { self.inner.issue_genesis(&self.codex) }
+    pub fn issue_genesis(self, codex_id: CodexId) -> Genesis { self.inner.issue_genesis(codex_id) }
 }
 
-pub struct OpBuilder<'c> {
+pub struct OpBuilderRef<'c> {
     contract_id: ContractId,
     destroying: SmallVec<Input>,
     reading: SmallVec<CellAddr>,
     inner: BuilderRef<'c>,
 }
 
-impl<'c> OpBuilder<'c> {
+impl<'c> OpBuilderRef<'c> {
+    pub fn new(api: &'c Api, contract_id: ContractId, call_id: CallId, sys: &'c TypeSystem) -> Self {
+        let inner = BuilderRef::new(api, call_id, sys);
+        Self { contract_id, destroying: none!(), reading: none!(), inner }
+    }
+
     pub fn add_immutable(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
         self.inner = self.inner.add_immutable(name, data, raw);
         self
@@ -133,6 +139,22 @@ impl<'c> OpBuilder<'c> {
         lock: Option<LibSite>,
     ) -> Self {
         self.inner = self.inner.add_destructible(name, seal, data, lock);
+        self
+    }
+
+    pub fn access(mut self, addr: CellAddr) -> Self {
+        self.reading
+            .push(addr)
+            .expect("number of read memory cells exceeds 64k limit");
+        self
+    }
+
+    pub fn destroy(mut self, addr: CellAddr, witness: StrictVal) -> Self {
+        // TODO: Convert witness
+        let input = Input { addr, witness: StateValue::None };
+        self.destroying
+            .push(input)
+            .expect("number of inputs exceeds 64k limit");
         self
     }
 
