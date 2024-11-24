@@ -5,7 +5,7 @@ extern crate strict_types;
 
 use sonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc, EmbeddedReaders};
 use sonic::{Api, ApiInner, AppendApi, DestructibleApi, Issuer, Private};
-use strict_types::SemId;
+use strict_types::{SemId, StrictVal};
 use ultrasonic::{fe128, CellAddr, Codex, Identity};
 
 mod dao {
@@ -226,21 +226,31 @@ fn main() {
         .start_deed("castVote")
         .using(fe128(1), svnum!(1u64), &init_state)
         .reading(CellAddr::new(votings, 0))
-        .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 0u64), None)
+        .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 1u64), None)
         .assign("signers", fe128(11), svnum!(1u64), None)
         .commit();
     deeds
         .start_deed("castVote")
         .using(fe128(2), svnum!(2u64), &init_state)
         .reading(CellAddr::new(votings, 0))
-        .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 0u64), None)
+        .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 2u64), None)
         .assign("signers", fe128(12), svnum!(2u64), None)
         .commit();
 
     let post_voting_state = deeds.effective_state();
-    //eprintln!("{post_voting_state:#?}");
-    let votes = post_voting_state.read("votes");
-    print!("{votes}");
+    //eprintln!("{post_voting_state:#x?}");
+    let StrictVal::Map(votings) = post_voting_state.read("votings") else {
+        panic!("invalid data")
+    };
+    let (_, first_voting) = votings.first().unwrap();
+    println!("voting: {first_voting}");
+    println!("Votes:");
+    let StrictVal::Set(votes) = post_voting_state.read("votes") else {
+        panic!("invalid data")
+    };
+    for vote in votes {
+        println!("- {vote}");
+    }
 
     // Now anybody accessing this file can figure out who is on duty today, by the decision of DAO.
     deeds

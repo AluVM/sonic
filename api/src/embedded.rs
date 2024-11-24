@@ -22,7 +22,7 @@
 // the License.
 
 use amplify::confinement::ConfinedBlob;
-use strict_encoding::{StrictDecode, StrictEncode};
+use strict_encoding::{StreamReader, StrictDecode, StrictEncode};
 use strict_types::typify::TypedVal;
 use strict_types::value::StrictNum;
 use strict_types::{SemId, StrictVal, TypeSystem};
@@ -134,14 +134,15 @@ impl EmbeddedImmutable {
         let mut buf = [0u8; TOTAL_BYTES];
         let mut i = 1u8;
         while let Some(el) = value.get(i) {
-            let from = USED_FIEL_BYTES * i as usize;
-            let to = from + USED_FIEL_BYTES;
-            buf[from..to].copy_from_slice(&el.0.to_le_bytes()[..USED_FIEL_BYTES]);
+            let from = USED_FIEL_BYTES * (i - 1) as usize;
+            let to = USED_FIEL_BYTES * i as usize;
+            buf[from..to].copy_from_slice(&el.0.to_be_bytes()[..USED_FIEL_BYTES]);
             i += 1;
         }
         debug_assert!(i <= 4);
 
-        let val = sys.strict_deserialize_type(sem_id, &buf).ok()?;
+        let mut cursor = StreamReader::cursor::<TOTAL_BYTES>(buf);
+        let val = sys.strict_read_type(sem_id, &mut cursor).ok()?;
         Some(val.unbox())
     }
 
@@ -151,7 +152,7 @@ impl EmbeddedImmutable {
         for chunk in ser.chunks(USED_FIEL_BYTES) {
             let mut buf = [0u8; u128::BITS as usize / 8];
             buf[..chunk.len()].copy_from_slice(chunk);
-            elems.push(u128::from_le_bytes(buf));
+            elems.push(u128::from_be_bytes(buf));
         }
 
         StateValue::from(elems)
