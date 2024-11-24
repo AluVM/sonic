@@ -27,14 +27,24 @@ use strict_types::{SemId, StrictDumb, StrictVal, TypeSystem};
 use ultrasonic::{StateData, StateValue};
 
 use crate::api::TOTAL_BYTES;
-use crate::{ApiVm, StateAdaptor, StateArithm, StructData, VmType, LIB_NAME_SONIC};
+use crate::{ApiVm, StateAdaptor, StateArithm, StateAtom, StateName, StateReader, StructData, VmType, LIB_NAME_SONIC};
 
 impl ApiVm for aluvm::Vm {
     type Arithm = AluVMArithm;
-    type Reader = LibSite;
+    type Reader = AluReader;
     type Adaptor = AluAdaptor;
 
     fn vm_type(&self) -> VmType { VmType::AluVM }
+}
+
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONIC)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(transparent))]
+pub struct AluReader(LibSite);
+
+impl StateReader for AluReader {
+    fn read<'s, I: IntoIterator<Item = &'s StateAtom>>(&self, state: impl Fn(&StateName) -> I) -> StrictVal { todo!() }
 }
 
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug)]
@@ -47,7 +57,15 @@ pub struct AluAdaptor {
 }
 
 impl StateAdaptor for AluAdaptor {
-    fn convert_immutable(&self, sem_id: SemId, data: &StateData, sys: &TypeSystem) -> Option<StrictVal> { todo!() }
+    fn convert_immutable(
+        &self,
+        sem_id: SemId,
+        raw_sem_id: SemId,
+        data: &StateData,
+        sys: &TypeSystem,
+    ) -> Option<StateAtom> {
+        todo!()
+    }
 
     fn convert_destructible(&self, sem_id: SemId, value: StateValue, sys: &TypeSystem) -> Option<StrictVal> { todo!() }
 

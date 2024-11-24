@@ -25,16 +25,16 @@ use core::fmt::Debug;
 
 use aluvm::{Lib, LibId, LibSite};
 use amplify::confinement::{LargeVec, SmallOrdMap, SmallOrdSet, TinyOrdMap};
-use commit_verify::{CommitId, ReservedBytes};
+use commit_verify::ReservedBytes;
 use sonicapi::{Api, MethodName, StateName};
 use strict_encoding::{StrictDecode, StrictDeserialize, StrictDumb, StrictEncode, StrictSerialize, TypeName};
 use strict_types::{StrictVal, TypeSystem};
-use ultrasonic::{fe128, CallId, CellAddr, Codex, Identity, Input, LibRepo, Operation, Opid, ProofOfPubl};
+use ultrasonic::{fe128, CallId, CellAddr, Codex, Identity, LibRepo, Operation, Opid, ProofOfPubl};
 
 use crate::annotations::Annotations;
 use crate::sigs::ContentSigs;
 use crate::state::RawState;
-use crate::{Builder, Contract, ContractMeta, ContractName, OpBuilderRef, State, LIB_NAME_SONIC};
+use crate::{Builder, Contract, ContractMeta, ContractName, ContractState, OpBuilderRef, LIB_NAME_SONIC};
 
 pub type Issuer = Container<()>;
 pub type Deeds<PoP> = Container<ContractDeeds<PoP>>;
@@ -82,7 +82,7 @@ pub struct ContractDeeds<PoP: ProofOfPubl> {
     pub operations: LargeVec<Operation>,
     pub contract_sigs: ContentSigs,
     #[strict_type(skip)]
-    pub state: Option<RawState>,
+    pub state: Option<ContractState>,
 }
 
 impl<PoP: ProofOfPubl> Eq for ContractDeeds<PoP> {}
@@ -102,6 +102,19 @@ impl<PoP: ProofOfPubl> StrictDumb for ContractDeeds<PoP> {
             contract_sigs: strict_dumb!(),
             state: None,
         }
+    }
+}
+
+impl<PoP: ProofOfPubl> ContractDeeds<PoP> {
+    fn deeds_state_mut(&mut self) -> (&mut LargeVec<Operation>, &mut RawState) {
+        (
+            &mut self.operations,
+            &mut self
+                .state
+                .as_mut()
+                .expect("contract state must be present")
+                .raw,
+        )
     }
 }
 
@@ -129,14 +142,22 @@ impl Issuer {
 }
 
 impl<PoP: ProofOfPubl> Deeds<PoP> {
-    pub fn compute_state(&self) -> &RawState {
+    pub fn computed_state(&self) -> &ContractState {
         match &self.payload.state {
             Some(state) => state,
             None => todo!("compute state"),
         }
     }
 
-    pub fn state(&self, api: impl Into<TypeName>) -> Option<&State> { todo!("compute API-based state") }
+    pub fn read(&self, reader: impl Into<StateName>) -> StrictVal {
+        let state = self.computed_state();
+        let empty = bmap![];
+        self.default_api
+            .read(reader, |name| match state.main.immutable(&name) {
+                None => empty.values(),
+                Some(src) => src.values(),
+            })
+    }
 
     pub fn start_deed(&mut self, method: impl Into<MethodName>) -> DeedBuilder<'_> {
         let builder = OpBuilderRef::new(
@@ -145,21 +166,28 @@ impl<PoP: ProofOfPubl> Deeds<PoP> {
             self.call_id(method),
             &self.types,
         );
-        self.compute_state();
-        DeedBuilder {
-            builder,
-            deeds: &mut self.payload.operations,
-            state: self.payload.state.as_mut().unwrap(),
-        }
+        self.computed_state();
+        let (deeds, state) = self.payload.deeds_state_mut();
+        DeedBuilder { builder, deeds, state }
     }
 
     pub fn apply(&mut self, op: Operation) {
-        let state = self.compute_state();
+        //let state = self.computed_state();
         // TODO: Enable verification
         // self.codex
         //    .verify(self.payload.contract.contract_id(), &op, state, self)
         //    .expect("invalid genesis data");
-        self.payload.state.as_mut().unwrap().apply(op);
+        let state = self.payload.state.as_mut().unwrap();
+        state.main.apply(&op, &self.default_api, &self.types);
+        for api in self.custom_apis.keys() {
+            // TODO: Remove name from API itself.
+            let Some(name) = api.name() else {
+                continue;
+            };
+            let state = state.apis.entry(name.clone()).or_default();
+            state.apply(&op, api, &self.types);
+        }
+        state.raw.apply(op);
     }
 }
 
@@ -200,7 +228,7 @@ impl IssueBuilder {
             genesis,
         };
         let contract_id = contract.contract_id();
-        let state = RawState::default();
+        let state = ContractState::default();
         let genesis_op = contract.genesis.to_operation(contract_id);
         let mut deeds = Deeds {
             codex: self.issuer.codex,

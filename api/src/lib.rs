@@ -48,8 +48,9 @@ pub mod alu;
 
 pub use api::{
     Api, ApiId, ApiInner, ApiVm, AppendApi, DestructibleApi, MethodName, StateAdaptor, StateArithm, StateName,
+    StateReader,
 };
-pub use state::{DataCell, StateTy, StructData};
+pub use state::{DataCell, StateAtom, StateTy, StructData};
 
 pub const LIB_NAME_SONIC: &str = "SONIC";
 

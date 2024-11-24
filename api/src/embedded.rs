@@ -21,13 +21,17 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use amplify::confinement::{ConfinedBlob, SmallBlob};
+use amplify::confinement::ConfinedBlob;
 use strict_encoding::{StrictDecode, StrictEncode};
+use strict_types::typify::TypedVal;
+use strict_types::value::StrictNum;
 use strict_types::{SemId, StrictVal, TypeSystem};
 use ultrasonic::{StateData, StateValue};
 
 use crate::api::{TOTAL_BYTES, USED_FIEL_BYTES};
-use crate::{ApiVm, StateAdaptor, StateArithm, StateName, StateTy, StructData, VmType, LIB_NAME_SONIC};
+use crate::{
+    ApiVm, StateAdaptor, StateArithm, StateAtom, StateName, StateReader, StateTy, StructData, VmType, LIB_NAME_SONIC,
+};
 
 #[derive(Clone, Debug)]
 pub struct EmbeddedProc;
@@ -42,31 +46,75 @@ impl ApiVm for EmbeddedProc {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONIC, tags = custom, dumb = Self::Const(strict_dumb!()))]
+#[strict_type(lib = LIB_NAME_SONIC, tags = custom, dumb = Self::Count(strict_dumb!()))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub enum EmbeddedReaders {
-    #[strict_type(tag = 0)]
-    Const(SmallBlob),
-
+    // #[strict_type(tag = 0)]
+    // Const(StrictVal),
     #[strict_type(tag = 1)]
     Count(StateName),
 
+    /// Sum over verifiable field-element based part of state.
     #[strict_type(tag = 2)]
-    Sum(StateName),
+    SumV(StateName),
 
-    /// Count values which strict serialization is prefixed with a strict serialized argument
+    /*
+    /// Count values which verifiable field-element part binary representation is prefixed with a
+    /// given byte string.
     #[strict_type(tag = 0x10)]
-    CountPrefixed(StateName, SemId),
-
+    CountPrefixedV(StateName, TinyBlob),
+     */
+    /// Convert verified state under the same state type into a vector.
     #[strict_type(tag = 0x20)]
-    List(StateName, SemId),
+    ListV(StateName),
 
-    #[strict_type(tag = 0x21)]
-    Set(StateName, SemId),
+    /// Convert verified state under the same state type into a sorted set.
+    #[strict_type(tag = 0x22)]
+    SetV(StateName),
 
     /// Map from field-based element state to a non-verifiable structured state
-    #[strict_type(tag = 0x22)]
-    MapF2S { name: StateName, key: SemId, val: SemId },
+    #[strict_type(tag = 0x30)]
+    MapV2U(StateName),
+}
+
+impl StateReader for EmbeddedReaders {
+    fn read<'s, I: IntoIterator<Item = &'s StateAtom>>(&self, state: impl Fn(&StateName) -> I) -> StrictVal {
+        match self {
+            //EmbeddedReaders::Const(val) => val.clone(),
+            EmbeddedReaders::Count(name) => {
+                let count = state(name).into_iter().count();
+                svnum!(count as u64)
+            }
+            EmbeddedReaders::SumV(name) => {
+                let sum = state(name)
+                    .into_iter()
+                    .map(|atom| match &atom.verified {
+                        StrictVal::Number(StrictNum::Uint(val)) => *val,
+                        _ => panic!("invalid type of state for sum aggregator"),
+                    })
+                    .sum::<u128>();
+                svnum!(sum)
+            }
+            EmbeddedReaders::ListV(name) => StrictVal::List(
+                state(name)
+                    .into_iter()
+                    .map(|atom| atom.verified.clone())
+                    .collect(),
+            ),
+            EmbeddedReaders::SetV(name) => StrictVal::List(
+                state(name)
+                    .into_iter()
+                    .map(|atom| atom.verified.clone())
+                    .collect(),
+            ),
+            EmbeddedReaders::MapV2U(name) => StrictVal::Map(
+                state(name)
+                    .into_iter()
+                    .filter_map(|atom| atom.unverified.clone().map(|u| (atom.verified.clone(), u)))
+                    .collect(),
+            ),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -88,10 +136,10 @@ impl EmbeddedImmutable {
         while let Some(el) = value.get(i) {
             let from = USED_FIEL_BYTES * i as usize;
             let to = from + USED_FIEL_BYTES;
-            buf[from..to].copy_from_slice(&el.0.to_le_bytes());
+            buf[from..=to].copy_from_slice(&el.0.to_le_bytes());
             i += 1;
         }
-        debug_assert_eq!(i, 4);
+        debug_assert!(i <= 4);
 
         let val = sys.strict_deserialize_type(sem_id, &buf).ok()?;
         Some(val.unbox())
@@ -111,9 +159,20 @@ impl EmbeddedImmutable {
 }
 
 impl StateAdaptor for EmbeddedImmutable {
-    fn convert_immutable(&self, sem_id: SemId, data: &StateData, sys: &TypeSystem) -> Option<StrictVal> {
-        // TODO: Do something with raw
-        self.convert_value(sem_id, data.value, sys)
+    fn convert_immutable(
+        &self,
+        sem_id: SemId,
+        raw_sem_id: SemId,
+        data: &StateData,
+        sys: &TypeSystem,
+    ) -> Option<StateAtom> {
+        let verified = self.convert_value(sem_id, data.value, sys)?;
+        let unverified = data
+            .raw
+            .as_ref()
+            .and_then(|raw| sys.strict_deserialize_type(raw_sem_id, raw.as_ref()).ok())
+            .map(TypedVal::unbox);
+        Some(StateAtom { verified, unverified })
     }
 
     fn convert_destructible(&self, sem_id: SemId, value: StateValue, sys: &TypeSystem) -> Option<StrictVal> {

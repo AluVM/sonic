@@ -59,46 +59,14 @@ mod dao {
         pub text: SmallString,
     }
 
-    #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, From)]
+    #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, From, Display)]
+    #[display("Participant #{party_id} voted {vote} in voting #{vote_id}")]
     #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
     #[strict_type(lib = LIB_NAME_DAO)]
     pub struct CastVote {
         pub vote_id: VoteId,
         pub vote: Vote,
         pub party_id: PartyId,
-    }
-
-    #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, Display, From)]
-    #[display(lowercase)]
-    #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-    #[strict_type(lib = LIB_NAME_DAO, tags = repr, try_from_u8, into_u8)]
-    #[repr(u8)]
-    enum Pro {
-        #[strict_type(dumb)]
-        Pro = 1,
-    }
-
-    #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, Display, From)]
-    #[display(lowercase)]
-    #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-    #[strict_type(lib = LIB_NAME_DAO, tags = repr, try_from_u8, into_u8)]
-    #[repr(u8)]
-    enum Conter {
-        #[strict_type(dumb)]
-        Conter = 0,
-    }
-
-    pub trait Query: StrictDumb + StrictEncode + StrictDecode {}
-    impl Query for Pro {}
-    impl Query for Conter {}
-
-    #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, Display, From)]
-    #[display("")]
-    #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-    #[strict_type(lib = LIB_NAME_DAO)]
-    pub struct VoteQuery<Q: Query> {
-        pub vote_id: VoteId,
-        pub vote: Q,
     }
 
     #[derive(Debug)]
@@ -115,8 +83,6 @@ mod dao {
         .transpile::<Party>()
         .transpile::<Voting>()
         .transpile::<CastVote>()
-        .transpile::<VoteQuery<Pro>>()
-        .transpile::<VoteQuery<Conter>>()
         .compile()
         .expect("invalid DAO type library")
     }
@@ -197,21 +163,10 @@ fn main() {
             }
         },
         readers: tiny_bmap! {
-            vname!("parties") => EmbeddedReaders::MapF2S {
-                name: vname!("_parties"),
-                key: types.get("DAO.PartyId"),
-                val: types.get("DAO.Party"),
-            },
-            vname!("votings") => EmbeddedReaders::MapF2S {
-                name: vname!("_votings"),
-                key: types.get("DAO.VoteId"),
-                val: types.get("DAO.Voting"),
-            },
-            vname!("votes") => EmbeddedReaders::Set(vname!("_votes"), types.get("DAO.CastVote")),
+            vname!("parties") => EmbeddedReaders::MapV2U(vname!("_parties")),
+            vname!("votings") => EmbeddedReaders::MapV2U(vname!("_votings")),
+            vname!("votes") => EmbeddedReaders::SetV(vname!("_votes")),
             vname!("votingCount") => EmbeddedReaders::Count(vname!("votings")),
-            vname!("totalVotes") => EmbeddedReaders::CountPrefixed(vname!("votings"), types.get("DAO.VoteId")),
-            vname!("proVotes") => EmbeddedReaders::CountPrefixed(vname!("votings"), types.get("DAO.VoteQueryPro")),
-            vname!("conterVotes") => EmbeddedReaders::CountPrefixed(vname!("votings"), types.get("DAO.VoteQueryConter")),
         },
         verifiers: tiny_bmap! {
             vname!("setup") => 0,
@@ -279,6 +234,9 @@ fn main() {
         .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 0u64), None)
         .assign("signers", fe128(12), svnum!(2u64), None)
         .commit();
+
+    let votes = deeds.read("votes");
+    print!("{votes}");
 
     // Now anybody accessing this file can figure out who is on duty today, by the decision of DAO.
     deeds

@@ -23,10 +23,18 @@
 
 use alloc::collections::BTreeMap;
 
-use commit_verify::CommitId;
 use indexmap::IndexMap;
-use strict_types::StrictVal;
+use sonicapi::{Api, StateAtom, StateName};
+use strict_encoding::TypeName;
+use strict_types::{StrictVal, TypeSystem};
 use ultrasonic::{fe128, CellAddr, Memory, Operation, StateCell, StateData, StateValue};
+
+#[derive(Clone, Debug, Default)]
+pub struct ContractState {
+    pub raw: RawState,
+    pub main: AdaptedState,
+    pub apis: BTreeMap<TypeName, AdaptedState>,
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct RawState {
@@ -64,7 +72,38 @@ impl RawState {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
-pub struct State {
-    pub immutable: BTreeMap<CellAddr, StrictVal>,
-    pub owned: BTreeMap<fe128, BTreeMap<CellAddr, StrictVal>>,
+pub struct AdaptedState {
+    pub immutable: BTreeMap<StateName, BTreeMap<CellAddr, StateAtom>>,
+    pub owned: BTreeMap<StateName, BTreeMap<CellAddr, StrictVal>>,
+}
+
+impl AdaptedState {
+    pub fn immutable(&self, name: &StateName) -> Option<&BTreeMap<CellAddr, StateAtom>> { self.immutable.get(name) }
+
+    pub fn owned(&self, name: &StateName) -> Option<&BTreeMap<CellAddr, StrictVal>> { self.owned.get(name) }
+
+    pub fn apply(&mut self, op: &Operation, api: &Api, sys: &TypeSystem) {
+        let opid = op.opid();
+        for (no, state) in op.immutable.iter().enumerate() {
+            if let Some((name, atom)) = api.convert_immutable(state, sys) {
+                self.immutable
+                    .entry(name)
+                    .or_default()
+                    .insert(CellAddr::new(opid, no as u16), atom);
+            }
+        }
+        for input in &op.destroying {
+            for map in self.owned.values_mut() {
+                map.remove(&input.addr);
+            }
+        }
+        for (no, state) in op.destructible.iter().enumerate() {
+            if let Some((name, atom)) = api.convert_destructible(state.data, sys) {
+                self.owned
+                    .entry(name)
+                    .or_default()
+                    .insert(CellAddr::new(opid, no as u16), atom);
+            }
+        }
+    }
 }

@@ -27,6 +27,12 @@ use strict_types::StrictVal;
 pub type StateTy = u128; // TODO: Make it equal to the internal type in used field element
 
 #[derive(Clone, Eq, PartialEq, Debug)]
+pub struct StateAtom {
+    pub verified: StrictVal,
+    pub unverified: Option<StrictVal>,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub struct StructData {
     pub ty: StateTy,
     /// Transformed and typefied value extracted from [`ultrasonic::StatData`] by an ApiAdaptor.

@@ -44,7 +44,7 @@ use strict_types::{SemId, StrictDecode, StrictDumb, StrictEncode, StrictVal, Typ
 use ultrasonic::{CallId, CodexId, Identity, StateData, StateValue};
 
 use crate::embedded::EmbeddedProc;
-use crate::{StructData, VmType, LIB_NAME_SONIC};
+use crate::{StateAtom, StructData, VmType, LIB_NAME_SONIC};
 
 pub(super) const USED_FIEL_BYTES: usize = u128::BITS as usize / 8 - 1;
 pub(super) const TOTAL_BYTES: usize = USED_FIEL_BYTES * 3;
@@ -133,6 +133,68 @@ impl Api {
             Api::Alu(api) => api.verifiers.get(&method),
         }
         .copied()
+    }
+
+    pub fn read<'s, I: IntoIterator<Item = &'s StateAtom>>(
+        &self,
+        name: impl Into<StateName>,
+        state: impl Fn(&StateName) -> I,
+    ) -> StrictVal {
+        let name = name.into();
+        match self {
+            Api::Embedded(api) => api
+                .readers
+                .get(&name)
+                .expect("state name is unknown for the API")
+                .read(state),
+            Api::Alu(api) => api
+                .readers
+                .get(&name)
+                .expect("state name is unknown for the API")
+                .read(state),
+        }
+    }
+
+    pub fn convert_immutable(&self, data: &StateData, sys: &TypeSystem) -> Option<(StateName, StateAtom)> {
+        match self {
+            Api::Embedded(api) => {
+                for (name, adaptor) in &api.append_only {
+                    if let Some(atom) = adaptor.convert(data, sys) {
+                        return Some((name.clone(), atom));
+                    }
+                }
+                None
+            }
+            Api::Alu(api) => {
+                for (name, adaptor) in &api.append_only {
+                    if let Some(atom) = adaptor.convert(data, sys) {
+                        return Some((name.clone(), atom));
+                    }
+                }
+                None
+            }
+        }
+    }
+
+    pub fn convert_destructible(&self, value: StateValue, sys: &TypeSystem) -> Option<(StateName, StrictVal)> {
+        match self {
+            Api::Embedded(api) => {
+                for (name, adaptor) in &api.destructible {
+                    if let Some(atom) = adaptor.convert(value, sys) {
+                        return Some((name.clone(), atom));
+                    }
+                }
+                None
+            }
+            Api::Alu(api) => {
+                for (name, adaptor) in &api.destructible {
+                    if let Some(atom) = adaptor.convert(value, sys) {
+                        return Some((name.clone(), atom));
+                    }
+                }
+                None
+            }
+        }
     }
 
     pub fn build_immutable(
@@ -295,8 +357,9 @@ pub struct AppendApi<Vm: ApiVm> {
 }
 
 impl<Vm: ApiVm> AppendApi<Vm> {
-    pub fn convert(&self, data: &StateData, sys: &TypeSystem) -> Option<StrictVal> {
-        self.adaptor.convert_immutable(self.sem_id, data, sys)
+    pub fn convert(&self, data: &StateData, sys: &TypeSystem) -> Option<StateAtom> {
+        self.adaptor
+            .convert_immutable(self.sem_id, self.raw_sem_id, data, sys)
     }
 
     /// Build an immutable memory cell out of structured state.
@@ -354,15 +417,27 @@ impl<T> Serde for T where T: serde::Serialize + for<'de> serde::Deserialize<'de>
 
 pub trait ApiVm {
     type Arithm: StateArithm;
-    type Reader: Clone + Ord + Debug + StrictDumb + StrictEncode + StrictDecode + Serde;
+    type Reader: StateReader;
     type Adaptor: StateAdaptor;
 
     fn vm_type(&self) -> VmType;
 }
 
+/// Reader constructs a composite state out of distinct values of all appendable state elements of
+/// the same type.
+pub trait StateReader: Clone + Ord + Debug + StrictDumb + StrictEncode + StrictDecode + Serde {
+    fn read<'s, I: IntoIterator<Item = &'s StateAtom>>(&self, state: impl Fn(&StateName) -> I) -> StrictVal;
+}
+
 /// Adaptors convert field elements into structured data and vise verse.
 pub trait StateAdaptor: Clone + Ord + Debug + StrictDumb + StrictEncode + StrictDecode + Serde {
-    fn convert_immutable(&self, sem_id: SemId, data: &StateData, sys: &TypeSystem) -> Option<StrictVal>;
+    fn convert_immutable(
+        &self,
+        sem_id: SemId,
+        raw_sem_id: SemId,
+        data: &StateData,
+        sys: &TypeSystem,
+    ) -> Option<StateAtom>;
     fn convert_destructible(&self, sem_id: SemId, value: StateValue, sys: &TypeSystem) -> Option<StrictVal>;
 
     fn build_immutable(&self, value: ConfinedBlob<0, TOTAL_BYTES>) -> StateValue;
