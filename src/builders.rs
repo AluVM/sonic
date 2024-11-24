@@ -29,6 +29,7 @@ use ultrasonic::{
     fe128, CallId, CellAddr, CodexId, ContractId, Genesis, Input, Operation, StateCell, StateData, StateValue,
 };
 
+#[derive(Clone, Debug)]
 pub struct Builder {
     call_id: CallId,
     destructible: SmallVec<StateCell>,
@@ -79,6 +80,7 @@ impl Builder {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct BuilderRef<'c> {
     type_system: &'c TypeSystem,
     api: &'c Api,
@@ -113,21 +115,29 @@ impl<'c> BuilderRef<'c> {
     pub fn issue_genesis(self, codex_id: CodexId) -> Genesis { self.inner.issue_genesis(codex_id) }
 }
 
-pub struct OpBuilderRef<'c> {
+#[derive(Clone, Debug)]
+pub struct OpBuilder {
     contract_id: ContractId,
     destroying: SmallVec<Input>,
     reading: SmallVec<CellAddr>,
-    inner: BuilderRef<'c>,
+    inner: Builder,
 }
 
-impl<'c> OpBuilderRef<'c> {
-    pub fn new(api: &'c Api, contract_id: ContractId, call_id: CallId, sys: &'c TypeSystem) -> Self {
-        let inner = BuilderRef::new(api, call_id, sys);
+impl OpBuilder {
+    pub fn new(contract_id: ContractId, call_id: CallId) -> Self {
+        let inner = Builder::new(call_id);
         Self { contract_id, destroying: none!(), reading: none!(), inner }
     }
 
-    pub fn add_immutable(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
-        self.inner = self.inner.add_immutable(name, data, raw);
+    pub fn add_immutable(
+        mut self,
+        name: impl Into<StateName>,
+        data: StrictVal,
+        raw: Option<StrictVal>,
+        api: &Api,
+        sys: &TypeSystem,
+    ) -> Self {
+        self.inner = self.inner.add_immutable(name, data, raw, api, sys);
         self
     }
 
@@ -137,8 +147,12 @@ impl<'c> OpBuilderRef<'c> {
         seal: fe128,
         data: StrictVal,
         lock: Option<LibSite>,
+        api: &Api,
+        sys: &TypeSystem,
     ) -> Self {
-        self.inner = self.inner.add_destructible(name, seal, data, lock);
+        self.inner = self
+            .inner
+            .add_destructible(name, seal, data, lock, api, sys);
         self
     }
 
@@ -161,12 +175,58 @@ impl<'c> OpBuilderRef<'c> {
     pub fn finalize(self) -> Operation {
         Operation {
             contract_id: self.contract_id,
-            call_id: self.inner.inner.call_id,
+            call_id: self.inner.call_id,
             destroying: self.destroying,
             reading: self.reading,
-            destructible: self.inner.inner.destructible,
-            immutable: self.inner.inner.immutable,
+            destructible: self.inner.destructible,
+            immutable: self.inner.immutable,
             reserved: zero!(),
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct OpBuilderRef<'c> {
+    type_system: &'c TypeSystem,
+    api: &'c Api,
+    inner: OpBuilder,
+}
+
+impl<'c> OpBuilderRef<'c> {
+    pub fn new(api: &'c Api, contract_id: ContractId, call_id: CallId, sys: &'c TypeSystem) -> Self {
+        let inner = OpBuilder::new(contract_id, call_id);
+        Self { api, type_system: sys, inner }
+    }
+
+    pub fn add_immutable(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
+        self.inner = self
+            .inner
+            .add_immutable(name, data, raw, self.api, self.type_system);
+        self
+    }
+
+    pub fn add_destructible(
+        mut self,
+        name: impl Into<StateName>,
+        seal: fe128,
+        data: StrictVal,
+        lock: Option<LibSite>,
+    ) -> Self {
+        self.inner = self
+            .inner
+            .add_destructible(name, seal, data, lock, self.api, self.type_system);
+        self
+    }
+
+    pub fn access(mut self, addr: CellAddr) -> Self {
+        self.inner = self.inner.access(addr);
+        self
+    }
+
+    pub fn destroy(mut self, addr: CellAddr, witness: StrictVal) -> Self {
+        self.inner = self.inner.destroy(addr, witness);
+        self
+    }
+
+    pub fn finalize(self) -> Operation { self.inner.finalize() }
 }

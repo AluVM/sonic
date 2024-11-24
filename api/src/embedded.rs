@@ -136,7 +136,7 @@ impl EmbeddedImmutable {
         while let Some(el) = value.get(i) {
             let from = USED_FIEL_BYTES * i as usize;
             let to = from + USED_FIEL_BYTES;
-            buf[from..=to].copy_from_slice(&el.0.to_le_bytes());
+            buf[from..to].copy_from_slice(&el.0.to_le_bytes()[..USED_FIEL_BYTES]);
             i += 1;
         }
         debug_assert!(i <= 4);
