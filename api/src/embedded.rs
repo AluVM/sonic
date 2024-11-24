@@ -101,7 +101,7 @@ impl StateReader for EmbeddedReaders {
                     .map(|atom| atom.verified.clone())
                     .collect(),
             ),
-            EmbeddedReaders::SetV(name) => StrictVal::List(
+            EmbeddedReaders::SetV(name) => StrictVal::Set(
                 state(name)
                     .into_iter()
                     .map(|atom| atom.verified.clone())

@@ -135,21 +135,27 @@ impl Api {
         .copied()
     }
 
+    pub fn readers(&self) -> Box<dyn Iterator<Item = &MethodName> + '_> {
+        match self {
+            Api::Embedded(api) => Box::new(api.readers.keys()),
+            Api::Alu(api) => Box::new(api.readers.keys()),
+        }
+    }
+
     pub fn read<'s, I: IntoIterator<Item = &'s StateAtom>>(
         &self,
-        name: impl Into<StateName>,
+        name: &StateName,
         state: impl Fn(&StateName) -> I,
     ) -> StrictVal {
-        let name = name.into();
         match self {
             Api::Embedded(api) => api
                 .readers
-                .get(&name)
+                .get(name)
                 .expect("state name is unknown for the API")
                 .read(state),
             Api::Alu(api) => api
                 .readers
-                .get(&name)
+                .get(name)
                 .expect("state name is unknown for the API")
                 .read(state),
         }

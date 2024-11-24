@@ -27,13 +27,70 @@ use indexmap::IndexMap;
 use sonicapi::{Api, StateAtom, StateName};
 use strict_encoding::TypeName;
 use strict_types::{StrictVal, TypeSystem};
-use ultrasonic::{fe128, CellAddr, Memory, Operation, StateCell, StateData, StateValue};
+use ultrasonic::{fe128, CellAddr, Memory, Operation, ProofOfPubl, StateCell, StateData, StateValue};
+
+use crate::Deeds;
+
+impl<PoP: ProofOfPubl> Deeds<PoP> {
+    pub fn effective_state(&self) -> EffectiveState {
+        let mut state = EffectiveState::default();
+
+        let genesis = self
+            .payload
+            .contract
+            .genesis
+            .to_operation(self.payload.contract.contract_id());
+
+        state.apply(genesis, &self.default_api, self.custom_apis.keys(), &self.types);
+        for op in &self.payload.operations {
+            state.apply(op.clone(), &self.default_api, self.custom_apis.keys(), &self.types);
+        }
+
+        state.main.compute(&self.default_api);
+        for (name, aux) in state.aux.iter_mut() {
+            aux.compute(self.api(name))
+        }
+        state
+    }
+}
 
 #[derive(Clone, Debug, Default)]
-pub struct ContractState {
+pub struct EffectiveState {
     pub raw: RawState,
     pub main: AdaptedState,
-    pub apis: BTreeMap<TypeName, AdaptedState>,
+    pub aux: BTreeMap<TypeName, AdaptedState>,
+}
+
+impl EffectiveState {
+    #[inline]
+    pub fn seal_addr(&self, seal: fe128) -> CellAddr { self.raw.seal_addr(seal) }
+
+    pub fn read(&self, name: impl Into<StateName>) -> &StrictVal {
+        let name = name.into();
+        self.main
+            .computed
+            .get(&name)
+            .unwrap_or_else(|| panic!("Computed state {name} is not known"))
+    }
+
+    pub(crate) fn apply<'a>(
+        &mut self,
+        op: Operation,
+        default_api: &Api,
+        custom_apis: impl IntoIterator<Item = &'a Api>,
+        sys: &TypeSystem,
+    ) {
+        self.main.apply(&op, default_api, sys);
+        for api in custom_apis {
+            // TODO: Remove name from API itself.
+            let Some(name) = api.name() else {
+                continue;
+            };
+            let state = self.aux.entry(name.clone()).or_default();
+            state.apply(&op, api, sys);
+        }
+        self.raw.apply(op);
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -75,6 +132,7 @@ impl RawState {
 pub struct AdaptedState {
     pub immutable: BTreeMap<StateName, BTreeMap<CellAddr, StateAtom>>,
     pub owned: BTreeMap<StateName, BTreeMap<CellAddr, StrictVal>>,
+    pub computed: BTreeMap<StateName, StrictVal>,
 }
 
 impl AdaptedState {
@@ -82,7 +140,18 @@ impl AdaptedState {
 
     pub fn owned(&self, name: &StateName) -> Option<&BTreeMap<CellAddr, StrictVal>> { self.owned.get(name) }
 
-    pub fn apply(&mut self, op: &Operation, api: &Api, sys: &TypeSystem) {
+    pub(self) fn compute(&mut self, api: &Api) {
+        let empty = bmap![];
+        for reader in api.readers() {
+            let val = api.read(reader, |name| match self.immutable(&name) {
+                None => empty.values(),
+                Some(src) => src.values(),
+            });
+            self.computed.insert(reader.clone(), val);
+        }
+    }
+
+    pub(self) fn apply(&mut self, op: &Operation, api: &Api, sys: &TypeSystem) {
         let opid = op.opid();
         for (no, state) in op.immutable.iter().enumerate() {
             if let Some((name, atom)) = api.convert_immutable(state, sys) {
@@ -91,6 +160,7 @@ impl AdaptedState {
                     .or_default()
                     .insert(CellAddr::new(opid, no as u16), atom);
             }
+            // TODO: Warn if no state is present
         }
         for input in &op.destroying {
             for map in self.owned.values_mut() {

@@ -33,7 +33,7 @@ use ultrasonic::{fe128, CallId, CellAddr, Codex, Identity, LibRepo, Operation, O
 
 use crate::annotations::Annotations;
 use crate::sigs::ContentSigs;
-use crate::{Builder, Contract, ContractMeta, ContractName, ContractState, OpBuilder, LIB_NAME_SONIC};
+use crate::{Builder, Contract, ContractMeta, ContractName, EffectiveState, OpBuilder, LIB_NAME_SONIC};
 
 pub type Issuer = Container<()>;
 pub type Deeds<PoP> = Container<ContractDeeds<PoP>>;
@@ -80,8 +80,6 @@ pub struct ContractDeeds<PoP: ProofOfPubl> {
     pub contract: Contract<PoP>,
     pub operations: LargeVec<Operation>,
     pub contract_sigs: ContentSigs,
-    #[strict_type(skip)]
-    pub state: Option<ContractState>,
 }
 
 impl<PoP: ProofOfPubl> Eq for ContractDeeds<PoP> {}
@@ -99,7 +97,6 @@ impl<PoP: ProofOfPubl> StrictDumb for ContractDeeds<PoP> {
             contract: strict_dumb!(),
             operations: strict_dumb!(),
             contract_sigs: strict_dumb!(),
-            state: None,
         }
     }
 }
@@ -128,29 +125,15 @@ impl Issuer {
 }
 
 impl<PoP: ProofOfPubl> Deeds<PoP> {
-    pub fn computed_state(&self) -> &ContractState {
-        match &self.payload.state {
-            Some(state) => state,
-            None => todo!("compute state"),
-        }
-    }
-
-    #[inline]
-    pub fn seal_addr(&self, seal: fe128) -> CellAddr { self.computed_state().raw.seal_addr(seal) }
-
-    pub fn read(&self, reader: impl Into<StateName>) -> StrictVal {
-        let state = self.computed_state();
-        let empty = bmap![];
-        self.default_api
-            .read(reader, |name| match state.main.immutable(&name) {
-                None => empty.values(),
-                Some(src) => src.values(),
-            })
+    pub fn api(&self, name: &TypeName) -> &Api {
+        self.custom_apis
+            .keys()
+            .find(|api| api.name() == Some(name))
+            .expect("API is not known")
     }
 
     pub fn start_deed(&mut self, method: impl Into<MethodName>) -> DeedBuilder<'_, PoP> {
         let builder = OpBuilder::new(self.payload.contract.contract_id(), self.call_id(method));
-        self.computed_state();
         DeedBuilder { builder, deeds: self }
     }
 
@@ -167,18 +150,6 @@ impl<PoP: ProofOfPubl> Deeds<PoP> {
                 .push(op.clone())
                 .expect("more than 4 billions of deeds are not supported");
         }
-
-        let state = self.payload.state.as_mut().unwrap();
-        state.main.apply(&op, &self.default_api, &self.types);
-        for api in self.custom_apis.keys() {
-            // TODO: Remove name from API itself.
-            let Some(name) = api.name() else {
-                continue;
-            };
-            let state = state.apis.entry(name.clone()).or_default();
-            state.apply(&op, api, &self.types);
-        }
-        state.raw.apply(op);
     }
 }
 
@@ -219,16 +190,10 @@ impl IssueBuilder {
             genesis,
         };
         let contract_id = contract.contract_id();
-        let state = ContractState::default();
         let genesis_op = contract.genesis.to_operation(contract_id);
         let mut deeds = Deeds {
             codex: self.issuer.codex,
-            payload: ContractDeeds {
-                contract,
-                operations: none!(),
-                contract_sigs: none!(),
-                state: Some(state),
-            },
+            payload: ContractDeeds { contract, operations: none!(), contract_sigs: none!() },
             default_api: self.issuer.default_api,
             default_api_sigs: self.issuer.default_api_sigs,
             custom_apis: self.issuer.custom_apis,
@@ -254,8 +219,8 @@ impl<'c, PoP: ProofOfPubl> DeedBuilder<'c, PoP> {
         self
     }
 
-    pub fn using(mut self, seal: fe128, witness: StrictVal) -> Self {
-        let addr = self.deeds.seal_addr(seal);
+    pub fn using(mut self, seal: fe128, witness: StrictVal, state: &EffectiveState) -> Self {
+        let addr = state.seal_addr(seal);
         self.builder = self.builder.destroy(addr, witness);
         self
     }

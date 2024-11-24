@@ -210,10 +210,12 @@ fn main() {
         )
         .commit();
 
+    let init_state = deeds.effective_state();
+
     // Alice vote against her being on duty today
     deeds
         .start_deed("castVote")
-        .using(fe128(0), svnum!(0u64))
+        .using(fe128(0), svnum!(0u64), &init_state)
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(0u8), partyId 0u64), None)
         .assign("signers", fe128(10), svnum!(0u64), None)
@@ -222,20 +224,22 @@ fn main() {
     // Bob and Carol vote for Alice being on duty today
     deeds
         .start_deed("castVote")
-        .using(fe128(1), svnum!(1u64))
+        .using(fe128(1), svnum!(1u64), &init_state)
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 0u64), None)
         .assign("signers", fe128(11), svnum!(1u64), None)
         .commit();
     deeds
         .start_deed("castVote")
-        .using(fe128(2), svnum!(2u64))
+        .using(fe128(2), svnum!(2u64), &init_state)
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 0u64), None)
         .assign("signers", fe128(12), svnum!(2u64), None)
         .commit();
 
-    let votes = deeds.read("votes");
+    let post_voting_state = deeds.effective_state();
+    //eprintln!("{post_voting_state:#?}");
+    let votes = post_voting_state.read("votes");
     print!("{votes}");
 
     // Now anybody accessing this file can figure out who is on duty today, by the decision of DAO.
