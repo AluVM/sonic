@@ -54,8 +54,6 @@ aluvm.workspace = true
 ultrasonic.workspace = true
 sonic-api.workspace = true
 indexmap = "2.6.0"
-chrono = "0.4.38"
-rand = "0.8.5"
 serde = { workspace = true, optional = true }
 
 [features]

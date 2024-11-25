@@ -175,12 +175,12 @@ impl IssueBuilder {
         self
     }
 
-    pub fn finish<PoP: ProofOfPubl + Default>(self, name: impl Into<TypeName>) -> Deeds<PoP> {
+    pub fn finish<PoP: ProofOfPubl + Default>(self, name: impl Into<TypeName>, timestamp: i64) -> Deeds<PoP> {
         let meta = ContractMeta {
             proof_of_publ: default!(),
             reserved: zero!(),
-            salt: rand::random(),
-            timestamp: chrono::Utc::now().timestamp(),
+            salt: timestamp as u64,
+            timestamp,
             name: ContractName::Named(name.into()),
             issuer: Identity::default(),
         };

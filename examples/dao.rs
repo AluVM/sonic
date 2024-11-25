@@ -16,6 +16,7 @@ fn codex() -> Codex {
         name: tiny_s!("Simple DAO"),
         developer: Identity::default(),
         version: default!(),
+        timestamp: 1732529307,
         field_order: 0xFFFFFFFF00000001,
         input_config: CoreConfig::default(),
         verification_config: CoreConfig::default(),
@@ -36,7 +37,7 @@ fn api() -> Api {
     Api::Embedded(ApiInner::<EmbeddedProc> {
         version: default!(),
         codex_id: codex.codex_id(),
-        timestamp: chrono::Utc::now().timestamp(),
+        timestamp: 1732529307,
         name: None,
         developer: Identity::default(),
         append_only: tiny_bmap! {
@@ -104,7 +105,7 @@ fn main() {
         .append("_parties", svnum!(2u64), Some(ston!(name "carol", identity "Carol Caterpillar")))
         .assign("signers", fe128(2), svnum!(2u64), None)
 
-        .finish::<Private>("WonderlandDAO");
+        .finish::<Private>("WonderlandDAO", 1732529307);
 
     deeds
         .save("examples/dao.contract")
