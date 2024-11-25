@@ -3,6 +3,7 @@ extern crate amplify;
 #[macro_use]
 extern crate strict_types;
 
+use aluvm::{aluasm, CoreConfig, Lib, LibSite};
 use sonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc, EmbeddedReaders};
 use sonic::{Api, ApiInner, AppendApi, DestructibleApi, Issuer, Private};
 use strict_types::{SemId, StrictVal};
@@ -115,19 +116,46 @@ mod dao {
     }
 }
 
+fn success_lib() -> Lib {
+    let code = aluasm! {
+        stop;
+    };
+    Lib::assemble(&code).unwrap()
+}
+
+fn cast_vote_lib() -> Lib {
+    // 1. Verify that there is just one referenced global state for the party and one for the voting
+    // 2. Verify that referenced global state has a valid voteId matching the one provided in the
+    //    operation
+    // 3. Verify that
+    // 4. Verify there is just one input
+    // 5. Verify that the provided witness argument is a prehash of the input
+    todo!()
+}
+
+fn codex() -> Codex {
+    let lib = success_lib();
+    let lib_id = lib.lib_id();
+    Codex {
+        name: tiny_s!("Simple DAO"),
+        developer: Identity::default(),
+        version: default!(),
+        field_order: 0xFFFFFFFF00000001,
+        input_config: CoreConfig::default(),
+        verification_config: CoreConfig::default(),
+        verifiers: tiny_bmap! {
+            0 => LibSite::new(lib_id, 0),
+            1 => LibSite::new(lib_id, 0),
+            2 => LibSite::new(lib_id, 0),
+        },
+        reserved: default!(),
+    }
+}
+
 fn main() {
     let types = dao::DaoTypes::new();
 
-    let codex = Codex {
-        name: Default::default(),
-        developer: Default::default(),
-        version: default!(),
-        field_order: 0,
-        input_config: Default::default(),
-        verification_config: Default::default(),
-        verifiers: Default::default(),
-        reserved: default!(),
-    };
+    let codex = codex();
 
     let api = Api::Embedded(ApiInner::<EmbeddedProc> {
         version: default!(),
@@ -177,7 +205,7 @@ fn main() {
     });
 
     // Creating DAO with three participants
-    let issuer = Issuer::new(codex, api, [], types.type_system());
+    let issuer = Issuer::new(codex, api, [success_lib()], types.type_system());
     issuer
         .save("examples/dao.codex")
         .expect("unable to save issuer to a file");

@@ -138,11 +138,13 @@ impl<PoP: ProofOfPubl> Deeds<PoP> {
     }
 
     pub fn apply(&mut self, op: Operation, push: bool) {
-        //let state = self.computed_state();
-        // TODO: Enable verification
-        // self.codex
-        //    .verify(self.payload.contract.contract_id(), &op, state, self)
-        //    .expect("invalid genesis data");
+        let state = self.effective_state();
+        if let Err(err) = self
+            .codex
+            .verify(self.payload.contract.contract_id(), &op, &state.raw, self)
+        {
+            panic!("Invalid genesis data: {err}");
+        }
 
         if push {
             self.payload
