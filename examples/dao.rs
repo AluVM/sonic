@@ -3,19 +3,25 @@ extern crate amplify;
 #[macro_use]
 extern crate strict_types;
 
+use std::path::Path;
+
 use aluvm::{CoreConfig, LibSite};
+use commit_verify::{Digest, Ripemd160};
+use rand::random;
 use sonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc, EmbeddedReaders};
-use sonic::{Api, ApiInner, AppendApi, DestructibleApi, Issuer, Private};
+use sonic::{Api, ApiInner, AppendApi, Deeds, DestructibleApi, IssueBuilder, Issuer, Private};
 use strict_types::{SemId, StrictVal};
-use ultrasonic::{fe128, CellAddr, Codex, Identity};
+use ultrasonic::{fe128, CellAddr, Codex, Identity, Opid};
+
+use crate::stl::{PartyId, Vote, VoteId};
 
 fn codex() -> Codex {
     let lib = libs::success();
     let lib_id = lib.lib_id();
     Codex {
+        version: default!(),
         name: tiny_s!("Simple DAO"),
         developer: Identity::default(),
-        version: default!(),
         timestamp: 1732529307,
         field_order: 0xFFFFFFFF00000001,
         input_config: CoreConfig::default(),
@@ -82,34 +88,81 @@ fn api() -> Api {
     })
 }
 
-fn main() {
-    let types = stl::DaoTypes::new();
-    let codex = codex();
-    let api = api();
+#[derive(Clone, Debug)]
+pub struct DaoBuilder {
+    name: &'static str,
+    timestamp: i64,
+    builder: IssueBuilder,
+}
 
-    // Creating DAO with three participants
-    let issuer = Issuer::new(codex, api, [libs::success()], types.type_system());
-    issuer
+impl DaoBuilder {
+    pub fn add_party(mut self, id: PartyId, nick: &str, full_name: &str) -> Self {
+        self.builder = self
+            .builder
+            .append("_parties", svnum!(id.0), Some(ston!(name nick, identity full_name)))
+            .assign("signers", fe128(0), svnum!(id.0), None);
+        self
+    }
+
+    pub fn finish(self) -> Dao { Dao(self.builder.finish::<Private>(self.name, self.timestamp)) }
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct Dao(Deeds<Private>);
+
+impl Dao {
+    pub fn codex() -> Issuer {
+        let types = stl::DaoTypes::new();
+        let codex = codex();
+        let api = api();
+        Issuer::new(codex, api, [libs::success()], types.type_system())
+    }
+
+    pub fn create(name: &'static str, timestamp: i64) -> DaoBuilder {
+        let codex = Self::codex();
+        let builder = codex.start_issue("setup");
+        DaoBuilder { builder, name, timestamp }
+    }
+
+    pub fn start_voting(&mut self, vote_id: VoteId, title: &str, text: &str) -> VotingRef {
+        let opid = self
+            .0
+            .start_deed("proposal")
+            .append("_votings", svnum!(vote_id.0), Some(ston!(title title, text text)))
+            .commit();
+        VotingRef { addr: CellAddr::new(opid, 0), vote_id }
+    }
+
+    pub fn vote(&mut self, voting: VotingRef, vote: Vote, party: &mut PartySigner) -> Opid {
+        let init_state = self.0.effective_state();
+        let party_id = party.id();
+        let unlock = party.unlock();
+        self.0
+            .start_deed("castVote")
+            .using(unlock.seal, svnum!(unlock.witness), &init_state)
+            .reading(voting.addr)
+            .append("_votes", ston!(voteId voting.vote_id.0, vote svenum!(vote), partyId party_id.0), None)
+            .assign("signers", party.next_lock(), svnum!(party_id.0), None)
+            .commit()
+    }
+}
+
+fn main() {
+    let codex = Dao::codex();
+    codex
         .save("examples/dao.codex")
         .expect("unable to save issuer to a file");
 
-    let mut deeds = issuer
-        .start_issue("setup")
-        // Alice
-        .append("_parties", svnum!(0u64), Some(ston!(name "alice", identity "Alice Wonderland")))
-        .assign("signers", fe128(0), svnum!(0u64), None)
-        // Bob
-        .append("_parties", svnum!(1u64), Some(ston!(name "bob", identity "Bob Capricorn")))
-        .assign("signers", fe128(1), svnum!(1u64), None)
-        // Carol
-        .append("_parties", svnum!(2u64), Some(ston!(name "carol", identity "Carol Caterpillar")))
-        .assign("signers", fe128(2), svnum!(2u64), None)
-
-        .finish::<Private>("WonderlandDAO", 1732529307);
-
-    deeds
-        .save("examples/dao.contract")
-        .expect("unable to save issuer to a file");
+    // Creating DAO with three participants
+    let mut alice = PartySigner::new();
+    let mut bob = PartySigner::new();
+    let mut carol = PartySigner::new();
+    let mut dao = Dao::create("WonderlandDAO", 1732529307)
+        .add_party(alice.id, "alice", "Alice Wonderland")
+        .add_party(bob.id, "alice", "Alice Wonderland")
+        .add_party(carol.id, "alice", "Alice Wonderland")
+        .finish();
+    dao.save("examples/dao.contract");
 
     // Proposing vote
     let votings = deeds
@@ -169,6 +222,44 @@ fn main() {
         .expect("unable to save issuer to a file");
 }
 
+/// Party signer is a personal voting account which should be created and managed in private by
+/// which DAO participant.
+///
+/// Here, for example purposes, we use a very simple setup where a lock is a hash value, and an
+/// unlocking condition (giving the voting right under the participant id) is a preimage value.
+pub struct PartySigner {
+    id: PartyId,
+    preimage: fe128,
+}
+
+impl PartySigner {
+    fn digest(value: fe128) -> fe128 {
+        let digest = Ripemd160::digest(value.0.to_le_bytes());
+        let mut buf = [0u8; 16];
+        buf.copy_from_slice(&digest[..16]);
+        fe128(u128::from_le_bytes(buf))
+    }
+
+    pub fn id(&self) -> PartyId { self.id }
+    pub fn unlock(&self) -> Unlock { Unlock { seal: Self::digest(self.preimage), witness: self.preimage.0 } }
+    pub fn curr_lock(&self) -> fe128 { Self::digest(self.preimage) }
+    pub fn next_lock(&mut self) -> fe128 {
+        self.preimage = Self::digest(fe128(random::<u128>()));
+        self.curr_lock()
+    }
+}
+
+pub struct Unlock {
+    pub seal: fe128,
+    pub witness: u128,
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub struct VotingRef {
+    pub addr: CellAddr,
+    pub vote_id: VoteId,
+}
+
 mod libs {
     use aluvm::{aluasm, Lib};
 
@@ -205,7 +296,7 @@ mod stl {
     #[display(inner)]
     #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
     #[strict_type(lib = LIB_NAME_DAO)]
-    pub struct PartyId(u64);
+    pub struct PartyId(pub u64);
 
     #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, Display, From)]
     #[display(r#"{name} "{identity}""#)]
@@ -220,7 +311,7 @@ mod stl {
     #[display(inner)]
     #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
     #[strict_type(lib = LIB_NAME_DAO)]
-    pub struct VoteId(u64);
+    pub struct VoteId(pub u64);
 
     #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, Display, From)]
     #[display(lowercase)]

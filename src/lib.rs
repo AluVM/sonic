@@ -51,6 +51,6 @@ mod builders;
 mod state;
 
 pub use builders::{Builder, BuilderRef, OpBuilder, OpBuilderRef};
-pub use container::{Container, ContainerPayload, ContractDeeds, Deeds, Issuer};
+pub use container::{Container, ContainerPayload, ContractDeeds, Deeds, IssueBuilder, Issuer};
 pub use contract::{Contract, ContractMeta, ContractName, ContractPrivate, ContractRef, Private};
 pub use state::{AdaptedState, EffectiveState, RawState};

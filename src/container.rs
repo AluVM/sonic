@@ -155,6 +155,7 @@ impl<PoP: ProofOfPubl> Deeds<PoP> {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct IssueBuilder {
     builder: Builder,
     issuer: Issuer,
