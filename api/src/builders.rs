@@ -24,11 +24,12 @@
 use aluvm::LibSite;
 use amplify::confinement::SmallVec;
 use amplify::num::u256;
-use sonicapi::{Api, StateName};
 use strict_types::{StrictVal, TypeSystem};
 use ultrasonic::{
     fe256, CallId, CellAddr, CodexId, ContractId, Genesis, Input, Operation, StateCell, StateData, StateValue,
 };
+
+use crate::{Api, StateName};
 
 #[derive(Clone, Debug)]
 pub struct Builder {

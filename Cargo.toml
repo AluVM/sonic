@@ -46,7 +46,6 @@ required-features = ["std"]
 
 [dependencies]
 amplify.workspace = true
-baid64 = "0.4.0"
 strict_encoding.workspace = true
 strict_types.workspace = true
 commit_verify = "0.12.0-alpha.3"
