@@ -24,12 +24,61 @@
 use aluvm::LibSite;
 use amplify::confinement::SmallVec;
 use amplify::num::u256;
+use strict_encoding::TypeName;
 use strict_types::{StrictVal, TypeSystem};
 use ultrasonic::{
-    fe256, CallId, CellAddr, CodexId, ContractId, Genesis, Input, Operation, StateCell, StateData, StateValue,
+    fe256, CallId, Capabilities, CellAddr, CodexId, Contract, ContractId, ContractMeta, ContractName, Genesis,
+    Identity, Input, Operation, StateCell, StateData, StateValue,
 };
 
-use crate::{Api, StateName};
+use crate::{Api, Articles, MethodName, Schema, StateName};
+
+impl Schema {
+    pub fn start_issue(self, method: impl Into<MethodName>) -> IssueBuilder {
+        let builder = Builder::new(self.call_id(method));
+        IssueBuilder { builder, schema: self }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct IssueBuilder {
+    builder: Builder,
+    schema: Schema,
+}
+
+impl IssueBuilder {
+    pub fn append(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
+        self.builder = self
+            .builder
+            .add_immutable(name, data, raw, &self.schema.default_api, &self.schema.types);
+        self
+    }
+
+    pub fn assign(mut self, name: impl Into<StateName>, toa: fe256, data: StrictVal, lock: Option<LibSite>) -> Self {
+        self.builder =
+            self.builder
+                .add_destructible(name, toa, data, lock, &self.schema.default_api, &self.schema.types);
+        self
+    }
+
+    pub fn finish<C: Capabilities + Default>(self, name: impl Into<TypeName>, timestamp: i64) -> Articles<C> {
+        let meta = ContractMeta {
+            capabilities: default!(),
+            reserved: zero!(),
+            timestamp,
+            name: ContractName::Named(name.into()),
+            issuer: Identity::default(),
+        };
+        let genesis = self.builder.issue_genesis(self.schema.codex.codex_id());
+        let contract = Contract {
+            version: default!(),
+            meta,
+            codex: self.schema.codex.clone(),
+            genesis,
+        };
+        Articles { contract, contract_sigs: none!(), schema: self.schema }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Builder {

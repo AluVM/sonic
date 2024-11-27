@@ -23,35 +23,24 @@
 
 use alloc::collections::BTreeMap;
 
+use amplify::confinement::{SmallOrdMap, SmallVec};
 use indexmap::IndexMap;
 use sonicapi::{Api, StateAtom, StateName};
 use strict_encoding::TypeName;
 use strict_types::{StrictVal, TypeSystem};
-use ultrasonic::{fe256, CellAddr, Memory, Operation, ProofOfPubl, StateCell, StateData, StateValue};
+use ultrasonic::{fe256, CellAddr, Memory, Operation, Opid, StateCell, StateData, StateValue};
 
-use crate::Deeds;
+use crate::LIB_NAME_SONIC;
 
-impl<PoP: ProofOfPubl> Deeds<PoP> {
-    pub fn effective_state(&self) -> EffectiveState {
-        let mut state = EffectiveState::default();
-
-        let genesis = self
-            .payload
-            .contract
-            .genesis
-            .to_operation(self.payload.contract.contract_id());
-
-        state.apply(genesis, &self.default_api, self.custom_apis.keys(), &self.types);
-        for op in &self.payload.operations {
-            state.apply(op.clone(), &self.default_api, self.custom_apis.keys(), &self.types);
-        }
-
-        state.main.compute(&self.default_api);
-        for (name, aux) in state.aux.iter_mut() {
-            aux.compute(self.api(name))
-        }
-        state
-    }
+#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONIC)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
+pub struct Transition {
+    pub opid: Opid,
+    pub destroyed: SmallOrdMap<CellAddr, StateData>,
+    pub created: SmallVec<StateCell>,
+    pub appended: SmallVec<StateData>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -94,6 +83,7 @@ impl EffectiveState {
 }
 
 #[derive(Clone, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct RawState {
     /// Tokens of authority
     pub toas: IndexMap<fe256, CellAddr>,
@@ -130,6 +120,7 @@ impl RawState {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct AdaptedState {
     pub immutable: BTreeMap<StateName, BTreeMap<CellAddr, StateAtom>>,
     pub owned: BTreeMap<StateName, BTreeMap<CellAddr, StrictVal>>,
@@ -141,8 +132,9 @@ impl AdaptedState {
 
     pub fn owned(&self, name: &StateName) -> Option<&BTreeMap<CellAddr, StrictVal>> { self.owned.get(name) }
 
-    pub(self) fn compute(&mut self, api: &Api) {
+    pub(super) fn compute(&mut self, api: &Api) {
         let empty = bmap![];
+        self.computed = bmap! {};
         for reader in api.readers() {
             let val = api.read(reader, |name| match self.immutable(&name) {
                 None => empty.values(),

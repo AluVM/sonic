@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "api", "url"]
+members = [".", "api", "sonix", "url"]
 default-members = [".", "api", "url"]
 
 [workspace.package]
@@ -20,6 +20,7 @@ strict_types = "~2.8.1"
 aluvm = "0.12.0-beta.2"
 ultrasonic = "0.12.0-beta.1"
 sonic-api = { version = "0.12.0-alpha.1", path = "api" }
+sonic = { version = "0.12.0-alpha.1", path = "." }
 serde = { version = "1", features = ["derive"] }
 
 [package]
@@ -42,7 +43,7 @@ name = "sonic"
 
 [[example]]
 name = "dao"
-required-features = ["std"]
+required-features = ["persist-file"]
 
 [dependencies]
 amplify.workspace = true
@@ -54,19 +55,25 @@ ultrasonic.workspace = true
 sonic-api.workspace = true
 indexmap = "2.6.0"
 serde = { workspace = true, optional = true }
+#toml = { version = "0.8.19", optional = true, features = ["indexmap"] }
+serde_cbor = { version = "0.11.2", optional = true }
 
 [features]
 default = ["std"]
-all = ["stl", "std", "serde"]
+all = ["stl", "std", "serde", "persist-file"]
 
 std = ["sonic-api/std"]
 stl = ["commit_verify/stl", "ultrasonic/stl", "strict_types/armor"]
+
+persist-file = ["std", "serde", "dep:serde_cbor"]
 serde = [
     "dep:serde",
     "amplify/serde",
     "strict_encoding/serde",
     "commit_verify/serde",
-    "ultrasonic/serde"
+    "ultrasonic/serde",
+    "sonic-api/serde",
+    "indexmap/serde",
 ]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

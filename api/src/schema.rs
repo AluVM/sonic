@@ -24,17 +24,19 @@
 use aluvm::{Lib, LibId};
 use amplify::confinement::{SmallOrdMap, SmallOrdSet, TinyOrdMap};
 use commit_verify::ReservedBytes;
-use strict_encoding::{StrictDeserialize, StrictSerialize};
+use strict_encoding::{StrictDeserialize, StrictSerialize, TypeName};
 use strict_types::TypeSystem;
 use ultrasonic::{CallId, Codex, LibRepo};
 
 use crate::sigs::ContentSigs;
 use crate::{Annotations, Api, MethodName, LIB_NAME_SONIC};
 
+/// Schema contains information required for creation of a contract.
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_SONIC)]
-pub struct Issuer {
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
+pub struct Schema {
     pub codex: Codex,
     pub default_api: Api,
     pub default_api_sigs: ContentSigs,
@@ -46,25 +48,17 @@ pub struct Issuer {
     pub reserved: ReservedBytes<8>,
 }
 
-impl StrictSerialize for Issuer {}
-impl StrictDeserialize for Issuer {}
+impl StrictSerialize for Schema {}
+impl StrictDeserialize for Schema {}
 
-impl LibRepo for Issuer {
+impl LibRepo for Schema {
     fn get_lib(&self, lib_id: LibId) -> Option<&Lib> { self.libs.iter().find(|lib| lib.lib_id() == lib_id) }
 }
 
-impl Issuer {
-    pub fn call_id(&self, method: impl Into<MethodName>) -> CallId {
-        self.default_api
-            .verifier(method)
-            .expect("unknown issue method absent in Codex API")
-    }
-}
-
-impl Issuer {
+impl Schema {
     pub fn new(codex: Codex, api: Api, libs: impl IntoIterator<Item = Lib>, types: TypeSystem) -> Self {
         // TODO: Ensure default API is unnamed?
-        Issuer {
+        Schema {
             codex,
             default_api: api,
             default_api_sigs: none!(),
@@ -76,6 +70,19 @@ impl Issuer {
             reserved: zero!(),
         }
     }
+
+    pub fn api(&self, name: &TypeName) -> &Api {
+        self.custom_apis
+            .keys()
+            .find(|api| api.name() == Some(name))
+            .expect("API is not known")
+    }
+
+    pub fn call_id(&self, method: impl Into<MethodName>) -> CallId {
+        self.default_api
+            .verifier(method)
+            .expect("unknown issue method absent in Codex API")
+    }
 }
 
 #[cfg(feature = "std")]
@@ -84,11 +91,11 @@ mod _fs {
 
     use strict_encoding::{SerializeError, StrictSerialize};
 
-    use super::Issuer;
+    use super::Schema;
 
     // TODO: Compute/verify state on load from file
 
-    impl Issuer {
+    impl Schema {
         pub fn save(&self, path: impl AsRef<Path>) -> Result<(), SerializeError> {
             self.strict_serialize_to_file::<{ usize::MAX }>(path)
         }

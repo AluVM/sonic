@@ -45,18 +45,20 @@ mod api;
 mod state;
 pub mod embedded;
 pub mod alu;
-mod issuer;
+mod schema;
 pub mod sigs;
 mod annotations;
 mod builders;
+mod articles;
 
 pub use annotations::{AnnotationName, Annotations};
 pub use api::{
     Api, ApiId, ApiInner, ApiVm, AppendApi, DestructibleApi, MethodName, StateAdaptor, StateArithm, StateName,
     StateReader,
 };
+pub use articles::Articles;
 pub use builders::{Builder, BuilderRef, OpBuilder, OpBuilderRef};
-pub use issuer::Issuer;
+pub use schema::Schema;
 pub use state::{DataCell, StateAtom, StateTy, StructData};
 
 pub const LIB_NAME_SONIC: &str = "SONIC";

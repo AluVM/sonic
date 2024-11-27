@@ -29,12 +29,14 @@ use ultrasonic::fe256;
 pub type StateTy = u256; // TODO: Make it equal to the internal type in used field element
 
 #[derive(Clone, Eq, PartialEq, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct StateAtom {
     pub verified: StrictVal,
     pub unverified: Option<StrictVal>,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct StructData {
     pub ty: StateTy,
     /// Transformed and typefied value extracted from [`ultrasonic::StatData`] by an ApiAdaptor.
@@ -42,6 +44,7 @@ pub struct StructData {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct DataCell {
     pub data: StructData,
     pub toa: fe256,
