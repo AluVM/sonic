@@ -27,7 +27,7 @@ use indexmap::IndexMap;
 use sonicapi::{Api, StateAtom, StateName};
 use strict_encoding::TypeName;
 use strict_types::{StrictVal, TypeSystem};
-use ultrasonic::{fe128, CellAddr, Memory, Operation, ProofOfPubl, StateCell, StateData, StateValue};
+use ultrasonic::{fe256, CellAddr, Memory, Operation, ProofOfPubl, StateCell, StateData, StateValue};
 
 use crate::Deeds;
 
@@ -63,7 +63,7 @@ pub struct EffectiveState {
 
 impl EffectiveState {
     #[inline]
-    pub fn seal_addr(&self, seal: fe128) -> CellAddr { self.raw.seal_addr(seal) }
+    pub fn addr(&self, toa: fe256) -> CellAddr { self.raw.addr(toa) }
 
     pub fn read(&self, name: impl Into<StateName>) -> &StrictVal {
         let name = name.into();
@@ -95,7 +95,8 @@ impl EffectiveState {
 
 #[derive(Clone, Debug, Default)]
 pub struct RawState {
-    pub seals: IndexMap<fe128, CellAddr>,
+    /// Tokens of authority
+    pub toas: IndexMap<fe256, CellAddr>,
     pub immutable: BTreeMap<CellAddr, StateData>,
     pub owned: BTreeMap<CellAddr, StateCell>,
 }
@@ -106,17 +107,17 @@ impl Memory for RawState {
 }
 
 impl RawState {
-    pub fn seal_addr(&self, seal: fe128) -> CellAddr { *self.seals.get(&seal).expect("undefined seal") }
+    pub fn addr(&self, toa: fe256) -> CellAddr { *self.toas.get(&toa).expect("undefined token oof authority") }
 
     pub fn apply(&mut self, op: Operation) {
         let opid = op.opid();
         for input in op.destroying {
             let res = self.owned.remove(&input.addr).expect("unknown input");
-            self.seals.shift_remove(&res.seal);
+            self.toas.shift_remove(&res.toa);
         }
         for (no, cell) in op.destructible.into_iter().enumerate() {
             let addr = CellAddr::new(opid, no as u16);
-            self.seals.insert(cell.seal, addr);
+            self.toas.insert(cell.toa, addr);
             self.owned.insert(addr, cell);
         }
         self.immutable.extend(

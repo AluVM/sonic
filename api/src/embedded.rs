@@ -22,6 +22,7 @@
 // the License.
 
 use amplify::confinement::ConfinedBlob;
+use amplify::num::u256;
 use strict_encoding::{StreamReader, StrictDecode, StrictEncode};
 use strict_types::typify::TypedVal;
 use strict_types::value::StrictNum;
@@ -150,9 +151,9 @@ impl EmbeddedImmutable {
         let mut elems = Vec::with_capacity(4);
         elems.push(self.0);
         for chunk in ser.chunks(USED_FIEL_BYTES) {
-            let mut buf = [0u8; u128::BITS as usize / 8];
+            let mut buf = [0u8; u256::BYTES as usize];
             buf[..chunk.len()].copy_from_slice(chunk);
-            elems.push(u128::from_be_bytes(buf));
+            elems.push(u256::from_be_bytes(buf));
         }
 
         StateValue::from(elems)

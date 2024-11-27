@@ -4,10 +4,11 @@ extern crate amplify;
 extern crate strict_types;
 
 use aluvm::{CoreConfig, LibSite};
+use amplify::num::u256;
 use sonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc, EmbeddedReaders};
 use sonic::{Api, ApiInner, AppendApi, DestructibleApi, Issuer, Private};
 use strict_types::{SemId, StrictVal};
-use ultrasonic::{fe128, CellAddr, Codex, Identity};
+use ultrasonic::{fe256, CellAddr, Codex, Identity};
 
 fn codex() -> Codex {
     let lib = libs::success();
@@ -97,13 +98,13 @@ fn main() {
         .start_issue("setup")
         // Alice
         .append("_parties", svnum!(0u64), Some(ston!(name "alice", identity "Alice Wonderland")))
-        .assign("signers", fe128(0), svnum!(0u64), None)
+        .assign("signers", fe256(u256::ZERO), svnum!(0u64), None)
         // Bob
         .append("_parties", svnum!(1u64), Some(ston!(name "bob", identity "Bob Capricorn")))
-        .assign("signers", fe128(1), svnum!(1u64), None)
+        .assign("signers", fe256(u256::ONE), svnum!(1u64), None)
         // Carol
         .append("_parties", svnum!(2u64), Some(ston!(name "carol", identity "Carol Caterpillar")))
-        .assign("signers", fe128(2), svnum!(2u64), None)
+        .assign("signers", fe256(u256::from(2u8)), svnum!(2u64), None)
 
         .finish::<Private>("WonderlandDAO", 1732529307);
 
@@ -126,26 +127,26 @@ fn main() {
     // Alice vote against her being on duty today
     deeds
         .start_deed("castVote")
-        .using(fe128(0), svnum!(0u64), &init_state)
+        .using(fe256(0), svnum!(0u64), &init_state)
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(0u8), partyId 0u64), None)
-        .assign("signers", fe128(10), svnum!(0u64), None)
+        .assign("signers", fe256(10), svnum!(0u64), None)
         .commit();
 
     // Bob and Carol vote for Alice being on duty today
     deeds
         .start_deed("castVote")
-        .using(fe128(1), svnum!(1u64), &init_state)
+        .using(fe256(1), svnum!(1u64), &init_state)
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 1u64), None)
-        .assign("signers", fe128(11), svnum!(1u64), None)
+        .assign("signers", fe256(11), svnum!(1u64), None)
         .commit();
     deeds
         .start_deed("castVote")
-        .using(fe128(2), svnum!(2u64), &init_state)
+        .using(fe256(2), svnum!(2u64), &init_state)
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 2u64), None)
-        .assign("signers", fe128(12), svnum!(2u64), None)
+        .assign("signers", fe256(12), svnum!(2u64), None)
         .commit();
 
     let post_voting_state = deeds.effective_state();

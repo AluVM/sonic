@@ -22,9 +22,11 @@
 // the License.
 
 use aluvm::LibSite;
+use amplify::num::u256;
 use strict_types::StrictVal;
+use ultrasonic::fe256;
 
-pub type StateTy = u128; // TODO: Make it equal to the internal type in used field element
+pub type StateTy = u256; // TODO: Make it equal to the internal type in used field element
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct StateAtom {
@@ -42,6 +44,6 @@ pub struct StructData {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct DataCell {
     pub data: StructData,
-    pub seal: u128, // TODO: Use proper type for the seal
+    pub toa: fe256,
     pub lock: Option<LibSite>,
 }

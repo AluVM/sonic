@@ -29,7 +29,7 @@ use commit_verify::ReservedBytes;
 use sonicapi::{Api, MethodName, StateName};
 use strict_encoding::{StrictDecode, StrictDeserialize, StrictDumb, StrictEncode, StrictSerialize, TypeName};
 use strict_types::{StrictVal, TypeSystem};
-use ultrasonic::{fe128, CallId, CellAddr, Codex, Identity, LibRepo, Operation, Opid, ProofOfPubl};
+use ultrasonic::{fe256, CallId, CellAddr, Codex, Identity, LibRepo, Operation, Opid, ProofOfPubl};
 
 use crate::annotations::Annotations;
 use crate::sigs::ContentSigs;
@@ -168,10 +168,10 @@ impl IssueBuilder {
         self
     }
 
-    pub fn assign(mut self, name: impl Into<StateName>, seal: fe128, data: StrictVal, lock: Option<LibSite>) -> Self {
+    pub fn assign(mut self, name: impl Into<StateName>, toa: fe256, data: StrictVal, lock: Option<LibSite>) -> Self {
         self.builder =
             self.builder
-                .add_destructible(name, seal, data, lock, &self.issuer.default_api, &self.issuer.types);
+                .add_destructible(name, toa, data, lock, &self.issuer.default_api, &self.issuer.types);
         self
     }
 
@@ -221,8 +221,8 @@ impl<'c, PoP: ProofOfPubl> DeedBuilder<'c, PoP> {
         self
     }
 
-    pub fn using(mut self, seal: fe128, witness: StrictVal, state: &EffectiveState) -> Self {
-        let addr = state.seal_addr(seal);
+    pub fn using(mut self, toa: fe256, witness: StrictVal, state: &EffectiveState) -> Self {
+        let addr = state.addr(toa);
         self.builder = self.builder.destroy(addr, witness);
         self
     }
@@ -234,10 +234,10 @@ impl<'c, PoP: ProofOfPubl> DeedBuilder<'c, PoP> {
         self
     }
 
-    pub fn assign(mut self, name: impl Into<StateName>, seal: fe128, data: StrictVal, lock: Option<LibSite>) -> Self {
-        self.builder =
-            self.builder
-                .add_destructible(name, seal, data, lock, &self.deeds.default_api, &self.deeds.types);
+    pub fn assign(mut self, name: impl Into<StateName>, toa: fe256, data: StrictVal, lock: Option<LibSite>) -> Self {
+        self.builder = self
+            .builder
+            .add_destructible(name, toa, data, lock, &self.deeds.default_api, &self.deeds.types);
         self
     }
 
