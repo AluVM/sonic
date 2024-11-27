@@ -24,7 +24,7 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 // TODO: Activate once StrictEncoding will be no_std
-// #![no_std]
+// #![cfg_attr(not(feature = "std"), no_std)]
 
 #[macro_use]
 extern crate core;

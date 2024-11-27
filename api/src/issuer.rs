@@ -77,3 +77,20 @@ impl Issuer {
         }
     }
 }
+
+#[cfg(feature = "std")]
+mod _fs {
+    use std::path::Path;
+
+    use strict_encoding::{SerializeError, StrictSerialize};
+
+    use super::Issuer;
+
+    // TODO: Compute/verify state on load from file
+
+    impl Issuer {
+        pub fn save(&self, path: impl AsRef<Path>) -> Result<(), SerializeError> {
+            self.strict_serialize_to_file::<{ usize::MAX }>(path)
+        }
+    }
+}

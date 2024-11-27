@@ -27,9 +27,10 @@ ultrasonic.workspace = true
 serde = { workspace = true, optional = true }
 
 [features]
-default = []
+default = ["std"]
 all = ["stl", "serde"]
 
+std = []
 stl = ["commit_verify/stl", "ultrasonic/stl", "strict_types/armor"]
 serde = [
     "dep:serde",

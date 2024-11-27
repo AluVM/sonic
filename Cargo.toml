@@ -59,7 +59,7 @@ serde = { workspace = true, optional = true }
 default = ["std"]
 all = ["stl", "std", "serde"]
 
-std = []
+std = ["sonic-api/std"]
 stl = ["commit_verify/stl", "ultrasonic/stl", "strict_types/armor"]
 serde = [
     "dep:serde",
