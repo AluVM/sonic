@@ -32,15 +32,19 @@ use ultrasonic::{fe256, CellAddr, Memory, Operation, Opid, StateCell, StateData,
 
 use crate::LIB_NAME_SONIC;
 
+/// State transitions keeping track of the operation reference plus the state destroyed by the
+/// operation.
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_SONIC)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct Transition {
     pub opid: Opid,
-    pub destroyed: SmallOrdMap<CellAddr, StateData>,
-    pub created: SmallVec<StateCell>,
-    pub appended: SmallVec<StateData>,
+    pub destroyed: SmallOrdMap<CellAddr, StateCell>,
+}
+
+impl Transition {
+    fn new(opid: Opid) -> Self { Self { opid, destroyed: none!() } }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -62,13 +66,14 @@ impl EffectiveState {
             .unwrap_or_else(|| panic!("Computed state {name} is not known"))
     }
 
+    #[must_use]
     pub(crate) fn apply<'a>(
         &mut self,
         op: Operation,
         default_api: &Api,
         custom_apis: impl IntoIterator<Item = &'a Api>,
         sys: &TypeSystem,
-    ) {
+    ) -> Transition {
         self.main.apply(&op, default_api, sys);
         for api in custom_apis {
             // TODO: Remove name from API itself.
@@ -78,7 +83,7 @@ impl EffectiveState {
             let state = self.aux.entry(name.clone()).or_default();
             state.apply(&op, api, sys);
         }
-        self.raw.apply(op);
+        self.raw.apply(op)
     }
 }
 
@@ -99,23 +104,36 @@ impl Memory for RawState {
 impl RawState {
     pub fn addr(&self, toa: fe256) -> CellAddr { *self.toas.get(&toa).expect("undefined token oof authority") }
 
-    pub fn apply(&mut self, op: Operation) {
+    #[must_use]
+    pub fn apply(&mut self, op: Operation) -> Transition {
         let opid = op.opid();
+        let mut transition = Transition::new(opid);
+
         for input in op.destroying {
             let res = self.owned.remove(&input.addr).expect("unknown input");
             self.toas.shift_remove(&res.toa);
+
+            let res = transition
+                .destroyed
+                .insert(input.addr, res)
+                .expect("transaction too large");
+            debug_assert!(res.is_none());
         }
+
         for (no, cell) in op.destructible.into_iter().enumerate() {
             let addr = CellAddr::new(opid, no as u16);
             self.toas.insert(cell.toa, addr);
             self.owned.insert(addr, cell);
         }
+
         self.immutable.extend(
             op.immutable
                 .into_iter()
                 .enumerate()
                 .map(|(no, data)| (CellAddr::new(opid, no as u16), data)),
         );
+
+        transition
     }
 }
 

@@ -125,14 +125,14 @@ impl<C: Capabilities, P: Persistence> Stock<C, P> {
         )?;
 
         self.persistence.stash_mut().append(&operation);
-        // TODO: Add operation to the trace
 
-        self.state.apply(
+        let transition = self.state.apply(
             operation,
             &self.articles.schema.default_api,
             self.articles.schema.custom_apis.keys(),
             &self.articles.schema.types,
         );
+        self.persistence.trace_mut().append(&transition);
 
         Ok(())
     }
@@ -252,7 +252,7 @@ mod fs {
         fn load_articles<C: Capabilities>(&self) -> Articles<C> { todo!() }
 
         fn save_raw_state(&self, state: &RawState) {
-            let path = self.path.clone().join("state.cbor");
+            let path = self.path.clone().join("raw.state");
             let file = fs::File::create(path).expect("unable to create state file");
             serde_cbor::to_writer(file, state).expect("unable to serialize state");
         }
@@ -265,7 +265,7 @@ mod fs {
                 Some(n) => n.as_str(),
             };
             let mut path = self.path.clone().join(name);
-            path.set_extension("cbor");
+            path.set_extension("state");
             let file = fs::File::create(path).expect("unable to create state file");
             serde_cbor::to_writer(file, state).expect("unable to serialize state");
         }
