@@ -245,7 +245,7 @@ mod fs {
         fn trace_mut(&mut self) -> &mut Self::Trace { &mut self.trace }
 
         fn save_articles<C: Capabilities>(&self, obj: &Articles<C>) {
-            let path = self.path.clone().join("articles.ste");
+            let path = self.path.clone().join("contract.articles");
             obj.save(path).expect("unable to save articles");
         }
 

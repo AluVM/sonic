@@ -1,0 +1,30 @@
+name: WonderlandDAO
+method: setup
+
+global:
+  - name: _parties
+    verified: 0
+    unverified:
+      name: alice
+      identity: Alice Wonderland
+  - name: _parties
+    verified: 1
+    unverified:
+      name: bob
+      identity: Bob Capricorn
+  - name: _parties
+    verified: 2
+    unverified:
+      name: carol
+      identity: Carol Caterpillar
+
+owned:
+  - name: signers
+    auth: 9KH3MZWb-pYj_LLXp-GeKCHhgJ-K5WgbV38-HTV5gd1W-VKenjA
+    data: 0
+  - name: signers
+    auth: ~SbFsBED-jym5A2IH-VVncnmVE-TFUez4RL-g3ny1DHb-tFVVgQ
+    data: 1
+  - name: signers
+    auth: ofV1XUM7-v9dX6VBN-q8B0RPLT-v0D0d9YE-AqtF_iq5-GdjY2g
+    data: 2

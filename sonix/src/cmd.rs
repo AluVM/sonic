@@ -21,9 +21,13 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use std::path::PathBuf;
+use std::fs::File;
+use std::path::{Path, PathBuf};
 
-use sonic::AuthToken;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use sonic::{AuthToken, DataCell, MethodName, Private, Schema, StateAtom, StateName};
+use strict_encoding::TypeName;
 
 #[derive(Parser)]
 pub enum Cmd {
@@ -60,4 +64,59 @@ pub enum Cmd {
 
     /// Accept deeds into a contract stock
     Accept { stock: PathBuf, input: PathBuf },
+}
+
+impl Cmd {
+    pub fn exec(&self) -> anyhow::Result<()> {
+        match self {
+            Cmd::Issue { schema, params, output } => issue(schema, params, output.as_deref()),
+            Cmd::Expand { .. } => todo!(),
+            Cmd::State { .. } => todo!(),
+            Cmd::Call { .. } => todo!(),
+            Cmd::Export { .. } => todo!(),
+            Cmd::Accept { .. } => todo!(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+struct NamedState<T> {
+    pub name: StateName,
+    #[serde(flatten)]
+    pub state: T,
+}
+
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+struct IssueParams {
+    pub name: TypeName,
+    pub method: MethodName,
+    pub timestamp: Option<DateTime<Utc>>,
+    pub global: Vec<NamedState<StateAtom>>,
+    pub owned: Vec<NamedState<DataCell>>,
+}
+
+fn issue(schema: &Path, form: &Path, output: Option<&Path>) -> anyhow::Result<()> {
+    let schema = Schema::load(schema)?;
+    let file = File::open(form)?;
+    let params = serde_yaml::from_reader::<_, IssueParams>(file)?;
+
+    let path = output.unwrap_or(form);
+    let output = path.with_file_name(&format!("{}.articles", params.name));
+
+    let mut builder = schema.start_issue(params.method);
+
+    for NamedState { name, state } in params.global {
+        builder = builder.append(name, state.verified, state.unverified)
+    }
+    for NamedState { name, state } in params.owned {
+        builder = builder.assign(name, state.auth, state.data, state.lock)
+    }
+
+    let timestamp = params.timestamp.unwrap_or_else(Utc::now).timestamp();
+    let articles = builder.finish::<Private>(params.name, timestamp);
+
+    articles.save(output)?;
+    Ok(())
 }

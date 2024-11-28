@@ -24,7 +24,7 @@
 use aluvm::LibSite;
 use amplify::num::u256;
 use strict_types::StrictVal;
-use ultrasonic::fe256;
+use ultrasonic::AuthToken;
 
 pub type StateTy = u256; // TODO: Make it equal to the internal type in used field element
 
@@ -46,7 +46,7 @@ pub struct StructData {
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct DataCell {
-    pub data: StructData,
-    pub toa: fe256,
+    pub data: StrictVal,
+    pub auth: AuthToken,
     pub lock: Option<LibSite>,
 }

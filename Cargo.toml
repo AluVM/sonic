@@ -22,6 +22,7 @@ ultrasonic = "0.12.0-beta.1"
 sonic-api = { version = "0.12.0-alpha.1", path = "api" }
 sonic = { version = "0.12.0-alpha.1", path = "." }
 serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9.34"
 
 [package]
 name = "sonic"
@@ -55,9 +56,7 @@ ultrasonic.workspace = true
 sonic-api.workspace = true
 indexmap = "2.6.0"
 serde = { workspace = true, optional = true }
-#toml = { version = "0.8.19", optional = true, features = ["indexmap"] }
-serde_yaml = { version = "0.9.34", optional = true }
-serde_cbor = { version = "0.11.2", optional = true }
+serde_yaml = { workspace = true, optional = true }
 
 [features]
 default = ["std"]
@@ -66,7 +65,7 @@ all = ["stl", "std", "serde", "persist-file"]
 std = ["sonic-api/std"]
 stl = ["commit_verify/stl", "ultrasonic/stl", "strict_types/armor"]
 
-persist-file = ["std", "serde", "dep:serde_yaml", "dep:serde_cbor"]
+persist-file = ["std", "serde", "dep:serde_yaml"]
 serde = [
     "dep:serde",
     "amplify/serde",
