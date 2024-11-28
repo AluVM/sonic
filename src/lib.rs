@@ -53,4 +53,4 @@ mod stock;
 pub use aora::file::FileAora;
 pub use aora::Aora;
 pub use state::{AdaptedState, EffectiveState, RawState, Transition};
-pub use stock::{CallParams, DeedBuilder, Stock};
+pub use stock::{CallParams, DeedBuilder, Persistence, Stock};
