@@ -5,10 +5,11 @@ extern crate strict_types;
 
 use aluvm::{CoreConfig, LibSite};
 use amplify::num::u256;
+use commit_verify::{Digest, Sha256};
 use sonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc, EmbeddedReaders};
 use sonic::{Api, ApiInner, AppendApi, DestructibleApi, Schema, Stock};
 use strict_types::{SemId, StrictVal};
-use ultrasonic::{fe256, CellAddr, Codex, Identity, Private, FIELD_ORDER_SECP};
+use ultrasonic::{fe256, AuthToken, CellAddr, Codex, Identity, Private, FIELD_ORDER_SECP};
 
 fn codex() -> Codex {
     let lib = libs::success();
@@ -94,17 +95,30 @@ fn main() {
         .save("examples/SimpleDAO.schema")
         .expect("unable to save issuer to a file");
 
+    let seed = &[0xCA; 30][..];
+    let mut auth = Sha256::digest(&seed);
+    let mut next_auth = || -> AuthToken {
+        auth = Sha256::digest(&*auth);
+        let mut buf = [0u8; 30];
+        buf.copy_from_slice(&auth[..30]);
+        AuthToken::from(buf)
+    };
+
+    let alice_auth = next_auth();
+    let bob_auth = next_auth();
+    let carol_auth = next_auth();
+
     let articles = issuer
         .start_issue("setup")
         // Alice
         .append("_parties", svnum!(0u64), Some(ston!(name "alice", identity "Alice Wonderland")))
-        .assign("signers", fe256(u256::ZERO), svnum!(0u64), None)
+        .assign("signers", alice_auth, svnum!(0u64), None)
         // Bob
         .append("_parties", svnum!(1u64), Some(ston!(name "bob", identity "Bob Capricorn")))
-        .assign("signers", fe256(u256::ONE), svnum!(1u64), None)
+        .assign("signers", bob_auth, svnum!(1u64), None)
         // Carol
         .append("_parties", svnum!(2u64), Some(ston!(name "carol", identity "Carol Caterpillar")))
-        .assign("signers", fe256(u256::from(2u8)), svnum!(2u64), None)
+        .assign("signers", carol_auth, svnum!(2u64), None)
 
         .finish::<Private>("WonderlandDAO", 1732529307);
 
@@ -123,26 +137,26 @@ fn main() {
     // Alice vote against her being on duty today
     stock
         .start_deed("castVote")
-        .using(fe256(u256::ZERO), svnum!(0u64))
+        .using(alice_auth, svnum!(0u64))
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(0u8), partyId 0u64), None)
-        .assign("signers", fe256(u256::from(10u8)), svnum!(0u64), None)
+        .assign("signers", next_auth(), svnum!(0u64), None)
         .commit();
 
     // Bob and Carol vote for Alice being on duty today
     stock
         .start_deed("castVote")
-        .using(fe256(u256::ONE), svnum!(1u64))
+        .using(bob_auth, svnum!(1u64))
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 1u64), None)
-        .assign("signers", fe256(u256::from(11u8)), svnum!(1u64), None)
+        .assign("signers", next_auth(), svnum!(1u64), None)
         .commit();
     stock
         .start_deed("castVote")
-        .using(fe256(u256::from(2u8)), svnum!(2u64))
+        .using(carol_auth, svnum!(2u64))
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 2u64), None)
-        .assign("signers", fe256(u256::from(12u8)), svnum!(2u64), None)
+        .assign("signers", next_auth(), svnum!(2u64), None)
         .commit();
 
     let StrictVal::Map(votings) = stock.state().read("votings") else {

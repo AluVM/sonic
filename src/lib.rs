@@ -42,6 +42,7 @@ extern crate commit_verify;
 extern crate serde;
 
 pub use sonicapi::*;
+pub use ultrasonic::*;
 
 mod aora;
 

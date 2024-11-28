@@ -23,12 +23,12 @@
 
 use alloc::collections::BTreeMap;
 
-use amplify::confinement::{SmallOrdMap, SmallVec};
+use amplify::confinement::SmallOrdMap;
 use indexmap::IndexMap;
 use sonicapi::{Api, StateAtom, StateName};
 use strict_encoding::TypeName;
 use strict_types::{StrictVal, TypeSystem};
-use ultrasonic::{fe256, CellAddr, Memory, Operation, Opid, StateCell, StateData, StateValue};
+use ultrasonic::{fe256, AuthToken, CellAddr, Memory, Operation, Opid, StateCell, StateData, StateValue};
 
 use crate::LIB_NAME_SONIC;
 
@@ -56,7 +56,7 @@ pub struct EffectiveState {
 
 impl EffectiveState {
     #[inline]
-    pub fn addr(&self, toa: fe256) -> CellAddr { self.raw.addr(toa) }
+    pub fn addr(&self, auth: AuthToken) -> CellAddr { self.raw.addr(auth) }
 
     pub fn read(&self, name: impl Into<StateName>) -> &StrictVal {
         let name = name.into();
@@ -91,7 +91,7 @@ impl EffectiveState {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct RawState {
     /// Tokens of authority
-    pub toas: IndexMap<fe256, CellAddr>,
+    pub auth: IndexMap<AuthToken, CellAddr>,
     pub immutable: BTreeMap<CellAddr, StateData>,
     pub owned: BTreeMap<CellAddr, StateCell>,
 }
@@ -102,7 +102,7 @@ impl Memory for RawState {
 }
 
 impl RawState {
-    pub fn addr(&self, toa: fe256) -> CellAddr { *self.toas.get(&toa).expect("undefined token oof authority") }
+    pub fn addr(&self, auth: AuthToken) -> CellAddr { *self.auth.get(&auth).expect("undefined token oof authority") }
 
     #[must_use]
     pub fn apply(&mut self, op: Operation) -> Transition {
@@ -111,7 +111,7 @@ impl RawState {
 
         for input in op.destroying {
             let res = self.owned.remove(&input.addr).expect("unknown input");
-            self.toas.shift_remove(&res.toa);
+            self.auth.shift_remove(&res.auth);
 
             let res = transition
                 .destroyed
@@ -122,7 +122,7 @@ impl RawState {
 
         for (no, cell) in op.destructible.into_iter().enumerate() {
             let addr = CellAddr::new(opid, no as u16);
-            self.toas.insert(cell.toa, addr);
+            self.auth.insert(cell.auth, addr);
             self.owned.insert(addr, cell);
         }
 

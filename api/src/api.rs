@@ -38,6 +38,7 @@ use core::fmt::Debug;
 use core::hash::{Hash, Hasher};
 
 use amplify::confinement::{ConfinedBlob, TinyOrdMap, TinyString, U16 as U16MAX};
+use amplify::num::u256;
 use amplify::Bytes32;
 use commit_verify::{CommitId, ReservedBytes};
 use strict_types::{SemId, StrictDecode, StrictDumb, StrictEncode, StrictVal, TypeName, TypeSystem, VariantName};
@@ -46,7 +47,7 @@ use ultrasonic::{CallId, CodexId, Identity, StateData, StateValue};
 use crate::embedded::EmbeddedProc;
 use crate::{StateAtom, StructData, VmType, LIB_NAME_SONIC};
 
-pub(super) const USED_FIEL_BYTES: usize = u128::BITS as usize / 8 - 1;
+pub(super) const USED_FIEL_BYTES: usize = u256::BYTES as usize - 2;
 pub(super) const TOTAL_BYTES: usize = USED_FIEL_BYTES * 3;
 
 pub type StateName = VariantName;

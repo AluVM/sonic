@@ -25,7 +25,7 @@ use aluvm::LibSite;
 use sonicapi::{MethodName, OpBuilder, StateName};
 use strict_encoding::{StrictWriter, TypeName, WriteRaw};
 use strict_types::StrictVal;
-use ultrasonic::{fe256, CallError, Capabilities, CellAddr, Operation, Opid};
+use ultrasonic::{fe256, AuthToken, CallError, Capabilities, CellAddr, Operation, Opid};
 
 use crate::{AdaptedState, Aora, Articles, EffectiveState, RawState, Transition};
 
@@ -162,32 +162,31 @@ impl<'c, C: Capabilities, P: Persistence> DeedBuilder<'c, C, P> {
         self
     }
 
-    pub fn using(mut self, toa: fe256, witness: StrictVal) -> Self {
-        let addr = self.stock.state.addr(toa);
+    pub fn using(mut self, auth: AuthToken, witness: StrictVal) -> Self {
+        let addr = self.stock.state.addr(auth);
         self.builder = self.builder.destroy(addr, witness);
         self
     }
 
     pub fn append(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
-        self.builder = self.builder.add_immutable(
-            name,
-            data,
-            raw,
-            &self.stock.articles.schema.default_api,
-            &self.stock.articles.schema.types,
-        );
+        let api = &self.stock.articles.schema.default_api;
+        let types = &self.stock.articles.schema.types;
+        self.builder = self.builder.add_immutable(name, data, raw, api, types);
         self
     }
 
-    pub fn assign(mut self, name: impl Into<StateName>, toa: fe256, data: StrictVal, lock: Option<LibSite>) -> Self {
-        self.builder = self.builder.add_destructible(
-            name,
-            toa,
-            data,
-            lock,
-            &self.stock.articles.schema.default_api,
-            &self.stock.articles.schema.types,
-        );
+    pub fn assign(
+        mut self,
+        name: impl Into<StateName>,
+        auth: AuthToken,
+        data: StrictVal,
+        lock: Option<LibSite>,
+    ) -> Self {
+        let api = &self.stock.articles.schema.default_api;
+        let types = &self.stock.articles.schema.types;
+        self.builder = self
+            .builder
+            .add_destructible(name, auth, data, lock, api, types);
         self
     }
 

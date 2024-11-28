@@ -127,7 +127,7 @@ pub struct EmbeddedImmutable(pub StateTy);
 impl EmbeddedImmutable {
     fn convert_value(&self, sem_id: SemId, value: StateValue, sys: &TypeSystem) -> Option<StrictVal> {
         // State type doesn't match
-        let ty = value.get(0)?.0;
+        let ty = value.get(0)?.to_u256();
         if ty != self.0 {
             return None;
         }
@@ -137,7 +137,7 @@ impl EmbeddedImmutable {
         while let Some(el) = value.get(i) {
             let from = USED_FIEL_BYTES * (i - 1) as usize;
             let to = USED_FIEL_BYTES * i as usize;
-            buf[from..to].copy_from_slice(&el.0.to_be_bytes()[..USED_FIEL_BYTES]);
+            buf[from..to].copy_from_slice(&el.to_u256().to_le_bytes()[..USED_FIEL_BYTES]);
             i += 1;
         }
         debug_assert!(i <= 4);
@@ -153,7 +153,7 @@ impl EmbeddedImmutable {
         for chunk in ser.chunks(USED_FIEL_BYTES) {
             let mut buf = [0u8; u256::BYTES as usize];
             buf[..chunk.len()].copy_from_slice(chunk);
-            elems.push(u256::from_be_bytes(buf));
+            elems.push(u256::from_le_bytes(buf));
         }
 
         StateValue::from(elems)

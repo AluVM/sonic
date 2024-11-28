@@ -27,8 +27,8 @@ use amplify::num::u256;
 use strict_encoding::TypeName;
 use strict_types::{StrictVal, TypeSystem};
 use ultrasonic::{
-    fe256, CallId, Capabilities, CellAddr, CodexId, Contract, ContractId, ContractMeta, ContractName, Genesis,
-    Identity, Input, Operation, StateCell, StateData, StateValue,
+    fe256, AuthToken, CallId, Capabilities, CellAddr, CodexId, Contract, ContractId, ContractMeta, ContractName,
+    Genesis, Identity, Input, Operation, StateCell, StateData, StateValue,
 };
 
 use crate::{Api, Articles, MethodName, Schema, StateName};
@@ -54,10 +54,16 @@ impl IssueBuilder {
         self
     }
 
-    pub fn assign(mut self, name: impl Into<StateName>, toa: fe256, data: StrictVal, lock: Option<LibSite>) -> Self {
+    pub fn assign(
+        mut self,
+        name: impl Into<StateName>,
+        auth: AuthToken,
+        data: StrictVal,
+        lock: Option<LibSite>,
+    ) -> Self {
         self.builder =
             self.builder
-                .add_destructible(name, toa, data, lock, &self.schema.default_api, &self.schema.types);
+                .add_destructible(name, auth, data, lock, &self.schema.default_api, &self.schema.types);
         self
     }
 
@@ -106,14 +112,14 @@ impl Builder {
     pub fn add_destructible(
         mut self,
         name: impl Into<StateName>,
-        toa: fe256,
+        auth: AuthToken,
         data: StrictVal,
         lock: Option<LibSite>,
         api: &Api,
         sys: &TypeSystem,
     ) -> Self {
         let data = api.build_destructible(name, data, sys);
-        let cell = StateCell { data, toa, lock };
+        let cell = StateCell { data, auth, lock };
         self.destructible
             .push(cell)
             .expect("too many state elements");
@@ -124,7 +130,7 @@ impl Builder {
         Genesis {
             codex_id,
             call_id: self.call_id,
-            nonce: fe256(u256::ZERO),
+            nonce: fe256::from(u256::ZERO),
             destructible: self.destructible,
             immutable: self.immutable,
             reserved: zero!(),
@@ -154,13 +160,13 @@ impl<'c> BuilderRef<'c> {
     pub fn add_destructible(
         mut self,
         name: impl Into<StateName>,
-        toa: fe256,
+        auth: AuthToken,
         data: StrictVal,
         lock: Option<LibSite>,
     ) -> Self {
         self.inner = self
             .inner
-            .add_destructible(name, toa, data, lock, self.api, self.type_system);
+            .add_destructible(name, auth, data, lock, self.api, self.type_system);
         self
     }
 
@@ -196,13 +202,15 @@ impl OpBuilder {
     pub fn add_destructible(
         mut self,
         name: impl Into<StateName>,
-        toa: fe256,
+        auth: AuthToken,
         data: StrictVal,
         lock: Option<LibSite>,
         api: &Api,
         sys: &TypeSystem,
     ) -> Self {
-        self.inner = self.inner.add_destructible(name, toa, data, lock, api, sys);
+        self.inner = self
+            .inner
+            .add_destructible(name, auth, data, lock, api, sys);
         self
     }
 
@@ -226,7 +234,7 @@ impl OpBuilder {
         Operation {
             contract_id: self.contract_id,
             call_id: self.inner.call_id,
-            nonce: fe256(u256::ZERO),
+            nonce: fe256::from(u256::ZERO),
             destroying: self.destroying,
             reading: self.reading,
             destructible: self.inner.destructible,
@@ -259,13 +267,13 @@ impl<'c> OpBuilderRef<'c> {
     pub fn add_destructible(
         mut self,
         name: impl Into<StateName>,
-        toa: fe256,
+        auth: AuthToken,
         data: StrictVal,
         lock: Option<LibSite>,
     ) -> Self {
         self.inner = self
             .inner
-            .add_destructible(name, toa, data, lock, self.api, self.type_system);
+            .add_destructible(name, auth, data, lock, self.api, self.type_system);
         self
     }
 
