@@ -47,7 +47,7 @@ pub mod file {
     use std::fs::File;
     use std::io::{Read, Seek, SeekFrom, Write};
     use std::marker::PhantomData;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
 
     use strict_encoding::{StreamReader, StreamWriter, StrictDecode, StrictEncode, StrictReader, StrictWriter};
     use ultrasonic::{Operation, Opid};
@@ -70,12 +70,28 @@ pub mod file {
     }
 
     impl<T: AoraItem> FileAora<T> {
-        pub fn new(path: impl AsRef<Path>, name: &str) -> Self {
+        fn prepare(path: impl AsRef<Path>, name: &str) -> (PathBuf, PathBuf) {
             let path = path.as_ref();
             let log = path.join(format!("{name}.aolog"));
-            let log = File::create(log).expect("unable to create append-only log file");
             let idx = path.join(format!("{name}.raidx"));
+            (log, idx)
+        }
+
+        pub fn new(path: impl AsRef<Path>, name: &str) -> Self {
+            let (log, idx) = Self::prepare(path, name);
+            let log = File::create(log).expect("unable to create append-only log file");
             let idx = File::create(idx).expect("unable to create random-access index file");
+            Self { log, idx, index: empty!(), _phantom: PhantomData }
+        }
+
+        pub fn open(path: impl AsRef<Path>, name: &str) -> Self {
+            let (log, idx) = Self::prepare(path, name);
+            let mut log = File::open(log).expect("unable to open append-only log file");
+            let mut idx = File::open(idx).expect("unable to open random-access index file");
+            log.seek(SeekFrom::End(0))
+                .expect("unable to seek to the end of the log");
+            idx.seek(SeekFrom::End(0))
+                .expect("unable to seek to the end of the index");
             Self { log, idx, index: empty!(), _phantom: PhantomData }
         }
     }

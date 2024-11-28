@@ -28,7 +28,7 @@ use indexmap::IndexMap;
 use sonicapi::{Api, StateAtom, StateName};
 use strict_encoding::TypeName;
 use strict_types::{StrictVal, TypeSystem};
-use ultrasonic::{fe256, AuthToken, CellAddr, Memory, Operation, Opid, StateCell, StateData, StateValue};
+use ultrasonic::{AuthToken, CellAddr, Memory, Operation, Opid, StateCell, StateData, StateValue};
 
 use crate::LIB_NAME_SONIC;
 

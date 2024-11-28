@@ -60,7 +60,7 @@ pub struct Stock<C: Capabilities, P: Persistence> {
 }
 
 impl<C: Capabilities, P: Persistence> Stock<C, P> {
-    pub fn with(articles: Articles<C>, persistence: P) -> Self {
+    pub fn create(articles: Articles<C>, persistence: P) -> Self {
         let mut state = EffectiveState::default();
 
         let genesis = articles
@@ -68,12 +68,31 @@ impl<C: Capabilities, P: Persistence> Stock<C, P> {
             .genesis
             .to_operation(articles.contract.contract_id());
 
-        state.apply(genesis, &articles.schema.default_api, articles.schema.custom_apis.keys(), &articles.schema.types);
+        // We do not need state transition for geneis.
+        let _ = state.apply(
+            genesis,
+            &articles.schema.default_api,
+            articles.schema.custom_apis.keys(),
+            &articles.schema.types,
+        );
 
         let mut me = Self { articles, state, persistence };
         me.recompute_state();
         me.save();
         me
+    }
+
+    pub fn open(articles: Articles<C>, persistence: P) -> Self {
+        let mut state = EffectiveState::default();
+        state.raw = persistence.load_raw_state();
+        state.main = persistence.load_state(None);
+        for api in articles.schema.custom_apis.keys() {
+            let name = api.name().expect("custom state must be named");
+            state
+                .aux
+                .insert(name.clone(), persistence.load_state(Some(name)));
+        }
+        Self { articles, state, persistence }
     }
 
     // TODO: Return statistics
@@ -204,7 +223,6 @@ impl<'c, C: Capabilities, P: Persistence> DeedBuilder<'c, C, P> {
 #[cfg(feature = "persist-file")]
 mod fs {
     use std::fs;
-    use std::io::Write;
     use std::path::{Path, PathBuf};
 
     use ultrasonic::ContractName;
@@ -219,6 +237,9 @@ mod fs {
     }
 
     impl FilePersistence {
+        const FILENAME_ARTICLES: &'static str = "contract.articles";
+        const FILENAME_STATE_RAW: &'static str = "state.raw.yaml";
+
         pub fn new(name: &str, path: impl AsRef<Path>) -> Self {
             let mut path = path.as_ref().to_path_buf();
             path.push(name);
@@ -228,6 +249,13 @@ mod fs {
             let stash = FileAora::new(&path, "stash");
             let trace = FileAora::new(&path, "trace");
 
+            Self { path, stash, trace }
+        }
+
+        pub fn open(path: impl AsRef<Path>) -> Self {
+            let path = path.as_ref().to_path_buf();
+            let stash = FileAora::open(&path, "stash");
+            let trace = FileAora::open(&path, "trace");
             Self { path, stash, trace }
         }
     }
@@ -245,25 +273,26 @@ mod fs {
         fn trace_mut(&mut self) -> &mut Self::Trace { &mut self.trace }
 
         fn save_articles<C: Capabilities>(&self, obj: &Articles<C>) {
-            let path = self.path.clone().join("contract.articles");
+            let path = self.path.clone().join(Self::FILENAME_ARTICLES);
             obj.save(path).expect("unable to save articles");
         }
 
-        fn load_articles<C: Capabilities>(&self) -> Articles<C> { todo!() }
+        fn load_articles<C: Capabilities>(&self) -> Articles<C> {
+            let path = self.path.clone().join(Self::FILENAME_ARTICLES);
+            Articles::load(path).expect("unable to load articles")
+        }
 
         fn save_raw_state(&self, state: &RawState) {
-            let path = self.path.clone().join("state.raw.yaml");
-            let mut file = fs::File::create(path).expect("unable to create state file");
-            /*file.write_all(
-                toml::to_string(state)
-                    .expect("unable to serialize state")
-                    .as_bytes(),
-            )
-            .expect("unable to write state");*/
+            let path = self.path.clone().join(Self::FILENAME_STATE_RAW);
+            let file = fs::File::create(path).expect("unable to create state file");
             serde_yaml::to_writer(file, state).expect("unable to serialize state");
         }
 
-        fn load_raw_state(&self) -> RawState { todo!() }
+        fn load_raw_state(&self) -> RawState {
+            let path = self.path.clone().join(Self::FILENAME_STATE_RAW);
+            let file = fs::File::open(path).expect("unable to create state file");
+            serde_yaml::from_reader(file).expect("unable to serialize state")
+        }
 
         fn save_state(&self, name: Option<&TypeName>, state: &AdaptedState) {
             let name = match name {
@@ -272,17 +301,20 @@ mod fs {
             };
             let mut path = self.path.clone().join(name);
             path.set_extension("yaml");
-            let mut file = fs::File::create(path).expect("unable to create state file");
-            /*file.write_all(
-                toml::to_string(state)
-                    .expect("unable to serialize state")
-                    .as_bytes(),
-            )
-            .expect("unable to write state");*/
+            let file = fs::File::create(path).expect("unable to create state file");
             serde_yaml::to_writer(file, state).expect("unable to serialize state");
         }
 
-        fn load_state(&self, name: Option<&TypeName>) -> AdaptedState { todo!() }
+        fn load_state(&self, name: Option<&TypeName>) -> AdaptedState {
+            let name = match name {
+                None => "state",
+                Some(n) => n.as_str(),
+            };
+            let mut path = self.path.clone().join(name);
+            path.set_extension("yaml");
+            let file = fs::File::open(path).expect("unable to create state file");
+            serde_yaml::from_reader(file).expect("unable to serialize state")
+        }
     }
 
     impl<C: Capabilities> Stock<C, FilePersistence> {
@@ -292,9 +324,13 @@ mod fs {
                 ContractName::Named(name) => name.to_string(),
             };
             let persistence = FilePersistence::new(&name, path);
-            Self::with(articles, persistence)
+            Self::create(articles, persistence)
         }
 
-        pub fn open(path: impl AsRef<Path>) -> Self { todo!() }
+        pub fn load(path: impl AsRef<Path>) -> Self {
+            let path = path.as_ref();
+            let persistence = FilePersistence::open(path);
+            Self::open(persistence.load_articles(), persistence)
+        }
     }
 }

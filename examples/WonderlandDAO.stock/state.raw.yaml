@@ -5,55 +5,65 @@ auth:
 immutable:
   03a9447831821ef908926dbfc4c49225f373df5edb410b7a8487fcb7aeab5897:0:
     value:
-    - 0.fe
-    - 0.fe
+      type: double
+      first: 0.fe
+      second: 0.fe
     raw: 0x05616C69636510416C69636520576F6E6465726C616E64
   03a9447831821ef908926dbfc4c49225f373df5edb410b7a8487fcb7aeab5897:1:
     value:
-    - 0.fe
-    - 1.fe
+      type: double
+      first: 0.fe
+      second: 1.fe
     raw: 0x03626F620D426F62204361707269636F726E
   03a9447831821ef908926dbfc4c49225f373df5edb410b7a8487fcb7aeab5897:2:
     value:
-    - 0.fe
-    - 2.fe
+      type: double
+      first: 0.fe
+      second: 2.fe
     raw: 0x056361726F6C114361726F6C20436174657270696C6C6172
   03ff8713173f858b8ff418b84e37bf5ce5a5fb6185ee1a183d0f94afb538ebad:0:
     value:
-    - 2.fe
-    - 2010000000000000064.fe
+      type: double
+      first: 2.fe
+      second: 2010000000000000064.fe
     raw: null
   1162e870c8160752ed8b1794489cecb32e6040e034e0700f077ef473e525e47d:0:
     value:
-    - 1.fe
-    - 64.fe
+      type: double
+      first: 1.fe
+      second: 64.fe
     raw: 0x17497320416C696365206F6E206475747920746F6461793F2B00566F7465202770726F2720696620416C6963652073686F756C64206265206F6E206475747920746F646179
   3e30f84d94a90b90040a2c4a86b6f37940d69bef857b81d77ae36f0856092bca:0:
     value:
-    - 2.fe
-    - 1010000000000000064.fe
+      type: double
+      first: 2.fe
+      second: 1010000000000000064.fe
     raw: null
   91f0650b151504841607b73a5baa8384d941b773e5979c6aecd8acb2a031597e:0:
     value:
-    - 2.fe
-    - 64.fe
+      type: double
+      first: 2.fe
+      second: 64.fe
     raw: null
 owned:
   03ff8713173f858b8ff418b84e37bf5ce5a5fb6185ee1a183d0f94afb538ebad:0:
     data:
-    - 0.fe
-    - 2.fe
+      type: double
+      first: 0.fe
+      second: 2.fe
     auth: ofV1XUM7-v9dX6VBN-q8B0RPLT-v0D0d9YE-AqtF_iq5-GdjY2g
     lock: null
   3e30f84d94a90b90040a2c4a86b6f37940d69bef857b81d77ae36f0856092bca:0:
     data:
-    - 0.fe
-    - 1.fe
+      type: double
+      first: 0.fe
+      second: 1.fe
     auth: ~SbFsBED-jym5A2IH-VVncnmVE-TFUez4RL-g3ny1DHb-tFVVgQ
     lock: null
   91f0650b151504841607b73a5baa8384d941b773e5979c6aecd8acb2a031597e:0:
     data:
-    - 0.fe
-    - 0.fe
+      type: double
+      first: 0.fe
+      second: 0.fe
     auth: 9KH3MZWb-pYj_LLXp-GeKCHhgJ-K5WgbV38-HTV5gd1W-VKenjA
     lock: null

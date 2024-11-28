@@ -52,14 +52,16 @@ impl<C: Capabilities> Articles<C> {
 mod _fs {
     use std::path::Path;
 
-    use strict_encoding::{SerializeError, StrictSerialize};
+    use strict_encoding::{DeserializeError, SerializeError, StrictDeserialize, StrictSerialize};
     use ultrasonic::Capabilities;
 
     use super::Articles;
 
-    // TODO: Compute/verify state on load from file
-
     impl<C: Capabilities> Articles<C> {
+        pub fn load(path: impl AsRef<Path>) -> Result<Self, DeserializeError> {
+            Self::strict_deserialize_from_file::<{ usize::MAX }>(path)
+        }
+
         pub fn save(&self, path: impl AsRef<Path>) -> Result<(), SerializeError> {
             self.strict_serialize_to_file::<{ usize::MAX }>(path)
         }

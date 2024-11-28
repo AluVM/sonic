@@ -26,7 +26,7 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sonic::{AuthToken, DataCell, MethodName, Private, Schema, StateAtom, StateName};
+use sonic::{Articles, AuthToken, DataCell, MethodName, Private, Schema, StateAtom, StateName, Stock};
 use strict_encoding::TypeName;
 
 #[derive(Parser)]
@@ -43,8 +43,8 @@ pub enum Cmd {
         output: Option<PathBuf>,
     },
 
-    /// Expand contract articles into a contract stock directory
-    Expand { articles: PathBuf, stock: Option<PathBuf> },
+    /// Process contract articles into a contract stock directory
+    Process { articles: PathBuf, stock: Option<PathBuf> },
 
     /// Print out a contract state
     State { stock: PathBuf },
@@ -69,13 +69,14 @@ pub enum Cmd {
 impl Cmd {
     pub fn exec(&self) -> anyhow::Result<()> {
         match self {
-            Cmd::Issue { schema, params, output } => issue(schema, params, output.as_deref()),
-            Cmd::Expand { .. } => todo!(),
-            Cmd::State { .. } => todo!(),
+            Cmd::Issue { schema, params, output } => issue(schema, params, output.as_deref())?,
+            Cmd::Process { articles, stock } => process(articles, stock.as_deref())?,
+            Cmd::State { stock } => state(stock),
             Cmd::Call { .. } => todo!(),
             Cmd::Export { .. } => todo!(),
             Cmd::Accept { .. } => todo!(),
         }
+        Ok(())
     }
 }
 
@@ -119,4 +120,19 @@ fn issue(schema: &Path, form: &Path, output: Option<&Path>) -> anyhow::Result<()
 
     articles.save(output)?;
     Ok(())
+}
+
+fn process(articles: &Path, stock: Option<&Path>) -> anyhow::Result<()> {
+    let path = stock.unwrap_or(articles);
+
+    let articles = Articles::<Private>::load(articles)?;
+    Stock::new(articles, path);
+
+    Ok(())
+}
+
+fn state(path: &Path) {
+    let stock = Stock::<Private, _>::load(path);
+    let val = serde_yaml::to_string(&stock.state().main).expect("unable to generate YAML");
+    println!("{val}");
 }

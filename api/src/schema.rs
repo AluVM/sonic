@@ -93,8 +93,6 @@ mod _fs {
 
     use super::Schema;
 
-    // TODO: Compute/verify state on load from file
-
     impl Schema {
         pub fn load(path: impl AsRef<Path>) -> Result<Self, DeserializeError> {
             Self::strict_deserialize_from_file::<{ usize::MAX }>(path)
