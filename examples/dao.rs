@@ -159,6 +159,8 @@ fn main() {
         .assign("signers", next_auth(), svnum!(2u64), None)
         .commit();
 
+    stock.save();
+
     let StrictVal::Map(votings) = stock.state().read("votings") else {
         panic!("invalid data")
     };

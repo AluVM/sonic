@@ -204,6 +204,7 @@ impl<'c, C: Capabilities, P: Persistence> DeedBuilder<'c, C, P> {
 #[cfg(feature = "persist-file")]
 mod fs {
     use std::fs;
+    use std::io::Write;
     use std::path::{Path, PathBuf};
 
     use ultrasonic::ContractName;
@@ -251,22 +252,34 @@ mod fs {
         fn load_articles<C: Capabilities>(&self) -> Articles<C> { todo!() }
 
         fn save_raw_state(&self, state: &RawState) {
-            let path = self.path.clone().join("raw.state");
-            let file = fs::File::create(path).expect("unable to create state file");
-            serde_cbor::to_writer(file, state).expect("unable to serialize state");
+            let path = self.path.clone().join("state.raw.yaml");
+            let mut file = fs::File::create(path).expect("unable to create state file");
+            /*file.write_all(
+                toml::to_string(state)
+                    .expect("unable to serialize state")
+                    .as_bytes(),
+            )
+            .expect("unable to write state");*/
+            serde_yaml::to_writer(file, state).expect("unable to serialize state");
         }
 
         fn load_raw_state(&self) -> RawState { todo!() }
 
         fn save_state(&self, name: Option<&TypeName>, state: &AdaptedState) {
             let name = match name {
-                None => "default",
+                None => "state",
                 Some(n) => n.as_str(),
             };
             let mut path = self.path.clone().join(name);
-            path.set_extension("state");
-            let file = fs::File::create(path).expect("unable to create state file");
-            serde_cbor::to_writer(file, state).expect("unable to serialize state");
+            path.set_extension("yaml");
+            let mut file = fs::File::create(path).expect("unable to create state file");
+            /*file.write_all(
+                toml::to_string(state)
+                    .expect("unable to serialize state")
+                    .as_bytes(),
+            )
+            .expect("unable to write state");*/
+            serde_yaml::to_writer(file, state).expect("unable to serialize state");
         }
 
         fn load_state(&self, name: Option<&TypeName>) -> AdaptedState { todo!() }

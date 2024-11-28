@@ -93,7 +93,7 @@ impl StateReader for EmbeddedReaders {
                         StrictVal::Number(StrictNum::Uint(val)) => *val,
                         _ => panic!("invalid type of state for sum aggregator"),
                     })
-                    .sum::<u128>();
+                    .sum::<u64>();
                 svnum!(sum)
             }
             EmbeddedReaders::ListV(name) => StrictVal::List(

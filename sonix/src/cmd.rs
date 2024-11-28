@@ -21,11 +21,43 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-#[macro_use]
-extern crate clap;
+use std::path::PathBuf;
 
-mod cmd;
+use sonic::AuthToken;
 
-fn main() {
-    println!("Hello, world!");
+#[derive(Parser)]
+pub enum Cmd {
+    /// Issue a new HyperSONIC contract
+    Issue {
+        /// Schema used to issue the contract
+        schema: PathBuf,
+
+        /// Parameters and data for the contract
+        params: PathBuf,
+
+        /// Output file which will contain articles of the contract
+        output: Option<PathBuf>,
+    },
+
+    /// Expand contract articles into a contract stock directory
+    Expand { articles: PathBuf, stock: Option<PathBuf> },
+
+    /// Print out a contract state
+    State { stock: PathBuf },
+
+    /// Make a contract call
+    Call { stock: PathBuf, call: PathBuf },
+
+    /// Export contract deeds to a file
+    Export {
+        stock: PathBuf,
+
+        /// List of tokens of authority which should serve as a contract terminals.
+        terminals: Vec<AuthToken>,
+
+        output: PathBuf,
+    },
+
+    /// Accept deeds into a contract stock
+    Accept { stock: PathBuf, input: PathBuf },
 }
