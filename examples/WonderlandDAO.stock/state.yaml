@@ -44,6 +44,12 @@ immutable:
         - 0
       unverified: null
   _votings:
+    08a781f81284c668bc439041be0cfbc6fee4546caa95af30be28e1802fb72625:0:
+      verified:
+      - 101
+      unverified:
+        title: Is Bob on duty today?
+        text: Vote 'pro' if Bob should be on duty today
     1162e870c8160752ed8b1794489cecb32e6040e034e0700f077ef473e525e47d:0:
       verified:
       - 100
@@ -87,6 +93,9 @@ computed:
     - 0
   votingCount: 0
   votings:
+  - - - 101
+    - title: Is Bob on duty today?
+      text: Vote 'pro' if Bob should be on duty today
   - - - 100
     - title: Is Alice on duty today?
       text: Vote 'pro' if Alice should be on duty today

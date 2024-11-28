@@ -24,6 +24,7 @@
 use aluvm::LibSite;
 use amplify::confinement::SmallVec;
 use amplify::num::u256;
+use chrono::{DateTime, Utc};
 use strict_encoding::TypeName;
 use strict_types::{StrictVal, TypeSystem};
 use ultrasonic::{
@@ -31,12 +32,51 @@ use ultrasonic::{
     Genesis, Identity, Input, Operation, StateCell, StateData, StateValue,
 };
 
-use crate::{Api, Articles, MethodName, Schema, StateName};
+use crate::{Api, Articles, DataCell, MethodName, Schema, StateAtom, StateName};
+
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct NamedState<T> {
+    pub name: StateName,
+    #[serde(flatten)]
+    pub state: T,
+}
+
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct CoreParams {
+    pub method: MethodName,
+    pub global: Vec<NamedState<StateAtom>>,
+    pub owned: Vec<NamedState<DataCell>>,
+}
+
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct IssueParams {
+    pub name: TypeName,
+    pub timestamp: Option<DateTime<Utc>>,
+    #[cfg_attr(feature = "serde", serde(flatten))]
+    pub core: CoreParams,
+}
 
 impl Schema {
     pub fn start_issue(self, method: impl Into<MethodName>) -> IssueBuilder {
         let builder = Builder::new(self.call_id(method));
         IssueBuilder { builder, schema: self }
+    }
+
+    pub fn issue<C: Capabilities + Default>(self, params: IssueParams) -> Articles<C> {
+        let mut builder = self.start_issue(params.core.method);
+
+        for NamedState { name, state } in params.core.global {
+            builder = builder.append(name, state.verified, state.unverified)
+        }
+        for NamedState { name, state } in params.core.owned {
+            builder = builder.assign(name, state.auth, state.data, state.lock)
+        }
+
+        let timestamp = params.timestamp.unwrap_or_else(Utc::now).timestamp();
+        builder.finish(params.name, timestamp)
     }
 }
 

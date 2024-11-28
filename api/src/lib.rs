@@ -57,7 +57,7 @@ pub use api::{
     StateReader,
 };
 pub use articles::Articles;
-pub use builders::{Builder, BuilderRef, OpBuilder, OpBuilderRef};
+pub use builders::{Builder, BuilderRef, CoreParams, IssueParams, NamedState, OpBuilder, OpBuilderRef};
 pub use schema::Schema;
 pub use state::{DataCell, StateAtom, StateTy, StructData};
 

@@ -23,6 +23,7 @@ sonic-api = { version = "0.12.0-alpha.1", path = "api" }
 sonic = { version = "0.12.0-alpha.1", path = "." }
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9.34"
+chrono = "0.4.38"
 
 [package]
 name = "sonic"

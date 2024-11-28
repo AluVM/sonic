@@ -17,5 +17,4 @@ sonic.workspace = true
 serde.workspace = true
 anyhow = "1.0.93"
 clap = { version = "4.5.21", features = ["derive"] }
-chrono = { version = "0.4.38", features = ["serde"] }
 serde_yaml.workspace = true

@@ -1,0 +1,12 @@
+method: castVote
+
+using: [ ]
+reading: [ ]
+
+global:
+  - name: _votings
+    verified: 101
+    unverified:
+      title: Is Bob on duty today?
+      text: Vote 'pro' if Bob should be on duty today
+owned: [ ]

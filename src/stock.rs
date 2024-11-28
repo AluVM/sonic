@@ -22,7 +22,7 @@
 // the License.
 
 use aluvm::LibSite;
-use sonicapi::{MethodName, OpBuilder, StateName};
+use sonicapi::{CoreParams, MethodName, NamedState, OpBuilder, StateName};
 use strict_encoding::{StrictWriter, TypeName, WriteRaw};
 use strict_types::StrictVal;
 use ultrasonic::{fe256, AuthToken, CallError, Capabilities, CellAddr, Operation, Opid};
@@ -135,6 +135,25 @@ impl<C: Capabilities, P: Persistence> Stock<C, P> {
         DeedBuilder { builder, stock: self }
     }
 
+    pub fn call(&mut self, params: CallParams) -> Opid {
+        let mut builder = self.start_deed(params.core.method);
+
+        for NamedState { name, state } in params.core.global {
+            builder = builder.append(name, state.verified, state.unverified);
+        }
+        for NamedState { name, state } in params.core.owned {
+            builder = builder.assign(name, state.auth, state.data, state.lock);
+        }
+        for addr in params.reading {
+            builder = builder.reading(addr);
+        }
+        for (auth, witness) in params.using {
+            builder = builder.using(auth, witness);
+        }
+
+        builder.commit()
+    }
+
     pub fn apply(&mut self, operation: Operation) -> Result<(), CallError> {
         self.articles.schema.codex.verify(
             self.articles.contract.contract_id(),
@@ -168,6 +187,15 @@ impl<C: Capabilities, P: Persistence> Stock<C, P> {
         self.persistence.save_articles(&self.articles);
         self.save_state();
     }
+}
+
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct CallParams {
+    #[cfg_attr(feature = "serde", serde(flatten))]
+    pub core: CoreParams,
+    pub using: Vec<(AuthToken, StrictVal)>,
+    pub reading: Vec<CellAddr>,
 }
 
 pub struct DeedBuilder<'c, C: Capabilities, P: Persistence> {
@@ -216,6 +244,7 @@ impl<'c, C: Capabilities, P: Persistence> DeedBuilder<'c, C, P> {
             panic!("Invalid operation data: {err}");
         }
         self.stock.recompute_state();
+        self.stock.save_state();
         opid
     }
 }

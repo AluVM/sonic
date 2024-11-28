@@ -24,10 +24,7 @@
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use sonic::{Articles, AuthToken, DataCell, MethodName, Private, Schema, StateAtom, StateName, Stock};
-use strict_encoding::TypeName;
+use sonic::{Articles, AuthToken, CallParams, IssueParams, Private, Schema, Stock};
 
 #[derive(Parser)]
 pub enum Cmd {
@@ -44,26 +41,47 @@ pub enum Cmd {
     },
 
     /// Process contract articles into a contract stock directory
-    Process { articles: PathBuf, stock: Option<PathBuf> },
+    Process {
+        /// Contract articles to process
+        articles: PathBuf,
+        /// Directory to put the contract stock directory inside
+        stock: Option<PathBuf>,
+    },
 
     /// Print out a contract state
-    State { stock: PathBuf },
+    State {
+        /// Contract stock directory
+        stock: PathBuf,
+    },
 
     /// Make a contract call
-    Call { stock: PathBuf, call: PathBuf },
+    Call {
+        /// Contract stock directory
+        stock: PathBuf,
+        /// Parameters and data for the call
+        call: PathBuf,
+    },
 
     /// Export contract deeds to a file
     Export {
+        /// Contract stock directory
         stock: PathBuf,
 
         /// List of tokens of authority which should serve as a contract terminals.
         terminals: Vec<AuthToken>,
 
+        /// Location to save the deeds file to
         output: PathBuf,
     },
 
     /// Accept deeds into a contract stock
-    Accept { stock: PathBuf, input: PathBuf },
+    Accept {
+        /// Contract stock directory
+        stock: PathBuf,
+
+        /// File with deeds to accept
+        input: PathBuf,
+    },
 }
 
 impl Cmd {
@@ -72,30 +90,12 @@ impl Cmd {
             Cmd::Issue { schema, params, output } => issue(schema, params, output.as_deref())?,
             Cmd::Process { articles, stock } => process(articles, stock.as_deref())?,
             Cmd::State { stock } => state(stock),
-            Cmd::Call { .. } => todo!(),
+            Cmd::Call { stock, call: path } => call(stock, path)?,
             Cmd::Export { .. } => todo!(),
             Cmd::Accept { .. } => todo!(),
         }
         Ok(())
     }
-}
-
-#[derive(Clone, Debug)]
-#[derive(Serialize, Deserialize)]
-struct NamedState<T> {
-    pub name: StateName,
-    #[serde(flatten)]
-    pub state: T,
-}
-
-#[derive(Clone, Debug)]
-#[derive(Serialize, Deserialize)]
-struct IssueParams {
-    pub name: TypeName,
-    pub method: MethodName,
-    pub timestamp: Option<DateTime<Utc>>,
-    pub global: Vec<NamedState<StateAtom>>,
-    pub owned: Vec<NamedState<DataCell>>,
 }
 
 fn issue(schema: &Path, form: &Path, output: Option<&Path>) -> anyhow::Result<()> {
@@ -106,19 +106,9 @@ fn issue(schema: &Path, form: &Path, output: Option<&Path>) -> anyhow::Result<()
     let path = output.unwrap_or(form);
     let output = path.with_file_name(&format!("{}.articles", params.name));
 
-    let mut builder = schema.start_issue(params.method);
-
-    for NamedState { name, state } in params.global {
-        builder = builder.append(name, state.verified, state.unverified)
-    }
-    for NamedState { name, state } in params.owned {
-        builder = builder.assign(name, state.auth, state.data, state.lock)
-    }
-
-    let timestamp = params.timestamp.unwrap_or_else(Utc::now).timestamp();
-    let articles = builder.finish::<Private>(params.name, timestamp);
-
+    let articles = schema.issue::<Private>(params);
     articles.save(output)?;
+
     Ok(())
 }
 
@@ -135,4 +125,13 @@ fn state(path: &Path) {
     let stock = Stock::<Private, _>::load(path);
     let val = serde_yaml::to_string(&stock.state().main).expect("unable to generate YAML");
     println!("{val}");
+}
+
+fn call(stock: &Path, form: &Path) -> anyhow::Result<()> {
+    let mut stock = Stock::<Private, _>::load(stock);
+    let file = File::open(form)?;
+    let call = serde_yaml::from_reader::<_, CallParams>(file)?;
+    let opid = stock.call(call);
+    println!("Operation ID: {opid}");
+    Ok(())
 }

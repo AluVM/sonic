@@ -44,7 +44,7 @@ pub trait Aora<T: AoraItem> {
 #[cfg(feature = "std")]
 pub mod file {
     use std::collections::BTreeMap;
-    use std::fs::File;
+    use std::fs::{File, OpenOptions};
     use std::io::{Read, Seek, SeekFrom, Write};
     use std::marker::PhantomData;
     use std::path::{Path, PathBuf};
@@ -79,15 +79,23 @@ pub mod file {
 
         pub fn new(path: impl AsRef<Path>, name: &str) -> Self {
             let (log, idx) = Self::prepare(path, name);
-            let log = File::create(log).expect("unable to create append-only log file");
-            let idx = File::create(idx).expect("unable to create random-access index file");
+            let log = File::create_new(log).expect("unable to create append-only log file");
+            let idx = File::create_new(idx).expect("unable to create random-access index file");
             Self { log, idx, index: empty!(), _phantom: PhantomData }
         }
 
         pub fn open(path: impl AsRef<Path>, name: &str) -> Self {
             let (log, idx) = Self::prepare(path, name);
-            let mut log = File::open(log).expect("unable to open append-only log file");
-            let mut idx = File::open(idx).expect("unable to open random-access index file");
+            let mut log = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(log)
+                .expect("unable to open append-only log file");
+            let mut idx = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(idx)
+                .expect("unable to open random-access index file");
             log.seek(SeekFrom::End(0))
                 .expect("unable to seek to the end of the log");
             idx.seek(SeekFrom::End(0))
