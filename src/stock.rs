@@ -21,11 +21,15 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+use std::collections::BTreeSet;
+use std::io;
+
 use aluvm::LibSite;
+use amplify::ByteArray;
 use sonicapi::{CoreParams, MethodName, NamedState, OpBuilder, StateName};
-use strict_encoding::{StrictWriter, TypeName, WriteRaw};
+use strict_encoding::{StrictEncode, StrictWriter, TypeName, WriteRaw};
 use strict_types::StrictVal;
-use ultrasonic::{fe256, AuthToken, CallError, Capabilities, CellAddr, Operation, Opid};
+use ultrasonic::{AuthToken, CallError, Capabilities, CellAddr, Operation, Opid};
 
 use crate::{AdaptedState, Aora, Articles, EffectiveState, RawState, Transition};
 
@@ -96,10 +100,40 @@ impl<C: Capabilities, P: Persistence> Stock<C, P> {
     }
 
     // TODO: Return statistics
+    pub fn export<'a>(
+        &mut self,
+        terminals: impl IntoIterator<Item = &'a AuthToken>,
+        mut writer: StrictWriter<impl WriteRaw>,
+    ) -> io::Result<()> {
+        let mut opids = BTreeSet::new();
+        let mut queue = terminals
+            .into_iter()
+            .map(|terminal| self.state.addr(*terminal).opid)
+            .collect::<BTreeSet<_>>();
+        let mut queue = queue.into_iter();
+        while let Some(opid) = queue.next() {
+            let st = self.persistence.trace_mut().read(opid.to_byte_array());
+            opids.extend(st.destroyed.into_keys().map(|a| a.opid));
+        }
+
+        // Write articles
+        writer = self.articles.strict_encode(writer)?;
+        // Stream operations
+        for (opid, op) in self.operations() {
+            if !opids.contains(&opid) {
+                continue;
+            }
+            writer = op.strict_encode(writer)?;
+        }
+
+        Ok(())
+    }
+
+    // TODO: Return statistics
     pub fn consume(&mut self, deeds: impl IntoIterator<Item = Operation>) -> Result<(), CallError> {
         for operation in deeds {
             let opid = operation.opid();
-            if self.persistence.stash().has(opid) {
+            if self.persistence.stash().has(opid.to_byte_array()) {
                 continue;
             }
 
@@ -109,6 +143,15 @@ impl<C: Capabilities, P: Persistence> Stock<C, P> {
         self.recompute_state();
         self.save_state();
         Ok(())
+    }
+
+    pub fn rollback(&self, ops: impl IntoIterator<Item = Opid>) { todo!() }
+
+    pub fn operations(&mut self) -> impl Iterator<Item = (Opid, Operation)> + use<'_, C, P> {
+        self.persistence
+            .stash_mut()
+            .iter()
+            .map(|(opid, op)| (Opid::from_byte_array(opid), op))
     }
 
     fn recompute_state(&mut self) {
@@ -123,12 +166,6 @@ impl<C: Capabilities, P: Persistence> Stock<C, P> {
                 .insert(api.name().cloned().expect("unnamed aux API"), s);
         }
     }
-
-    pub fn consign(&self, terminals: impl IntoIterator<Item = fe256>, writer: &mut StrictWriter<impl WriteRaw>) {
-        todo!()
-    }
-
-    pub fn rollback(&self, ops: impl IntoIterator<Item = Opid>) { todo!() }
 
     pub fn start_deed(&mut self, method: impl Into<MethodName>) -> DeedBuilder<'_, C, P> {
         let builder = OpBuilder::new(self.articles.contract.contract_id(), self.articles.schema.call_id(method));

@@ -25,14 +25,8 @@ immutable:
     value:
       type: double
       first: 2.fe
-      second: 64000000000000000102.fe
+      second: 2010000000000000064.fe
     raw: null
-  08a781f81284c668bc439041be0cfbc6fee4546caa95af30be28e1802fb72625:0:
-    value:
-      type: double
-      first: 1.fe
-      second: 65.fe
-    raw: 0x15497320426F62206F6E206475747920746F6461793F2900566F7465202770726F2720696620426F622073686F756C64206265206F6E206475747920746F646179
   1162e870c8160752ed8b1794489cecb32e6040e034e0700f077ef473e525e47d:0:
     value:
       type: double
@@ -43,7 +37,7 @@ immutable:
     value:
       type: double
       first: 2.fe
-      second: 64000000000000000101.fe
+      second: 1010000000000000064.fe
     raw: null
   91f0650b151504841607b73a5baa8384d941b773e5979c6aecd8acb2a031597e:0:
     value:

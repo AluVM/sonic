@@ -25,6 +25,7 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use sonic::{Articles, AuthToken, CallParams, IssueParams, Private, Schema, Stock};
+use strict_encoding::{StreamWriter, StrictWriter};
 
 #[derive(Parser)]
 pub enum Cmd {
@@ -91,7 +92,7 @@ impl Cmd {
             Cmd::Process { articles, stock } => process(articles, stock.as_deref())?,
             Cmd::State { stock } => state(stock),
             Cmd::Call { stock, call: path } => call(stock, path)?,
-            Cmd::Export { .. } => todo!(),
+            Cmd::Export { stock, terminals, output } => export(stock, terminals, output)?,
             Cmd::Accept { .. } => todo!(),
         }
         Ok(())
@@ -133,5 +134,13 @@ fn call(stock: &Path, form: &Path) -> anyhow::Result<()> {
     let call = serde_yaml::from_reader::<_, CallParams>(file)?;
     let opid = stock.call(call);
     println!("Operation ID: {opid}");
+    Ok(())
+}
+
+fn export<'a>(stock: &Path, terminals: impl IntoIterator<Item = &'a AuthToken>, output: &Path) -> anyhow::Result<()> {
+    let mut stock = Stock::<Private, _>::load(stock);
+    let file = File::create_new(output)?;
+    let writer = StrictWriter::with(StreamWriter::new::<{ usize::MAX }>(file));
+    stock.export(terminals, writer)?;
     Ok(())
 }
