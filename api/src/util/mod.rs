@@ -21,32 +21,7 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use aluvm::LibSite;
-use amplify::num::u256;
-use strict_types::StrictVal;
-use ultrasonic::AuthToken;
+mod annotations;
+pub mod sigs;
 
-pub type StateTy = u256; // TODO: Make it equal to the internal type in used field element
-
-#[derive(Clone, Eq, PartialEq, Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
-pub struct StateAtom {
-    pub verified: StrictVal,
-    pub unverified: Option<StrictVal>,
-}
-
-#[derive(Clone, Eq, PartialEq, Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
-pub struct StructData {
-    pub ty: StateTy,
-    /// Transformed and typefied value extracted from [`ultrasonic::StatData`] by an ApiAdaptor.
-    pub value: StrictVal,
-}
-
-#[derive(Clone, Eq, PartialEq, Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
-pub struct DataCell {
-    pub data: StrictVal,
-    pub auth: AuthToken,
-    pub lock: Option<LibSite>,
-}
+pub use annotations::{AnnotationName, Annotations};

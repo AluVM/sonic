@@ -62,7 +62,7 @@ SONIC is a part of a larger ecosystem used to build safe distributed software, w
 
 ## License
 
-    Designed in 2019-2024 by Dr Maxim Orlovsky <orlovsky@ubideco.org>
+    Designed in 2019-2025 by Dr Maxim Orlovsky <orlovsky@ubideco.org>
     Written in 2024-2025 by Dr Maxim Orlovsky <orlovsky@ubideco.org>
     
     Copyright (C) 2019-2024 LNP/BP Standards Association, Switzerland.

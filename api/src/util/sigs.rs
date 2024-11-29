@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-// Designed in 2019-2024 by Dr Maxim Orlovsky <orlovsky@ubideco.org>
+// Designed in 2019-2025 by Dr Maxim Orlovsky <orlovsky@ubideco.org>
 // Written in 2024-2025 by Dr Maxim Orlovsky <orlovsky@ubideco.org>
 //
-// Copyright (C) 2019-2025 LNP/BP Standards Association, Switzerland.
+// Copyright (C) 2019-2024 LNP/BP Standards Association, Switzerland.
 // Copyright (C) 2024-2025 Laboratories for Ubiquitous Deterministic Computing (UBIDECO),
 //                         Institute for Distributed and Cognitive Systems (InDCS), Switzerland.
 // Copyright (C) 2019-2025 Dr Maxim Orlovsky.
@@ -86,4 +86,21 @@ impl IntoIterator for ContentSigs {
     type IntoIter = btree_map::IntoIter<Identity, SigBlob>;
 
     fn into_iter(self) -> Self::IntoIter { self.0.into_iter() }
+}
+
+impl ContentSigs {
+    pub fn merge(&mut self, other: ContentSigs) -> usize {
+        let mut count = 0;
+        for (identity, sig) in other {
+            if self.contains_key(&identity) {
+                continue;
+            }
+            // TODO: Validate sigs
+            // If we have signatures in excess, we just ignore it
+            if let Ok(None) = self.insert(identity, sig) {
+                count += 1;
+            }
+        }
+        count
+    }
 }

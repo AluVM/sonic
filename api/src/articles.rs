@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-// Designed in 2019-2024 by Dr Maxim Orlovsky <orlovsky@ubideco.org>
+// Designed in 2019-2025 by Dr Maxim Orlovsky <orlovsky@ubideco.org>
 // Written in 2024-2025 by Dr Maxim Orlovsky <orlovsky@ubideco.org>
 //
-// Copyright (C) 2019-2025 LNP/BP Standards Association, Switzerland.
+// Copyright (C) 2019-2024 LNP/BP Standards Association, Switzerland.
 // Copyright (C) 2024-2025 Laboratories for Ubiquitous Deterministic Computing (UBIDECO),
 //                         Institute for Distributed and Cognitive Systems (InDCS), Switzerland.
 // Copyright (C) 2019-2025 Dr Maxim Orlovsky.
@@ -46,6 +46,27 @@ impl<C: Capabilities> Articles<C> {
     pub fn contract_id(&self) -> ContractId { self.contract.contract_id() }
 
     pub fn api(&self, name: &TypeName) -> &Api { self.schema.api(name) }
+
+    pub fn merge(&mut self, other: Self) -> Result<bool, MergeError> {
+        if self.contract_id() != other.contract_id() {
+            return Err(MergeError::ContractMismatch);
+        }
+
+        self.schema.merge(other.schema)?;
+        self.contract_sigs.merge(other.contract_sigs);
+
+        Ok(true)
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Debug, Display, Error)]
+#[display(doc_comments)]
+pub enum MergeError {
+    /// contract id for the merged contract articles doesn't match
+    ContractMismatch,
+
+    /// codex id for the merged schema doesn't match
+    CodexMismatch,
 }
 
 #[cfg(feature = "std")]

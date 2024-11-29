@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-// Designed in 2019-2024 by Dr Maxim Orlovsky <orlovsky@ubideco.org>
+// Designed in 2019-2025 by Dr Maxim Orlovsky <orlovsky@ubideco.org>
 // Written in 2024-2025 by Dr Maxim Orlovsky <orlovsky@ubideco.org>
 //
-// Copyright (C) 2019-2025 LNP/BP Standards Association, Switzerland.
+// Copyright (C) 2019-2024 LNP/BP Standards Association, Switzerland.
 // Copyright (C) 2024-2025 Laboratories for Ubiquitous Deterministic Computing (UBIDECO),
 //                         Institute for Distributed and Cognitive Systems (InDCS), Switzerland.
 // Copyright (C) 2019-2025 Dr Maxim Orlovsky.
@@ -21,15 +21,19 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use std::collections::BTreeSet;
+use alloc::collections::BTreeSet;
+// Used in strict encoding; once solved there, remove here
 use std::io;
+use std::io::ErrorKind;
 
 use aluvm::LibSite;
 use amplify::ByteArray;
-use sonicapi::{CoreParams, MethodName, NamedState, OpBuilder, StateName};
-use strict_encoding::{StrictEncode, StrictWriter, TypeName, WriteRaw};
+use sonicapi::{CoreParams, MergeError, MethodName, NamedState, OpBuilder, StateName};
+use strict_encoding::{
+    DecodeError, ReadRaw, StrictDecode, StrictEncode, StrictReader, StrictWriter, TypeName, WriteRaw,
+};
 use strict_types::StrictVal;
-use ultrasonic::{AuthToken, CallError, Capabilities, CellAddr, Operation, Opid};
+use ultrasonic::{AuthToken, CallError, Capabilities, CellAddr, ContractId, Operation, Opid};
 
 use crate::{AdaptedState, Aora, Articles, EffectiveState, RawState, Transition};
 
@@ -99,6 +103,8 @@ impl<C: Capabilities, P: Persistence> Stock<C, P> {
         Self { articles, state, persistence }
     }
 
+    pub fn contract_id(&self) -> ContractId { self.articles.contract_id() }
+
     // TODO: Return statistics
     pub fn export<'a>(
         &mut self,
@@ -106,7 +112,7 @@ impl<C: Capabilities, P: Persistence> Stock<C, P> {
         mut writer: StrictWriter<impl WriteRaw>,
     ) -> io::Result<()> {
         let mut opids = BTreeSet::new();
-        let mut queue = terminals
+        let queue = terminals
             .into_iter()
             .map(|terminal| self.state.addr(*terminal).opid)
             .collect::<BTreeSet<_>>();
@@ -115,6 +121,8 @@ impl<C: Capabilities, P: Persistence> Stock<C, P> {
             let st = self.persistence.trace_mut().read(opid.to_byte_array());
             opids.extend(st.destroyed.into_keys().map(|a| a.opid));
         }
+
+        // TODO: Include all operations defining published state
 
         // Write articles
         writer = self.articles.strict_encode(writer)?;
@@ -130,16 +138,27 @@ impl<C: Capabilities, P: Persistence> Stock<C, P> {
     }
 
     // TODO: Return statistics
-    pub fn consume(&mut self, deeds: impl IntoIterator<Item = Operation>) -> Result<(), CallError> {
-        for operation in deeds {
-            let opid = operation.opid();
-            if self.persistence.stash().has(opid.to_byte_array()) {
-                continue;
-            }
+    pub fn accept(&mut self, reader: &mut StrictReader<impl ReadRaw>) -> Result<(), AcceptError> {
+        let articles = Articles::<C>::strict_decode(reader)?;
+        self.articles.merge(articles)?;
 
+        loop {
+            match Operation::strict_decode(reader) {
+                Ok(operation) => self.apply(operation)?,
+                Err(DecodeError::Io(e)) if e.kind() == ErrorKind::UnexpectedEof => break,
+                Err(e) => return Err(e.into()),
+            };
+        }
+        self.recompute_state();
+        self.save_state();
+        Ok(())
+    }
+
+    // TODO: Return statistics
+    pub fn consume(&mut self, deeds: impl IntoIterator<Item = Operation>) -> Result<(), AcceptError> {
+        for operation in deeds {
             self.apply(operation)?;
         }
-
         self.recompute_state();
         self.save_state();
         Ok(())
@@ -191,7 +210,21 @@ impl<C: Capabilities, P: Persistence> Stock<C, P> {
         builder.commit()
     }
 
-    pub fn apply(&mut self, operation: Operation) -> Result<(), CallError> {
+    /// # Returns
+    ///
+    /// Whether operation was already successfully included (`true`), or was already present in the
+    /// stash.
+    pub fn apply(&mut self, operation: Operation) -> Result<bool, AcceptError> {
+        if operation.contract_id != self.contract_id() {
+            return Err(AcceptError::ContractMismatch);
+        }
+
+        let opid = operation.opid();
+
+        if self.persistence.stash().has(opid.to_byte_array()) {
+            return Ok(false);
+        }
+
         self.articles.schema.codex.verify(
             self.articles.contract.contract_id(),
             &operation,
@@ -209,7 +242,7 @@ impl<C: Capabilities, P: Persistence> Stock<C, P> {
         );
         self.persistence.trace_mut().append(&transition);
 
-        Ok(())
+        Ok(true)
     }
 
     fn save_state(&self) {
@@ -284,6 +317,22 @@ impl<'c, C: Capabilities, P: Persistence> DeedBuilder<'c, C, P> {
         self.stock.save_state();
         opid
     }
+}
+
+#[derive(Clone, Eq, PartialEq, Debug, Display, Error, From)]
+#[display(inner)]
+pub enum AcceptError {
+    #[display("contract id doesn't match")]
+    ContractMismatch,
+
+    #[from]
+    Articles(MergeError),
+
+    #[from]
+    Verify(CallError),
+
+    #[from]
+    Io(DecodeError),
 }
 
 #[cfg(feature = "persist-file")]

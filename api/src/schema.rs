@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-// Designed in 2019-2024 by Dr Maxim Orlovsky <orlovsky@ubideco.org>
+// Designed in 2019-2025 by Dr Maxim Orlovsky <orlovsky@ubideco.org>
 // Written in 2024-2025 by Dr Maxim Orlovsky <orlovsky@ubideco.org>
 //
-// Copyright (C) 2019-2025 LNP/BP Standards Association, Switzerland.
+// Copyright (C) 2019-2024 LNP/BP Standards Association, Switzerland.
 // Copyright (C) 2024-2025 Laboratories for Ubiquitous Deterministic Computing (UBIDECO),
 //                         Institute for Distributed and Cognitive Systems (InDCS), Switzerland.
 // Copyright (C) 2019-2025 Dr Maxim Orlovsky.
@@ -29,7 +29,7 @@ use strict_types::TypeSystem;
 use ultrasonic::{CallId, Codex, LibRepo};
 
 use crate::sigs::ContentSigs;
-use crate::{Annotations, Api, MethodName, LIB_NAME_SONIC};
+use crate::{Annotations, Api, MergeError, MethodName, LIB_NAME_SONIC};
 
 /// Schema contains information required for creation of a contract.
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -82,6 +82,43 @@ impl Schema {
         self.default_api
             .verifier(method)
             .expect("unknown issue method absent in Codex API")
+    }
+
+    pub fn merge(&mut self, other: Self) -> Result<bool, MergeError> {
+        if self.codex.codex_id() != other.codex.codex_id() {
+            return Err(MergeError::CodexMismatch);
+        }
+        self.codex_sigs.merge(other.codex_sigs);
+
+        if self.default_api != other.default_api {
+            let _ = self
+                .custom_apis
+                .insert(other.default_api, other.default_api_sigs);
+        } else {
+            self.default_api_sigs.merge(other.default_api_sigs);
+        }
+
+        for (api, other_sigs) in other.custom_apis {
+            let Ok(entry) = self.custom_apis.entry(api) else {
+                continue;
+            };
+            entry.or_default().merge(other_sigs);
+        }
+
+        // NB: We must not fail here, since otherwise it opens an attack vector on invalidating valid
+        // consignments by adding too many libs
+        // TODO: Return warnings instead
+        let _ = self.libs.extend(other.libs);
+        let _ = self.types.extend(other.types);
+
+        for (annotation, other_sigs) in other.annotations {
+            let Ok(entry) = self.annotations.entry(annotation) else {
+                continue;
+            };
+            entry.or_default().merge(other_sigs);
+        }
+
+        Ok(true)
     }
 }
 

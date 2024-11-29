@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-// Designed in 2019-2024 by Dr Maxim Orlovsky <orlovsky@ubideco.org>
+// Designed in 2019-2025 by Dr Maxim Orlovsky <orlovsky@ubideco.org>
 // Written in 2024-2025 by Dr Maxim Orlovsky <orlovsky@ubideco.org>
 //
-// Copyright (C) 2019-2025 LNP/BP Standards Association, Switzerland.
+// Copyright (C) 2019-2024 LNP/BP Standards Association, Switzerland.
 // Copyright (C) 2024-2025 Laboratories for Ubiquitous Deterministic Computing (UBIDECO),
 //                         Institute for Distributed and Cognitive Systems (InDCS), Switzerland.
 // Copyright (C) 2019-2025 Dr Maxim Orlovsky.
@@ -41,25 +41,24 @@ extern crate commit_verify;
 #[macro_use]
 extern crate serde;
 
-mod api;
 mod state;
-pub mod embedded;
-pub mod alu;
+mod api;
+mod adaptors;
 mod schema;
-pub mod sigs;
-mod annotations;
-mod builders;
 mod articles;
+mod builders;
+mod util;
 
-pub use annotations::{AnnotationName, Annotations};
+pub use adaptors::{alu, embedded};
 pub use api::{
     Api, ApiId, ApiInner, ApiVm, AppendApi, DestructibleApi, MethodName, StateAdaptor, StateArithm, StateName,
     StateReader,
 };
-pub use articles::Articles;
+pub use articles::{Articles, MergeError};
 pub use builders::{Builder, BuilderRef, CoreParams, IssueParams, NamedState, OpBuilder, OpBuilderRef};
 pub use schema::Schema;
 pub use state::{DataCell, StateAtom, StateTy, StructData};
+pub use util::{sigs, AnnotationName, Annotations};
 
 pub const LIB_NAME_SONIC: &str = "SONIC";
 

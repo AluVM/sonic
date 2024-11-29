@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
-// Designed in 2019-2024 by Dr Maxim Orlovsky <orlovsky@ubideco.org>
+// Designed in 2019-2025 by Dr Maxim Orlovsky <orlovsky@ubideco.org>
 // Written in 2024-2025 by Dr Maxim Orlovsky <orlovsky@ubideco.org>
 //
-// Copyright (C) 2019-2025 LNP/BP Standards Association, Switzerland.
+// Copyright (C) 2019-2024 LNP/BP Standards Association, Switzerland.
 // Copyright (C) 2024-2025 Laboratories for Ubiquitous Deterministic Computing (UBIDECO),
 //                         Institute for Distributed and Cognitive Systems (InDCS), Switzerland.
 // Copyright (C) 2019-2025 Dr Maxim Orlovsky.
@@ -25,7 +25,7 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use sonic::{Articles, AuthToken, CallParams, IssueParams, Private, Schema, Stock};
-use strict_encoding::{StreamWriter, StrictWriter};
+use strict_encoding::{StreamReader, StreamWriter, StrictReader, StrictWriter};
 
 #[derive(Parser)]
 pub enum Cmd {
@@ -69,6 +69,7 @@ pub enum Cmd {
         stock: PathBuf,
 
         /// List of tokens of authority which should serve as a contract terminals.
+        #[clap(short, long)]
         terminals: Vec<AuthToken>,
 
         /// Location to save the deeds file to
@@ -93,7 +94,7 @@ impl Cmd {
             Cmd::State { stock } => state(stock),
             Cmd::Call { stock, call: path } => call(stock, path)?,
             Cmd::Export { stock, terminals, output } => export(stock, terminals, output)?,
-            Cmd::Accept { .. } => todo!(),
+            Cmd::Accept { stock, input } => accept(stock, input)?,
         }
         Ok(())
     }
@@ -142,5 +143,13 @@ fn export<'a>(stock: &Path, terminals: impl IntoIterator<Item = &'a AuthToken>, 
     let file = File::create_new(output)?;
     let writer = StrictWriter::with(StreamWriter::new::<{ usize::MAX }>(file));
     stock.export(terminals, writer)?;
+    Ok(())
+}
+
+fn accept(stock: &Path, input: &Path) -> anyhow::Result<()> {
+    let mut stock = Stock::<Private, _>::load(stock);
+    let file = File::open(input)?;
+    let mut reader = StrictReader::with(StreamReader::new::<{ usize::MAX }>(file));
+    stock.accept(&mut reader)?;
     Ok(())
 }

@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "api", "sonix", "url"]
+members = [".", "api", "cli", "url"]
 default-members = [".", "api", "url"]
 
 [workspace.package]
