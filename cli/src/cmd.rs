@@ -24,7 +24,7 @@
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
-use sonic::{Articles, AuthToken, CallParams, IssueParams, Private, Schema, Stock};
+use hypersonic::{Articles, AuthToken, CallParams, IssueParams, Private, Schema, Stock};
 
 #[derive(Parser)]
 pub enum Cmd {

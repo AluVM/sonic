@@ -15,10 +15,8 @@ exclude = [".github"]
 
 [dependencies]
 amplify.workspace = true
-strict_encoding.workspace = true
 strict_types.workspace = true
-ultrasonic.workspace = true
-serde = { workspace = true, optional = true }
+ultrasonic = { workspace = true, features = ["serde"] } # TODO: Remove serde feature
 
 [features]
 default = ["std"]

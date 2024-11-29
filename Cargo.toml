@@ -3,7 +3,7 @@ members = [".", "api", "cli", "url"]
 default-members = [".", "api", "url"]
 
 [workspace.package]
-version = "0.12.0-alpha.1"
+version = "0.12.0-beta.1"
 authors = ["Dr Maxim Orlovsky <orlovsky@ubideco.org>"]
 repository = "https://github.com/AluVM/sonare"
 homepage = "https://ubideco.org/SONARE"
@@ -17,19 +17,19 @@ rust-version = "1.77.0" # Due to `rustfix`
 amplify = "~4.8.0"
 strict_encoding = "~2.8.1"
 strict_types = "~2.8.1"
-aluvm = "0.12.0-beta.2"
-ultrasonic = "0.12.0-beta.1"
-sonic-api = { version = "0.12.0-alpha.1", path = "api" }
-sonic = { version = "0.12.0-alpha.1", path = "." }
+aluvm = "0.12.0-beta.3"
+ultrasonic = "0.12.0-beta.2"
+sonic-api = { version = "0.12.0-beta.1", path = "api" }
+hypersonic = { version = "0.12.0-beta.1", path = "." }
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9.34"
 chrono = "0.4.38"
 
 [package]
-name = "sonic"
+name = "hypersonic"
 version.workspace = true
 authors.workspace = true
-description = "API linker for the formally-verifiable distributed software"
+description = "Formally-verifiable distributed software"
 repository.workspace = true
 homepage.workspace = true
 keywords.workspace = true
@@ -41,7 +41,7 @@ rust-version.workspace = true
 exclude = [".github"]
 
 [lib]
-name = "sonic"
+name = "hypersonic"
 
 [[example]]
 name = "dao"
@@ -51,7 +51,7 @@ required-features = ["persist-file"]
 amplify.workspace = true
 strict_encoding.workspace = true
 strict_types.workspace = true
-commit_verify = "0.12.0-alpha.3"
+commit_verify = "0.12.0-beta.1"
 aluvm.workspace = true
 ultrasonic.workspace = true
 sonic-api.workspace = true
@@ -87,9 +87,3 @@ wasm-bindgen-test = "0.3"
 
 [package.metadata.docs.rs]
 features = ["all"]
-
-[patch.crates-io]
-strict_types = { git = "https://github.com/strict-types/strict-types", branch = "develop" }
-commit_verify = { git = "https://github.com/LNP-BP/client_side_validation", branch = "v0.12" }
-zk-aluvm = { git = "https://github.com/AluVM/zk-aluvm" }
-ultrasonic = { git = "https://github.com/AluVM/ultrasonic" }

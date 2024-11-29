@@ -6,10 +6,10 @@ extern crate strict_types;
 use aluvm::{CoreConfig, LibSite};
 use amplify::num::u256;
 use commit_verify::{Digest, Sha256};
-use sonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc, EmbeddedReaders};
-use sonic::{Api, ApiInner, AppendApi, DestructibleApi, Schema, Stock};
+use hypersonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc, EmbeddedReaders};
+use hypersonic::{Api, ApiInner, AppendApi, DestructibleApi, Schema, Stock};
 use strict_types::{SemId, StrictVal};
-use ultrasonic::{fe256, AuthToken, CellAddr, Codex, Identity, Private, FIELD_ORDER_SECP};
+use ultrasonic::{AuthToken, CellAddr, Codex, Identity, Private, FIELD_ORDER_SECP};
 
 fn codex() -> Codex {
     let lib = libs::success();
