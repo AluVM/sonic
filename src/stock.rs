@@ -111,11 +111,11 @@ impl<C: Capabilities, P: Persistence> Stock<C, P> {
         terminals: impl IntoIterator<Item = &'a AuthToken>,
         mut writer: StrictWriter<impl WriteRaw>,
     ) -> io::Result<()> {
-        let mut opids = BTreeSet::new();
         let queue = terminals
             .into_iter()
             .map(|terminal| self.state.addr(*terminal).opid)
             .collect::<BTreeSet<_>>();
+        let mut opids = queue.clone();
         let mut queue = queue.into_iter();
         while let Some(opid) = queue.next() {
             let st = self.persistence.trace_mut().read(opid.to_byte_array());
@@ -214,7 +214,7 @@ impl<C: Capabilities, P: Persistence> Stock<C, P> {
     ///
     /// Whether operation was already successfully included (`true`), or was already present in the
     /// stash.
-    pub fn apply(&mut self, operation: Operation) -> Result<bool, AcceptError> {
+    fn apply(&mut self, operation: Operation) -> Result<bool, AcceptError> {
         if operation.contract_id != self.contract_id() {
             return Err(AcceptError::ContractMismatch);
         }

@@ -185,6 +185,9 @@ pub mod file {
         fn next(&mut self) -> Option<Self::Item> {
             let mut id = [0u8; 32];
             self.idx.read_exact(&mut id).ok()?;
+            self.idx
+                .seek(SeekFrom::Current(8))
+                .expect("broken index file");
             let item = T::strict_decode(&mut self.log).ok()?;
             Some((id, item))
         }
