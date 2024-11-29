@@ -92,7 +92,7 @@ fn main() {
     // Creating DAO with three participants
     let issuer = Schema::new(codex, api, [libs::success()], types.type_system());
     issuer
-        .save("examples/SimpleDAO.schema")
+        .save("examples/dao/data/SimpleDAO.schema")
         .expect("unable to save issuer to a file");
 
     let seed = &[0xCA; 30][..];
@@ -122,7 +122,7 @@ fn main() {
 
         .finish::<Private>("WonderlandDAO", 1732529307);
 
-    let mut stock = Stock::new(articles, "examples");
+    let mut stock = Stock::new(articles, "examples/dao/data");
 
     // Proposing vote
     let votings = stock
@@ -134,13 +134,17 @@ fn main() {
         )
         .commit();
 
+    let alice_auth2 = next_auth();
+    let bob_auth2 = next_auth();
+    let carol_auth2 = next_auth();
+
     // Alice vote against her being on duty today
     stock
         .start_deed("castVote")
         .using(alice_auth, svnum!(0u64))
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(0u8), partyId 0u64), None)
-        .assign("signers", next_auth(), svnum!(0u64), None)
+        .assign("signers", alice_auth2, svnum!(0u64), None)
         .commit();
 
     // Bob and Carol vote for Alice being on duty today
@@ -149,14 +153,14 @@ fn main() {
         .using(bob_auth, svnum!(1u64))
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 1u64), None)
-        .assign("signers", next_auth(), svnum!(1u64), None)
+        .assign("signers", bob_auth2, svnum!(1u64), None)
         .commit();
     stock
         .start_deed("castVote")
         .using(carol_auth, svnum!(2u64))
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 2u64), None)
-        .assign("signers", next_auth(), svnum!(2u64), None)
+        .assign("signers", carol_auth2, svnum!(2u64), None)
         .commit();
 
     stock.save();
@@ -175,9 +179,9 @@ fn main() {
     }
 
     // Now anybody accessing this file can figure out who is on duty today, by the decision of DAO.
-    /*stock
-    .consign(, "examples/dao.deeds")
-    .expect("unable to save issuer to a file");*/
+    stock
+        .export_file(&[alice_auth2, bob_auth2, carol_auth2], "examples/dao/data/voting.deeds")
+        .expect("unable to save deeds to a file");
 }
 
 mod libs {

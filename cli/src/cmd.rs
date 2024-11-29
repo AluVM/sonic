@@ -25,7 +25,6 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use sonic::{Articles, AuthToken, CallParams, IssueParams, Private, Schema, Stock};
-use strict_encoding::{StreamReader, StreamWriter, StrictReader, StrictWriter};
 
 #[derive(Parser)]
 pub enum Cmd {
@@ -140,16 +139,12 @@ fn call(stock: &Path, form: &Path) -> anyhow::Result<()> {
 
 fn export<'a>(stock: &Path, terminals: impl IntoIterator<Item = &'a AuthToken>, output: &Path) -> anyhow::Result<()> {
     let mut stock = Stock::<Private, _>::load(stock);
-    let file = File::create_new(output)?;
-    let writer = StrictWriter::with(StreamWriter::new::<{ usize::MAX }>(file));
-    stock.export(terminals, writer)?;
+    stock.export_file(terminals, output)?;
     Ok(())
 }
 
 fn accept(stock: &Path, input: &Path) -> anyhow::Result<()> {
     let mut stock = Stock::<Private, _>::load(stock);
-    let file = File::open(input)?;
-    let mut reader = StrictReader::with(StreamReader::new::<{ usize::MAX }>(file));
-    stock.accept(&mut reader)?;
+    stock.accept_file(input)?;
     Ok(())
 }

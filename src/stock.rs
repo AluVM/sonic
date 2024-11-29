@@ -332,14 +332,16 @@ pub enum AcceptError {
     Verify(CallError),
 
     #[from]
+    #[cfg_attr(feature = "std", from(std::io::Error))]
     Io(DecodeError),
 }
 
 #[cfg(feature = "persist-file")]
 mod fs {
-    use std::fs;
+    use std::fs::{self, File};
     use std::path::{Path, PathBuf};
 
+    use strict_encoding::{StreamReader, StreamWriter};
     use ultrasonic::ContractName;
 
     use super::*;
@@ -399,13 +401,13 @@ mod fs {
 
         fn save_raw_state(&self, state: &RawState) {
             let path = self.path.clone().join(Self::FILENAME_STATE_RAW);
-            let file = fs::File::create(path).expect("unable to create state file");
+            let file = File::create(path).expect("unable to create state file");
             serde_yaml::to_writer(file, state).expect("unable to serialize state");
         }
 
         fn load_raw_state(&self) -> RawState {
             let path = self.path.clone().join(Self::FILENAME_STATE_RAW);
-            let file = fs::File::open(path).expect("unable to create state file");
+            let file = File::open(path).expect("unable to create state file");
             serde_yaml::from_reader(file).expect("unable to serialize state")
         }
 
@@ -446,6 +448,22 @@ mod fs {
             let path = path.as_ref();
             let persistence = FilePersistence::open(path);
             Self::open(persistence.load_articles(), persistence)
+        }
+
+        pub fn export_file<'a>(
+            &mut self,
+            terminals: impl IntoIterator<Item = &'a AuthToken>,
+            output: impl AsRef<Path>,
+        ) -> io::Result<()> {
+            let file = File::create_new(output)?;
+            let writer = StrictWriter::with(StreamWriter::new::<{ usize::MAX }>(file));
+            self.export(terminals, writer)
+        }
+
+        pub fn accept_file(&mut self, input: impl AsRef<Path>) -> Result<(), AcceptError> {
+            let file = File::open(input)?;
+            let mut reader = StrictReader::with(StreamReader::new::<{ usize::MAX }>(file));
+            self.accept(&mut reader)
         }
     }
 }
