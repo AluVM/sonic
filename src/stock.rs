@@ -37,7 +37,7 @@ use ultrasonic::{AuthToken, CallError, Capabilities, CellAddr, ContractId, Opera
 
 use crate::{AdaptedState, Aora, Articles, EffectiveState, RawState, Transition};
 
-pub trait Persistence {
+pub trait StockPersistence {
     type Stash: Aora<Operation>;
     type Trace: Aora<Transition>;
 
@@ -59,7 +59,7 @@ pub trait Persistence {
 
 /// Append-only, random-accessed deeds & trace; updatable and rollback-enabled state.
 #[derive(Getters)]
-pub struct Stock<C: Capabilities, P: Persistence> {
+pub struct Stock<C: Capabilities, P: StockPersistence> {
     articles: Articles<C>,
     state: EffectiveState,
 
@@ -67,7 +67,7 @@ pub struct Stock<C: Capabilities, P: Persistence> {
     persistence: P,
 }
 
-impl<C: Capabilities, P: Persistence> Stock<C, P> {
+impl<C: Capabilities, P: StockPersistence> Stock<C, P> {
     pub fn create(articles: Articles<C>, persistence: P) -> Self {
         let mut state = EffectiveState::default();
 
@@ -104,6 +104,16 @@ impl<C: Capabilities, P: Persistence> Stock<C, P> {
     }
 
     pub fn contract_id(&self) -> ContractId { self.articles.contract_id() }
+
+    pub fn export_all(&mut self, mut writer: StrictWriter<impl WriteRaw>) -> io::Result<()> {
+        // Write articles
+        writer = self.articles.strict_encode(writer)?;
+        // Stream operations
+        for (opid, op) in self.operations() {
+            writer = op.strict_encode(writer)?;
+        }
+        Ok(())
+    }
 
     // TODO: Return statistics
     pub fn export<'a>(
@@ -268,12 +278,12 @@ pub struct CallParams {
     pub reading: Vec<CellAddr>,
 }
 
-pub struct DeedBuilder<'c, C: Capabilities, P: Persistence> {
+pub struct DeedBuilder<'c, C: Capabilities, P: StockPersistence> {
     pub(super) builder: OpBuilder,
     pub(super) stock: &'c mut Stock<C, P>,
 }
 
-impl<'c, C: Capabilities, P: Persistence> DeedBuilder<'c, C, P> {
+impl<'c, C: Capabilities, P: StockPersistence> DeedBuilder<'c, C, P> {
     pub fn reading(mut self, addr: CellAddr) -> Self {
         self.builder = self.builder.access(addr);
         self
@@ -337,7 +347,7 @@ pub enum AcceptError {
 }
 
 #[cfg(feature = "persist-file")]
-mod fs {
+pub mod fs {
     use std::fs::{self, File};
     use std::path::{Path, PathBuf};
 
@@ -377,7 +387,7 @@ mod fs {
         }
     }
 
-    impl Persistence for FilePersistence {
+    impl StockPersistence for FilePersistence {
         type Stash = FileAora<Operation>;
         type Trace = FileAora<Transition>;
 
@@ -450,7 +460,13 @@ mod fs {
             Self::open(persistence.load_articles(), persistence)
         }
 
-        pub fn export_file<'a>(
+        pub fn backup_to_file(&mut self, output: impl AsRef<Path>) -> io::Result<()> {
+            let file = File::create_new(output)?;
+            let writer = StrictWriter::with(StreamWriter::new::<{ usize::MAX }>(file));
+            self.export_all(writer)
+        }
+
+        pub fn export_to_file<'a>(
             &mut self,
             terminals: impl IntoIterator<Item = &'a AuthToken>,
             output: impl AsRef<Path>,

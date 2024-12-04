@@ -139,7 +139,7 @@ fn call(stock: &Path, form: &Path) -> anyhow::Result<()> {
 
 fn export<'a>(stock: &Path, terminals: impl IntoIterator<Item = &'a AuthToken>, output: &Path) -> anyhow::Result<()> {
     let mut stock = Stock::<Private, _>::load(stock);
-    stock.export_file(terminals, output)?;
+    stock.export_to_file(terminals, output)?;
     Ok(())
 }
 
