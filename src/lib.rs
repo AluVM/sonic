@@ -53,4 +53,6 @@ mod stock;
 pub use aora::file::FileAora;
 pub use aora::Aora;
 pub use state::{AdaptedState, EffectiveState, RawState, Transition};
-pub use stock::{AcceptError, CallParams, DeedBuilder, Persistence, Stock};
+#[cfg(feature = "std")]
+pub use stock::fs::FilePersistence;
+pub use stock::{AcceptError, CallParams, DeedBuilder, Stock, StockPersistence};
