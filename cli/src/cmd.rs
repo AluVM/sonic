@@ -24,7 +24,7 @@
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
-use hypersonic::{Articles, AuthToken, CallParams, IssueParams, Private, Schema, Stock};
+use hypersonic::{Articles, AuthToken, CallParams, IssueParams, Schema, Stock};
 
 #[derive(Parser)]
 pub enum Cmd {
@@ -107,7 +107,7 @@ fn issue(schema: &Path, form: &Path, output: Option<&Path>) -> anyhow::Result<()
     let path = output.unwrap_or(form);
     let output = path.with_file_name(&format!("{}.articles", params.name));
 
-    let articles = schema.issue::<Private>(params);
+    let articles = schema.issue::<0>(params);
     articles.save(output)?;
 
     Ok(())
@@ -116,20 +116,20 @@ fn issue(schema: &Path, form: &Path, output: Option<&Path>) -> anyhow::Result<()
 fn process(articles: &Path, stock: Option<&Path>) -> anyhow::Result<()> {
     let path = stock.unwrap_or(articles);
 
-    let articles = Articles::<Private>::load(articles)?;
+    let articles = Articles::<0>::load(articles)?;
     Stock::new(articles, path);
 
     Ok(())
 }
 
 fn state(path: &Path) {
-    let stock = Stock::<Private, _>::load(path);
+    let stock = Stock::<_, 0>::load(path);
     let val = serde_yaml::to_string(&stock.state().main).expect("unable to generate YAML");
     println!("{val}");
 }
 
 fn call(stock: &Path, form: &Path) -> anyhow::Result<()> {
-    let mut stock = Stock::<Private, _>::load(stock);
+    let mut stock = Stock::<_, 0>::load(stock);
     let file = File::open(form)?;
     let call = serde_yaml::from_reader::<_, CallParams>(file)?;
     let opid = stock.call(call);
@@ -138,13 +138,13 @@ fn call(stock: &Path, form: &Path) -> anyhow::Result<()> {
 }
 
 fn export<'a>(stock: &Path, terminals: impl IntoIterator<Item = &'a AuthToken>, output: &Path) -> anyhow::Result<()> {
-    let mut stock = Stock::<Private, _>::load(stock);
+    let mut stock = Stock::<_, 0>::load(stock);
     stock.export_to_file(terminals, output)?;
     Ok(())
 }
 
 fn accept(stock: &Path, input: &Path) -> anyhow::Result<()> {
-    let mut stock = Stock::<Private, _>::load(stock);
+    let mut stock = Stock::<_, 0>::load(stock);
     stock.accept_file(input)?;
     Ok(())
 }

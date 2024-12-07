@@ -23,15 +23,14 @@
 
 use amplify::confinement::{TinyString, TinyVec};
 use strict_types::StrictVal;
-use ultrasonic::{Capabilities, ContractId};
+use ultrasonic::ContractId;
 
-pub trait SonareProtocol {
+pub trait SonicProtocol {
     const URL_SCHEME: &'static str;
-    type Cap: Capabilities;
 }
 
-pub struct Request<S: SonareProtocol> {
-    pub pop: S::Cap,
+pub struct Request {
+    // pub pop: S::Cap,
     pub contract_id: Option<ContractId>,
     pub interface: Option<TinyString>,
     pub method: Option<TinyString>,

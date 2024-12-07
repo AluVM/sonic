@@ -33,12 +33,12 @@ use strict_encoding::{
     DecodeError, ReadRaw, StrictDecode, StrictEncode, StrictReader, StrictWriter, TypeName, WriteRaw,
 };
 use strict_types::StrictVal;
-use ultrasonic::{AuthToken, CallError, Capabilities, CellAddr, ContractId, Operation, Opid};
+use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Operation, Opid};
 
 use crate::aora::Aora;
 use crate::{AdaptedState, Articles, EffectiveState, RawState, Transition};
 
-pub trait Supply<C: Capabilities> {
+pub trait Supply<const CAPS: u32> {
     type Stash: Aora<Operation>;
     type Trace: Aora<Transition>;
 
@@ -48,8 +48,8 @@ pub trait Supply<C: Capabilities> {
     fn stash_mut(&mut self) -> &mut Self::Stash;
     fn trace_mut(&mut self) -> &mut Self::Trace;
 
-    fn save_articles(&self, obj: &Articles<C>);
-    fn load_articles(&self) -> Articles<C>;
+    fn save_articles(&self, obj: &Articles<CAPS>);
+    fn load_articles(&self) -> Articles<CAPS>;
 
     fn save_raw_state(&self, state: &RawState);
     fn load_raw_state(&self) -> RawState;
@@ -60,16 +60,16 @@ pub trait Supply<C: Capabilities> {
 
 /// Append-only, random-accessed deeds & trace; updatable and rollback-enabled state.
 #[derive(Getters)]
-pub struct Stock<C: Capabilities, S: Supply<C>> {
-    articles: Articles<C>,
+pub struct Stock<S: Supply<CAPS>, const CAPS: u32> {
+    articles: Articles<CAPS>,
     state: EffectiveState,
 
     #[getter(skip)]
     supply: S,
 }
 
-impl<C: Capabilities, S: Supply<C>> Stock<C, S> {
-    pub fn create(articles: Articles<C>, persistence: S) -> Self {
+impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
+    pub fn create(articles: Articles<CAPS>, persistence: S) -> Self {
         let mut state = EffectiveState::default();
 
         let genesis = articles
@@ -91,7 +91,7 @@ impl<C: Capabilities, S: Supply<C>> Stock<C, S> {
         me
     }
 
-    pub fn open(articles: Articles<C>, persistence: S) -> Self {
+    pub fn open(articles: Articles<CAPS>, persistence: S) -> Self {
         let mut state = EffectiveState::default();
         state.raw = persistence.load_raw_state();
         state.main = persistence.load_state(None);
@@ -150,7 +150,7 @@ impl<C: Capabilities, S: Supply<C>> Stock<C, S> {
 
     // TODO: Return statistics
     pub fn accept(&mut self, reader: &mut StrictReader<impl ReadRaw>) -> Result<(), AcceptError> {
-        let articles = Articles::<C>::strict_decode(reader)?;
+        let articles = Articles::<CAPS>::strict_decode(reader)?;
         self.articles.merge(articles)?;
 
         loop {
@@ -177,7 +177,7 @@ impl<C: Capabilities, S: Supply<C>> Stock<C, S> {
 
     pub fn rollback(&self, ops: impl IntoIterator<Item = Opid>) { todo!() }
 
-    pub fn operations(&mut self) -> impl Iterator<Item = (Opid, Operation)> + use<'_, C, S> {
+    pub fn operations(&mut self) -> impl Iterator<Item = (Opid, Operation)> + use<'_, S, CAPS> {
         self.supply
             .stash_mut()
             .iter()
@@ -197,7 +197,7 @@ impl<C: Capabilities, S: Supply<C>> Stock<C, S> {
         }
     }
 
-    pub fn start_deed(&mut self, method: impl Into<MethodName>) -> DeedBuilder<'_, C, S> {
+    pub fn start_deed(&mut self, method: impl Into<MethodName>) -> DeedBuilder<'_, S, CAPS> {
         let builder = OpBuilder::new(self.articles.contract.contract_id(), self.articles.schema.call_id(method));
         DeedBuilder { builder, stock: self }
     }
@@ -279,12 +279,12 @@ pub struct CallParams {
     pub reading: Vec<CellAddr>,
 }
 
-pub struct DeedBuilder<'c, C: Capabilities, P: Supply<C>> {
+pub struct DeedBuilder<'c, S: Supply<CAPS>, const CAPS: u32> {
     pub(super) builder: OpBuilder,
-    pub(super) stock: &'c mut Stock<C, P>,
+    pub(super) stock: &'c mut Stock<S, CAPS>,
 }
 
-impl<'c, C: Capabilities, P: Supply<C>> DeedBuilder<'c, C, P> {
+impl<'c, S: Supply<CAPS>, const CAPS: u32> DeedBuilder<'c, S, CAPS> {
     pub fn reading(mut self, addr: CellAddr) -> Self {
         self.builder = self.builder.access(addr);
         self
@@ -388,7 +388,7 @@ pub mod fs {
         }
     }
 
-    impl<C: Capabilities> Supply<C> for FileSupply {
+    impl<const CAPS: u32> Supply<CAPS> for FileSupply {
         type Stash = FileAora<Operation>;
         type Trace = FileAora<Transition>;
 
@@ -400,12 +400,12 @@ pub mod fs {
 
         fn trace_mut(&mut self) -> &mut Self::Trace { &mut self.trace }
 
-        fn save_articles(&self, obj: &Articles<C>) {
+        fn save_articles(&self, obj: &Articles<CAPS>) {
             let path = self.path.clone().join(Self::FILENAME_ARTICLES);
             obj.save(path).expect("unable to save articles");
         }
 
-        fn load_articles(&self) -> Articles<C> {
+        fn load_articles(&self) -> Articles<CAPS> {
             let path = self.path.clone().join(Self::FILENAME_ARTICLES);
             Articles::load(path).expect("unable to load articles")
         }
@@ -445,8 +445,8 @@ pub mod fs {
         }
     }
 
-    impl<C: Capabilities> Stock<C, FileSupply> {
-        pub fn new(articles: Articles<C>, path: impl AsRef<Path>) -> Self {
+    impl<const CAPS: u32> Stock<FileSupply, CAPS> {
+        pub fn new(articles: Articles<CAPS>, path: impl AsRef<Path>) -> Self {
             let name = match &articles.contract.meta.name {
                 ContractName::Unnamed => articles.contract_id().to_string(),
                 ContractName::Named(name) => name.to_string(),

@@ -22,7 +22,7 @@
 // the License.
 
 use strict_encoding::{StrictDeserialize, StrictSerialize, TypeName};
-use ultrasonic::{Capabilities, Contract, ContractId};
+use ultrasonic::{Contract, ContractId};
 
 use crate::sigs::ContentSigs;
 use crate::{Api, Schema, LIB_NAME_SONIC};
@@ -32,17 +32,17 @@ use crate::{Api, Schema, LIB_NAME_SONIC};
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_SONIC)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
-pub struct Articles<C: Capabilities> {
-    pub contract: Contract<C>,
+pub struct Articles<const CAPS: u32> {
+    pub contract: Contract<CAPS>,
     pub contract_sigs: ContentSigs,
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub schema: Schema,
 }
 
-impl<C: Capabilities> StrictSerialize for Articles<C> {}
-impl<C: Capabilities> StrictDeserialize for Articles<C> {}
+impl<const CAPS: u32> StrictSerialize for Articles<CAPS> {}
+impl<const CAPS: u32> StrictDeserialize for Articles<CAPS> {}
 
-impl<C: Capabilities> Articles<C> {
+impl<const CAPS: u32> Articles<CAPS> {
     pub fn contract_id(&self) -> ContractId { self.contract.contract_id() }
 
     pub fn api(&self, name: &TypeName) -> &Api { self.schema.api(name) }
@@ -74,11 +74,10 @@ mod _fs {
     use std::path::Path;
 
     use strict_encoding::{DeserializeError, SerializeError, StrictDeserialize, StrictSerialize};
-    use ultrasonic::Capabilities;
 
     use super::Articles;
 
-    impl<C: Capabilities> Articles<C> {
+    impl<const CAPS: u32> Articles<CAPS> {
         pub fn load(path: impl AsRef<Path>) -> Result<Self, DeserializeError> {
             Self::strict_deserialize_from_file::<{ usize::MAX }>(path)
         }

@@ -28,8 +28,8 @@ use chrono::{DateTime, Utc};
 use strict_encoding::TypeName;
 use strict_types::{StrictVal, TypeSystem};
 use ultrasonic::{
-    fe256, AuthToken, CallId, Capabilities, CellAddr, CodexId, Contract, ContractId, ContractMeta, ContractName,
-    Genesis, Identity, Input, Operation, StateCell, StateData, StateValue,
+    fe256, AuthToken, CallId, CellAddr, CodexId, Contract, ContractId, ContractMeta, ContractName, Genesis, Identity,
+    Input, Operation, StateCell, StateData, StateValue,
 };
 
 use crate::{Api, Articles, DataCell, MethodName, Schema, StateAtom, StateName};
@@ -65,7 +65,7 @@ impl Schema {
         IssueBuilder { builder, schema: self }
     }
 
-    pub fn issue<C: Capabilities + Default>(self, params: IssueParams) -> Articles<C> {
+    pub fn issue<const CAPS: u32>(self, params: IssueParams) -> Articles<CAPS> {
         let mut builder = self.start_issue(params.core.method);
 
         for NamedState { name, state } in params.core.global {
@@ -107,7 +107,7 @@ impl IssueBuilder {
         self
     }
 
-    pub fn finish<C: Capabilities + Default>(self, name: impl Into<TypeName>, timestamp: i64) -> Articles<C> {
+    pub fn finish<const CAPS: u32>(self, name: impl Into<TypeName>, timestamp: i64) -> Articles<CAPS> {
         let meta = ContractMeta {
             capabilities: default!(),
             reserved: zero!(),

@@ -87,3 +87,6 @@ wasm-bindgen-test = "0.3"
 
 [package.metadata.docs.rs]
 features = ["all"]
+
+[patch.crates-io]
+ultrasonic = { git = "https://github.com/AluVM/ultrasonic" }
