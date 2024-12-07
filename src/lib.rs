@@ -44,14 +44,11 @@ extern crate serde;
 pub use sonicapi::*;
 pub use ultrasonic::*;
 
-mod aora;
+pub mod aora;
 
 mod state;
 mod stock;
 
-#[cfg(feature = "std")]
-pub use aora::file::FileAora;
-pub use aora::Aora;
 pub use state::{AdaptedState, EffectiveState, RawState, Transition};
 #[cfg(feature = "std")]
 pub use stock::fs::FilePersistence;

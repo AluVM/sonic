@@ -35,7 +35,8 @@ use strict_encoding::{
 use strict_types::StrictVal;
 use ultrasonic::{AuthToken, CallError, Capabilities, CellAddr, ContractId, Operation, Opid};
 
-use crate::{AdaptedState, Aora, Articles, EffectiveState, RawState, Transition};
+use crate::aora::Aora;
+use crate::{AdaptedState, Articles, EffectiveState, RawState, Transition};
 
 pub trait StockPersistence {
     type Stash: Aora<Operation>;
@@ -355,7 +356,7 @@ pub mod fs {
     use ultrasonic::ContractName;
 
     use super::*;
-    use crate::FileAora;
+    use crate::aora::file::FileAora;
 
     pub struct FilePersistence {
         path: PathBuf,
