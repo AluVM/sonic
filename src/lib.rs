@@ -51,5 +51,5 @@ mod stock;
 
 pub use state::{AdaptedState, EffectiveState, RawState, Transition};
 #[cfg(feature = "std")]
-pub use stock::fs::FilePersistence;
-pub use stock::{AcceptError, CallParams, DeedBuilder, Stock, StockPersistence};
+pub use stock::fs::FileSupply;
+pub use stock::{AcceptError, CallParams, DeedBuilder, Stock, Supply};

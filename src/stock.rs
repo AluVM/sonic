@@ -38,7 +38,7 @@ use ultrasonic::{AuthToken, CallError, Capabilities, CellAddr, ContractId, Opera
 use crate::aora::Aora;
 use crate::{AdaptedState, Articles, EffectiveState, RawState, Transition};
 
-pub trait StockPersistence {
+pub trait Supply<C: Capabilities> {
     type Stash: Aora<Operation>;
     type Trace: Aora<Transition>;
 
@@ -48,8 +48,8 @@ pub trait StockPersistence {
     fn stash_mut(&mut self) -> &mut Self::Stash;
     fn trace_mut(&mut self) -> &mut Self::Trace;
 
-    fn save_articles<C: Capabilities>(&self, obj: &Articles<C>);
-    fn load_articles<C: Capabilities>(&self) -> Articles<C>;
+    fn save_articles(&self, obj: &Articles<C>);
+    fn load_articles(&self) -> Articles<C>;
 
     fn save_raw_state(&self, state: &RawState);
     fn load_raw_state(&self) -> RawState;
@@ -60,16 +60,16 @@ pub trait StockPersistence {
 
 /// Append-only, random-accessed deeds & trace; updatable and rollback-enabled state.
 #[derive(Getters)]
-pub struct Stock<C: Capabilities, P: StockPersistence> {
+pub struct Stock<C: Capabilities, S: Supply<C>> {
     articles: Articles<C>,
     state: EffectiveState,
 
     #[getter(skip)]
-    persistence: P,
+    supply: S,
 }
 
-impl<C: Capabilities, P: StockPersistence> Stock<C, P> {
-    pub fn create(articles: Articles<C>, persistence: P) -> Self {
+impl<C: Capabilities, S: Supply<C>> Stock<C, S> {
+    pub fn create(articles: Articles<C>, persistence: S) -> Self {
         let mut state = EffectiveState::default();
 
         let genesis = articles
@@ -85,13 +85,13 @@ impl<C: Capabilities, P: StockPersistence> Stock<C, P> {
             &articles.schema.types,
         );
 
-        let mut me = Self { articles, state, persistence };
+        let mut me = Self { articles, state, supply: persistence };
         me.recompute_state();
         me.save();
         me
     }
 
-    pub fn open(articles: Articles<C>, persistence: P) -> Self {
+    pub fn open(articles: Articles<C>, persistence: S) -> Self {
         let mut state = EffectiveState::default();
         state.raw = persistence.load_raw_state();
         state.main = persistence.load_state(None);
@@ -101,7 +101,7 @@ impl<C: Capabilities, P: StockPersistence> Stock<C, P> {
                 .aux
                 .insert(name.clone(), persistence.load_state(Some(name)));
         }
-        Self { articles, state, persistence }
+        Self { articles, state, supply: persistence }
     }
 
     pub fn contract_id(&self) -> ContractId { self.articles.contract_id() }
@@ -129,7 +129,7 @@ impl<C: Capabilities, P: StockPersistence> Stock<C, P> {
         let mut opids = queue.clone();
         let mut queue = queue.into_iter();
         while let Some(opid) = queue.next() {
-            let st = self.persistence.trace_mut().read(opid.to_byte_array());
+            let st = self.supply.trace_mut().read(opid.to_byte_array());
             opids.extend(st.destroyed.into_keys().map(|a| a.opid));
         }
 
@@ -177,8 +177,8 @@ impl<C: Capabilities, P: StockPersistence> Stock<C, P> {
 
     pub fn rollback(&self, ops: impl IntoIterator<Item = Opid>) { todo!() }
 
-    pub fn operations(&mut self) -> impl Iterator<Item = (Opid, Operation)> + use<'_, C, P> {
-        self.persistence
+    pub fn operations(&mut self) -> impl Iterator<Item = (Opid, Operation)> + use<'_, C, S> {
+        self.supply
             .stash_mut()
             .iter()
             .map(|(opid, op)| (Opid::from_byte_array(opid), op))
@@ -197,7 +197,7 @@ impl<C: Capabilities, P: StockPersistence> Stock<C, P> {
         }
     }
 
-    pub fn start_deed(&mut self, method: impl Into<MethodName>) -> DeedBuilder<'_, C, P> {
+    pub fn start_deed(&mut self, method: impl Into<MethodName>) -> DeedBuilder<'_, C, S> {
         let builder = OpBuilder::new(self.articles.contract.contract_id(), self.articles.schema.call_id(method));
         DeedBuilder { builder, stock: self }
     }
@@ -232,7 +232,7 @@ impl<C: Capabilities, P: StockPersistence> Stock<C, P> {
 
         let opid = operation.opid();
 
-        if self.persistence.stash().has(opid.to_byte_array()) {
+        if self.supply.stash().has(opid.to_byte_array()) {
             return Ok(false);
         }
 
@@ -243,7 +243,7 @@ impl<C: Capabilities, P: StockPersistence> Stock<C, P> {
             &self.articles.schema,
         )?;
 
-        self.persistence.stash_mut().append(&operation);
+        self.supply.stash_mut().append(&operation);
 
         let transition = self.state.apply(
             operation,
@@ -251,21 +251,21 @@ impl<C: Capabilities, P: StockPersistence> Stock<C, P> {
             self.articles.schema.custom_apis.keys(),
             &self.articles.schema.types,
         );
-        self.persistence.trace_mut().append(&transition);
+        self.supply.trace_mut().append(&transition);
 
         Ok(true)
     }
 
     fn save_state(&self) {
-        self.persistence.save_raw_state(&self.state.raw);
-        self.persistence.save_state(None, &self.state.main);
+        self.supply.save_raw_state(&self.state.raw);
+        self.supply.save_state(None, &self.state.main);
         for (name, aux) in &self.state.aux {
-            self.persistence.save_state(Some(name), aux);
+            self.supply.save_state(Some(name), aux);
         }
     }
 
     pub fn save(&self) {
-        self.persistence.save_articles(&self.articles);
+        self.supply.save_articles(&self.articles);
         self.save_state();
     }
 }
@@ -279,12 +279,12 @@ pub struct CallParams {
     pub reading: Vec<CellAddr>,
 }
 
-pub struct DeedBuilder<'c, C: Capabilities, P: StockPersistence> {
+pub struct DeedBuilder<'c, C: Capabilities, P: Supply<C>> {
     pub(super) builder: OpBuilder,
     pub(super) stock: &'c mut Stock<C, P>,
 }
 
-impl<'c, C: Capabilities, P: StockPersistence> DeedBuilder<'c, C, P> {
+impl<'c, C: Capabilities, P: Supply<C>> DeedBuilder<'c, C, P> {
     pub fn reading(mut self, addr: CellAddr) -> Self {
         self.builder = self.builder.access(addr);
         self
@@ -358,13 +358,13 @@ pub mod fs {
     use super::*;
     use crate::aora::file::FileAora;
 
-    pub struct FilePersistence {
+    pub struct FileSupply {
         path: PathBuf,
         stash: FileAora<Operation>,
         trace: FileAora<Transition>,
     }
 
-    impl FilePersistence {
+    impl FileSupply {
         const FILENAME_ARTICLES: &'static str = "contract.articles";
         const FILENAME_STATE_RAW: &'static str = "state.raw.yaml";
 
@@ -388,7 +388,7 @@ pub mod fs {
         }
     }
 
-    impl StockPersistence for FilePersistence {
+    impl<C: Capabilities> Supply<C> for FileSupply {
         type Stash = FileAora<Operation>;
         type Trace = FileAora<Transition>;
 
@@ -400,12 +400,12 @@ pub mod fs {
 
         fn trace_mut(&mut self) -> &mut Self::Trace { &mut self.trace }
 
-        fn save_articles<C: Capabilities>(&self, obj: &Articles<C>) {
+        fn save_articles(&self, obj: &Articles<C>) {
             let path = self.path.clone().join(Self::FILENAME_ARTICLES);
             obj.save(path).expect("unable to save articles");
         }
 
-        fn load_articles<C: Capabilities>(&self) -> Articles<C> {
+        fn load_articles(&self) -> Articles<C> {
             let path = self.path.clone().join(Self::FILENAME_ARTICLES);
             Articles::load(path).expect("unable to load articles")
         }
@@ -445,19 +445,19 @@ pub mod fs {
         }
     }
 
-    impl<C: Capabilities> Stock<C, FilePersistence> {
+    impl<C: Capabilities> Stock<C, FileSupply> {
         pub fn new(articles: Articles<C>, path: impl AsRef<Path>) -> Self {
             let name = match &articles.contract.meta.name {
                 ContractName::Unnamed => articles.contract_id().to_string(),
                 ContractName::Named(name) => name.to_string(),
             };
-            let persistence = FilePersistence::new(&name, path);
+            let persistence = FileSupply::new(&name, path);
             Self::create(articles, persistence)
         }
 
         pub fn load(path: impl AsRef<Path>) -> Self {
             let path = path.as_ref();
-            let persistence = FilePersistence::open(path);
+            let persistence = FileSupply::open(path);
             Self::open(persistence.load_articles(), persistence)
         }
 
