@@ -25,21 +25,20 @@
 
 use core::borrow::Borrow;
 
-pub trait AoraItem: Sized {
-    fn aora_id(&self) -> [u8; 32];
-}
-
 /// AORA: Append-only random-accessed data persistence.
-pub trait Aora<T: AoraItem> {
-    fn append(&mut self, item: &T);
-    fn extend(&mut self, iter: impl IntoIterator<Item = impl Borrow<T>>) {
-        for item in iter {
-            self.append(item.borrow());
+pub trait Aora {
+    type Item: Sized;
+    type Id: Into<[u8; 32]> + From<[u8; 32]>;
+
+    fn append(&mut self, id: Self::Id, item: &Self::Item);
+    fn extend(&mut self, iter: impl IntoIterator<Item = (Self::Id, impl Borrow<Self::Item>)>) {
+        for (id, item) in iter {
+            self.append(id, item.borrow());
         }
     }
-    fn has(&self, id: impl Into<[u8; 32]>) -> bool;
-    fn read(&mut self, id: impl Into<[u8; 32]>) -> T;
-    fn iter(&mut self) -> impl Iterator<Item = ([u8; 32], T)>;
+    fn has(&self, id: Self::Id) -> bool;
+    fn read(&mut self, id: Self::Id) -> Self::Item;
+    fn iter(&mut self) -> impl Iterator<Item = (Self::Id, Self::Item)>;
 }
 
 #[cfg(feature = "std")]
@@ -52,26 +51,17 @@ pub mod file {
     use std::path::{Path, PathBuf};
 
     use strict_encoding::{StreamReader, StreamWriter, StrictDecode, StrictEncode, StrictReader, StrictWriter};
-    use ultrasonic::Operation;
 
     use super::*;
-    use crate::Transition;
 
-    impl AoraItem for Operation {
-        fn aora_id(&self) -> [u8; 32] { self.opid().to_byte_array() }
-    }
-    impl AoraItem for Transition {
-        fn aora_id(&self) -> [u8; 32] { self.opid.to_byte_array() }
-    }
-
-    pub struct FileAora<T: AoraItem> {
+    pub struct FileAora<Id: Ord + From<[u8; 32]>, T> {
         log: File,
         idx: File,
-        index: BTreeMap<[u8; 32], u64>,
+        index: BTreeMap<Id, u64>,
         _phantom: PhantomData<T>,
     }
 
-    impl<T: AoraItem> FileAora<T> {
+    impl<Id: Ord + From<[u8; 32]>, T> FileAora<Id, T> {
         fn prepare(path: impl AsRef<Path>, name: &str) -> (PathBuf, PathBuf) {
             let path = path.as_ref();
             let log = path.join(format!("{name}.log"));
@@ -114,7 +104,7 @@ pub mod file {
                     .expect("unable to read index entry");
                 let pos = u64::from_le_bytes(buf);
 
-                index.insert(id, pos);
+                index.insert(id.into(), pos);
             }
 
             log.seek(SeekFrom::End(0))
@@ -126,9 +116,12 @@ pub mod file {
         }
     }
 
-    impl<T: AoraItem + StrictEncode + StrictDecode> Aora<T> for FileAora<T> {
-        fn append(&mut self, item: &T) {
-            let id = item.aora_id();
+    impl<Id: Ord + From<[u8; 32]> + Into<[u8; 32]>, T: StrictEncode + StrictDecode> Aora for FileAora<Id, T> {
+        type Item = T;
+        type Id = Id;
+
+        fn append(&mut self, id: Self::Id, item: &T) {
+            let id = id.into();
             let pos = self
                 .log
                 .stream_position()
@@ -138,20 +131,17 @@ pub mod file {
             self.idx
                 .seek(SeekFrom::End(0))
                 .expect("unable to seek to the end of the index");
-            debug_assert_eq!(id.as_ref().len(), 32);
-            self.idx
-                .write_all(&id.as_ref())
-                .expect("unable to write to index");
+            self.idx.write_all(&id).expect("unable to write to index");
             self.idx
                 .write_all(&pos.to_le_bytes())
                 .expect("unable to write to index");
-            self.index.insert(id, pos);
+            self.index.insert(id.into(), pos);
         }
 
-        fn has(&self, id: impl Into<[u8; 32]>) -> bool { self.index.contains_key(&id.into()) }
+        fn has(&self, id: Self::Id) -> bool { self.index.contains_key(&id) }
 
-        fn read(&mut self, id: impl Into<[u8; 32]>) -> T {
-            let pos = self.index.get(&id.into()).expect("unknown item");
+        fn read(&mut self, id: Self::Id) -> T {
+            let pos = self.index.get(&id).expect("unknown item");
 
             self.log
                 .seek(SeekFrom::Start(*pos))
@@ -160,7 +150,7 @@ pub mod file {
             T::strict_decode(&mut reader).expect("unable to read item")
         }
 
-        fn iter(&mut self) -> impl Iterator<Item = ([u8; 32], T)> {
+        fn iter(&mut self) -> impl Iterator<Item = (Self::Id, T)> {
             self.log
                 .seek(SeekFrom::Start(0))
                 .expect("unable to seek to the start of the log file");
@@ -173,14 +163,14 @@ pub mod file {
         }
     }
 
-    pub struct Iter<'file, T: AoraItem + StrictDecode> {
+    pub struct Iter<'file, Id: From<[u8; 32]>, T: StrictDecode> {
         log: StrictReader<StreamReader<&'file File>>,
         idx: &'file File,
-        _phantom: PhantomData<T>,
+        _phantom: PhantomData<(Id, T)>,
     }
 
-    impl<'file, T: AoraItem + StrictDecode> Iterator for Iter<'file, T> {
-        type Item = ([u8; 32], T);
+    impl<'file, Id: From<[u8; 32]>, T: StrictDecode> Iterator for Iter<'file, Id, T> {
+        type Item = (Id, T);
 
         fn next(&mut self) -> Option<Self::Item> {
             let mut id = [0u8; 32];
@@ -189,7 +179,7 @@ pub mod file {
                 .seek(SeekFrom::Current(8))
                 .expect("broken index file");
             let item = T::strict_decode(&mut self.log).ok()?;
-            Some((id, item))
+            Some((id.into(), item))
         }
     }
 }

@@ -27,7 +27,6 @@ use std::io;
 use std::io::ErrorKind;
 
 use aluvm::LibSite;
-use amplify::ByteArray;
 use sonicapi::{CoreParams, MergeError, MethodName, NamedState, OpBuilder, StateName};
 use strict_encoding::{
     DecodeError, ReadRaw, StrictDecode, StrictEncode, StrictReader, StrictWriter, TypeName, WriteRaw,
@@ -39,8 +38,8 @@ use crate::aora::Aora;
 use crate::{AdaptedState, Articles, EffectiveState, RawState, Transition};
 
 pub trait Supply<const CAPS: u32> {
-    type Stash: Aora<Operation>;
-    type Trace: Aora<Transition>;
+    type Stash: Aora<Id = Opid, Item = Operation>;
+    type Trace: Aora<Id = Opid, Item = Transition>;
 
     fn stash(&self) -> &Self::Stash;
     fn trace(&self) -> &Self::Trace;
@@ -110,7 +109,7 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
         // Write articles
         writer = self.articles.strict_encode(writer)?;
         // Stream operations
-        for (opid, op) in self.operations() {
+        for (_, op) in self.operations() {
             writer = op.strict_encode(writer)?;
         }
         Ok(())
@@ -129,7 +128,7 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
         let mut opids = queue.clone();
         let mut queue = queue.into_iter();
         while let Some(opid) = queue.next() {
-            let st = self.supply.trace_mut().read(opid.to_byte_array());
+            let st = self.supply.trace_mut().read(opid);
             opids.extend(st.destroyed.into_keys().map(|a| a.opid));
         }
 
@@ -181,7 +180,6 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
         self.supply
             .stash_mut()
             .iter()
-            .map(|(opid, op)| (Opid::from_byte_array(opid), op))
     }
 
     fn recompute_state(&mut self) {
@@ -232,7 +230,7 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
 
         let opid = operation.opid();
 
-        if self.supply.stash().has(opid.to_byte_array()) {
+        if self.supply.stash().has(opid) {
             return Ok(false);
         }
 
@@ -243,7 +241,7 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
             &self.articles.schema,
         )?;
 
-        self.supply.stash_mut().append(&operation);
+        self.supply.stash_mut().append(opid, &operation);
 
         let transition = self.state.apply(
             operation,
@@ -251,7 +249,7 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
             self.articles.schema.custom_apis.keys(),
             &self.articles.schema.types,
         );
-        self.supply.trace_mut().append(&transition);
+        self.supply.trace_mut().append(opid, &transition);
 
         Ok(true)
     }
@@ -360,8 +358,8 @@ pub mod fs {
 
     pub struct FileSupply {
         path: PathBuf,
-        stash: FileAora<Operation>,
-        trace: FileAora<Transition>,
+        stash: FileAora<Opid, Operation>,
+        trace: FileAora<Opid, Transition>,
     }
 
     impl FileSupply {
@@ -389,8 +387,8 @@ pub mod fs {
     }
 
     impl<const CAPS: u32> Supply<CAPS> for FileSupply {
-        type Stash = FileAora<Operation>;
-        type Trace = FileAora<Transition>;
+        type Stash = FileAora<Opid, Operation>;
+        type Trace = FileAora<Opid, Transition>;
 
         fn stash(&self) -> &Self::Stash { &self.stash }
 
