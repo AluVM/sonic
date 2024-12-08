@@ -1,6 +1,7 @@
 [workspace]
 members = [".", "api", "cli", "url"]
 default-members = [".", "api", "url"]
+resolver = "2"
 
 [workspace.package]
 version = "0.12.0-beta.1"

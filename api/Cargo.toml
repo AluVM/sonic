@@ -29,7 +29,7 @@ chrono.workspace = true
 
 [features]
 default = ["std"]
-all = ["stl", "serde"]
+all = ["std", "stl", "serde"]
 
 std = []
 stl = ["commit_verify/stl", "ultrasonic/stl", "strict_types/armor"]

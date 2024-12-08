@@ -38,7 +38,7 @@ use crate::{Api, Articles, DataCell, MethodName, Schema, StateAtom, StateName};
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct NamedState<T> {
     pub name: StateName,
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serde", serde(flatten))]
     pub state: T,
 }
 

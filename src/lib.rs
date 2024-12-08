@@ -34,8 +34,6 @@ extern crate alloc;
 extern crate amplify;
 #[macro_use]
 extern crate strict_types;
-#[macro_use]
-extern crate commit_verify;
 
 #[cfg(feature = "serde")]
 #[macro_use]
@@ -50,6 +48,6 @@ mod state;
 mod stock;
 
 pub use state::{AdaptedState, EffectiveState, RawState, Transition};
-#[cfg(feature = "std")]
+#[cfg(feature = "persist-file")]
 pub use stock::fs::FileSupply;
 pub use stock::{AcceptError, CallParams, DeedBuilder, Stock, Supply};
