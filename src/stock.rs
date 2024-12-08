@@ -177,9 +177,7 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
     pub fn rollback(&self, ops: impl IntoIterator<Item = Opid>) { todo!() }
 
     pub fn operations(&mut self) -> impl Iterator<Item = (Opid, Operation)> + use<'_, S, CAPS> {
-        self.supply
-            .stash_mut()
-            .iter()
+        self.supply.stash_mut().iter()
     }
 
     fn recompute_state(&mut self) {
@@ -369,7 +367,6 @@ pub mod fs {
         pub fn new(name: &str, path: impl AsRef<Path>) -> Self {
             let mut path = path.as_ref().to_path_buf();
             path.push(name);
-            path.set_extension("stock");
             fs::create_dir_all(&path).expect("Unable to create directory to store Stock");
 
             let stash = FileAora::new(&path, "stash");
