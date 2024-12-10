@@ -271,6 +271,7 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
 pub struct CallParams {
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub core: CoreParams,
+    // We can't use BTreeMap here since AuthToken is not Ord
     pub using: Vec<(AuthToken, StrictVal)>,
     pub reading: Vec<CellAddr>,
 }
