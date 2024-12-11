@@ -27,11 +27,12 @@ use strict_encoding::{StreamReader, StrictDecode, StrictEncode};
 use strict_types::typify::TypedVal;
 use strict_types::value::StrictNum;
 use strict_types::{SemId, StrictVal, TypeSystem};
-use ultrasonic::{StateData, StateValue};
+use ultrasonic::{fe256, StateData, StateValue};
 
 use crate::api::{TOTAL_BYTES, USED_FIEL_BYTES};
 use crate::{
-    ApiVm, StateAdaptor, StateArithm, StateAtom, StateName, StateReader, StateTy, StructData, VmType, LIB_NAME_SONIC,
+    ApiVm, StateAdaptor, StateArithm, StateAtom, StateCalc, StateName, StateReader, StateTy, UncountableState, VmType,
+    LIB_NAME_SONIC,
 };
 
 #[derive(Clone, Debug)]
@@ -198,11 +199,90 @@ pub enum EmbeddedArithm {
 }
 
 impl StateArithm for EmbeddedArithm {
-    fn measure(&self, state: StructData) -> Option<u8> { todo!() }
+    type Calc = EmbeddedCalc;
 
-    fn accumulate(&mut self, state: StructData) -> Option<()> { todo!() }
+    fn measure(&self, state: StateValue, target: StateValue) -> Option<i8> {
+        let res = match (state, target) {
+            (StateValue::Single { first: val }, StateValue::Single { first: tgt })
+                if val.to_u256() == tgt.to_u256() =>
+            {
+                return Some(0)
+            }
+            (StateValue::Single { first: val }, StateValue::Single { first: tgt }) if val.to_u256() < tgt.to_u256() => {
+                (tgt.to_u256() - val.to_u256()) / tgt.to_u256()
+            }
+            (StateValue::Single { first: val }, StateValue::Single { first: tgt }) if val.to_u256() > tgt.to_u256() => {
+                (val.to_u256() - tgt.to_u256()) / tgt.to_u256()
+            }
+            _ => return None,
+        };
+        if res > u256::from(u64::MAX) {
+            Some(i8::MAX)
+        } else {
+            Some(res.low_u64().ilog2() as i8)
+        }
+    }
 
-    fn lessen(&mut self, state: StructData) -> Option<()> { todo!() }
+    fn calculator(&self) -> Self::Calc {
+        match self {
+            EmbeddedArithm::NonFungible => EmbeddedCalc::NonFungible(empty!()),
+            EmbeddedArithm::Fungible => EmbeddedCalc::Fungible(StateValue::None),
+        }
+    }
+}
 
-    fn diff(&self) -> Option<StructData> { todo!() }
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum EmbeddedCalc {
+    NonFungible(Vec<StateValue>),
+    Fungible(StateValue),
+}
+
+impl StateCalc for EmbeddedCalc {
+    fn accumulate(&mut self, state: StateValue) -> Result<(), UncountableState> {
+        match self {
+            EmbeddedCalc::NonFungible(states) => {
+                states.push(state);
+                Ok(())
+            }
+            EmbeddedCalc::Fungible(value) => match (state, value) {
+                (StateValue::Single { first: add }, StateValue::Single { first: val }) => {
+                    *val = fe256::from(val.to_u256() + add.to_u256());
+                    Ok(())
+                }
+                _ => Err(UncountableState),
+            },
+        }
+    }
+
+    fn lessen(&mut self, state: StateValue) -> Result<(), UncountableState> {
+        match self {
+            EmbeddedCalc::NonFungible(states) => {
+                if let Some(pos) = states.iter().position(|s| *s == state) {
+                    states.remove(pos);
+                    Ok(())
+                } else {
+                    Err(UncountableState)
+                }
+            }
+            EmbeddedCalc::Fungible(value) => match (state, value) {
+                (StateValue::Single { first: dec }, StateValue::Single { first: val })
+                    if dec.to_u256() > val.to_u256() =>
+                {
+                    Err(UncountableState)
+                }
+                (StateValue::Single { first: dec }, StateValue::Single { first: val }) => {
+                    *val = fe256::from(val.to_u256() - dec.to_u256());
+                    Ok(())
+                }
+                _ => Err(UncountableState),
+            },
+        }
+    }
+
+    fn diff(self) -> Result<Vec<StateValue>, UncountableState> {
+        Ok(match self {
+            EmbeddedCalc::NonFungible(items) => items,
+            EmbeddedCalc::Fungible(value) => vec![value],
+        })
+    }
 }

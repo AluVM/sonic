@@ -27,7 +27,10 @@ use strict_types::{SemId, StrictDumb, StrictVal, TypeSystem};
 use ultrasonic::{StateData, StateValue};
 
 use crate::api::TOTAL_BYTES;
-use crate::{ApiVm, StateAdaptor, StateArithm, StateAtom, StateName, StateReader, StructData, VmType, LIB_NAME_SONIC};
+use crate::{
+    ApiVm, StateAdaptor, StateArithm, StateAtom, StateCalc, StateName, StateReader, UncountableState, VmType,
+    LIB_NAME_SONIC,
+};
 
 impl ApiVm for aluvm::Vm {
     type Arithm = AluVMArithm;
@@ -99,11 +102,17 @@ impl StrictDumb for AluVMArithm {
 }
 
 impl StateArithm for AluVMArithm {
-    fn measure(&self, state: StructData) -> Option<u8> { todo!() }
+    type Calc = ();
 
-    fn accumulate(&mut self, state: StructData) -> Option<()> { todo!() }
+    fn measure(&self, state: StateValue, target: StateValue) -> Option<i8> { todo!() }
 
-    fn lessen(&mut self, state: StructData) -> Option<()> { todo!() }
+    fn calculator(&self) -> Self::Calc { todo!() }
+}
 
-    fn diff(&self) -> Option<StructData> { todo!() }
+impl StateCalc for () {
+    fn accumulate(&mut self, state: StateValue) -> Result<(), UncountableState> { Err(UncountableState) }
+
+    fn lessen(&mut self, state: StateValue) -> Result<(), UncountableState> { Err(UncountableState) }
+
+    fn diff(self) -> Result<Vec<StateValue>, UncountableState> { Err(UncountableState) }
 }

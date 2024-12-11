@@ -45,7 +45,7 @@ use strict_types::{SemId, StrictDecode, StrictDumb, StrictEncode, StrictVal, Typ
 use ultrasonic::{CallId, CodexId, Identity, StateData, StateValue};
 
 use crate::embedded::EmbeddedProc;
-use crate::{StateAtom, StructData, VmType, LIB_NAME_SONIC};
+use crate::{StateAtom, VmType, LIB_NAME_SONIC};
 
 pub(super) const USED_FIEL_BYTES: usize = u256::BYTES as usize - 2;
 pub(super) const TOTAL_BYTES: usize = USED_FIEL_BYTES * 3;
@@ -241,6 +241,30 @@ impl Api {
                 .build(data, sys),
         }
     }
+
+    pub fn calculate(&self, name: impl Into<StateName>) -> Box<dyn StateCalc> {
+        let name = name.into();
+        match self {
+            Api::Embedded(api) => {
+                let calc = api
+                    .destructible
+                    .get(&name)
+                    .expect("state name is unknown for the API")
+                    .arithmetics
+                    .calculator();
+                Box::new(calc)
+            }
+            Api::Alu(api) => {
+                let calc = api
+                    .destructible
+                    .get(&name)
+                    .expect("state name is unknown for the API")
+                    .arithmetics
+                    .calculator();
+                Box::new(calc)
+            }
+        }
+    }
 }
 
 /// API is an interface implementation.
@@ -410,6 +434,7 @@ impl<Vm: ApiVm> DestructibleApi<Vm> {
     pub fn build(&self, value: StrictVal, sys: &TypeSystem) -> StateValue {
         self.adaptor.build_state(self.sem_id, value, sys)
     }
+    pub fn arithmetics(&self) -> &Vm::Arithm { &self.arithmetics }
 }
 
 #[cfg(not(feature = "serde"))]
@@ -461,22 +486,33 @@ pub trait StateAdaptor: Clone + Ord + Debug + StrictDumb + StrictEncode + Strict
     }
 }
 
-// TODO: Use Result's instead of Option
 pub trait StateArithm: Clone + Debug + StrictDumb + StrictEncode + StrictDecode + Serde {
-    /// Procedure which converts [`StructData`] corresponding to this type into a weight in range
-    /// `0..256` representing how much this specific state fulfills certain state requirement.
+    /// Type that performs calculations on the state
+    type Calc: StateCalc;
+
+    /// Procedure which converts [`StateValue`] corresponding to this type into a weight in range
+    /// `-126..127` representing how much this specific state fulfills certain state requirement.
     ///
     /// This is used in selecting state required to fulfill input for a provided contract
     /// [`Request`].
-    fn measure(&self, state: StructData) -> Option<u8>;
+    fn measure(&self, state: StateValue, target: StateValue) -> Option<i8>;
 
-    /// Procedure which is called on [`StateArithm`] to accumulate an input state.
-    fn accumulate(&mut self, state: StructData) -> Option<()>;
+    /// Returns a calculator object used to perform calculations on the state.
+    fn calculator(&self) -> Self::Calc;
+}
 
-    /// Procedure which is called on [`StateArithm`] to lessen an output state.
-    fn lessen(&mut self, state: StructData) -> Option<()>;
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Display, Error)]
+#[display("state can't be computed")]
+pub struct UncountableState;
 
-    /// Procedure which is called on [`StateArithm`] to compute the difference between an input
+pub trait StateCalc {
+    /// Procedure which is called on [`StateCalc`] to accumulate an input state.
+    fn accumulate(&mut self, state: StateValue) -> Result<(), UncountableState>;
+
+    /// Procedure which is called on [`StateCalc`] to lessen an output state.
+    fn lessen(&mut self, state: StateValue) -> Result<(), UncountableState>;
+
+    /// Procedure which is called on [`StateCalc`] to compute the difference between an input
     /// state and output state.
-    fn diff(&self) -> Option<StructData>;
+    fn diff(self) -> Result<Vec<StateValue>, UncountableState>;
 }
