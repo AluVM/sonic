@@ -209,6 +209,8 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
         self.supply.stash_mut().iter()
     }
 
+    pub fn operation(&mut self, opid: Opid) -> Operation { self.supply.stash_mut().read(opid) }
+
     fn recompute_state(&mut self) {
         self.state.main.compute(&self.articles.schema.default_api);
         self.state.aux = bmap! {};
