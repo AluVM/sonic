@@ -22,6 +22,7 @@
 // the License.
 
 use alloc::collections::BTreeSet;
+use core::iter;
 // Used in strict encoding; once solved there, remove here
 use std::io;
 use std::io::ErrorKind;
@@ -115,11 +116,20 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
         Ok(())
     }
 
-    // TODO: Return statistics
     pub fn export<'a>(
         &mut self,
         terminals: impl IntoIterator<Item = &'a AuthToken>,
+        writer: StrictWriter<impl WriteRaw>,
+    ) -> io::Result<()> {
+        self.export_aux(terminals, writer, |_| iter::empty::<()>())
+    }
+
+    // TODO: Return statistics
+    pub fn export_aux<'a, Aux: StrictEncode, I: ExactSizeIterator<Item = Aux>>(
+        &mut self,
+        terminals: impl IntoIterator<Item = &'a AuthToken>,
         mut writer: StrictWriter<impl WriteRaw>,
+        aux: impl Fn(Opid) -> I,
     ) -> io::Result<()> {
         let queue = terminals
             .into_iter()
@@ -142,22 +152,41 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
                 continue;
             }
             writer = op.strict_encode(writer)?;
+            let iter = aux(opid);
+            writer = (iter.len() as u64).strict_encode(writer)?;
+            for item in iter {
+                writer = item.strict_encode(writer)?;
+            }
         }
 
         Ok(())
     }
 
-    // TODO: Return statistics
     pub fn accept(&mut self, reader: &mut StrictReader<impl ReadRaw>) -> Result<(), AcceptError> {
+        self.accept_aux(reader, |_, _: ()| {})
+    }
+
+    // TODO: Return statistics
+    pub fn accept_aux<T: StrictDecode>(
+        &mut self,
+        reader: &mut StrictReader<impl ReadRaw>,
+        aux: impl Fn(Opid, T),
+    ) -> Result<(), AcceptError> {
         let articles = Articles::<CAPS>::strict_decode(reader)?;
         self.articles.merge(articles)?;
 
         loop {
-            match Operation::strict_decode(reader) {
-                Ok(operation) => self.apply(operation)?,
+            let op = match Operation::strict_decode(reader) {
+                Ok(operation) => operation,
                 Err(DecodeError::Io(e)) if e.kind() == ErrorKind::UnexpectedEof => break,
                 Err(e) => return Err(e.into()),
             };
+            let opid = op.opid();
+            let len = u64::strict_decode(reader)?;
+            for _ in 0..len {
+                aux(opid, T::strict_decode(reader)?);
+            }
+            self.apply(op)?;
         }
         self.recompute_state();
         self.save_state();
