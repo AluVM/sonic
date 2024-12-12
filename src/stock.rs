@@ -23,6 +23,7 @@
 
 use alloc::collections::BTreeSet;
 use core::iter;
+use std::collections::BTreeMap;
 // Used in strict encoding; once solved there, remove here
 use std::io;
 use std::io::ErrorKind;
@@ -241,8 +242,8 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
         for addr in params.reading {
             builder = builder.reading(addr);
         }
-        for (auth, witness) in params.using {
-            builder = builder.using(auth, witness);
+        for (addr, witness) in params.using {
+            builder = builder.using(addr, witness);
         }
 
         builder.commit()
@@ -302,8 +303,7 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
 pub struct CallParams {
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub core: CoreParams,
-    // We can't use BTreeMap here since AuthToken is not Ord
-    pub using: Vec<(AuthToken, StrictVal)>,
+    pub using: BTreeMap<CellAddr, StrictVal>,
     pub reading: Vec<CellAddr>,
 }
 
@@ -318,8 +318,7 @@ impl<'c, S: Supply<CAPS>, const CAPS: u32> DeedBuilder<'c, S, CAPS> {
         self
     }
 
-    pub fn using(mut self, auth: AuthToken, witness: StrictVal) -> Self {
-        let addr = self.stock.state.addr(auth);
+    pub fn using(mut self, addr: CellAddr, witness: StrictVal) -> Self {
         self.builder = self.builder.destroy(addr, witness);
         self
     }

@@ -144,6 +144,7 @@ fn main() {
         .assign("signers", carol_auth, svnum!(2u64), None)
 
         .finish::<0>("WonderlandDAO", 1732529307);
+    let opid = articles.contract.genesis_opid();
 
     let mut stock = Stock::new(articles, "examples/dao/data");
 
@@ -164,7 +165,7 @@ fn main() {
     // Alice vote against her being on duty today
     stock
         .start_deed("castVote")
-        .using(alice_auth, svnum!(0u64))
+        .using(CellAddr::new(opid, 0), svnum!(0u64))
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(0u8), partyId 0u64), None)
         .assign("signers", alice_auth2, svnum!(0u64), None)
@@ -173,14 +174,14 @@ fn main() {
     // Bob and Carol vote for Alice being on duty today
     stock
         .start_deed("castVote")
-        .using(bob_auth, svnum!(1u64))
+        .using(CellAddr::new(opid, 1), svnum!(1u64))
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 1u64), None)
         .assign("signers", bob_auth2, svnum!(1u64), None)
         .commit();
     stock
         .start_deed("castVote")
-        .using(carol_auth, svnum!(2u64))
+        .using(CellAddr::new(opid, 2), svnum!(2u64))
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 2u64), None)
         .assign("signers", carol_auth2, svnum!(2u64), None)
