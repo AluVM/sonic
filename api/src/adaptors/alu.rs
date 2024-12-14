@@ -110,9 +110,9 @@ impl StateArithm for AluVMArithm {
 }
 
 impl StateCalc for () {
-    fn accumulate(&mut self, state: StateValue) -> Result<(), UncountableState> { Err(UncountableState) }
+    fn accumulate(&mut self, state: StrictVal) -> Result<(), UncountableState> { Err(UncountableState) }
 
-    fn lessen(&mut self, state: StateValue) -> Result<(), UncountableState> { Err(UncountableState) }
+    fn lessen(&mut self, state: StrictVal) -> Result<(), UncountableState> { Err(UncountableState) }
 
-    fn diff(self) -> Result<Vec<StateValue>, UncountableState> { Err(UncountableState) }
+    fn diff(self) -> Result<Vec<StrictVal>, UncountableState> { Err(UncountableState) }
 }

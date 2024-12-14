@@ -27,7 +27,7 @@ use strict_encoding::{StreamReader, StrictDecode, StrictEncode};
 use strict_types::typify::TypedVal;
 use strict_types::value::StrictNum;
 use strict_types::{SemId, StrictVal, TypeSystem};
-use ultrasonic::{fe256, StateData, StateValue};
+use ultrasonic::{StateData, StateValue};
 
 use crate::api::{TOTAL_BYTES, USED_FIEL_BYTES};
 use crate::{
@@ -226,27 +226,27 @@ impl StateArithm for EmbeddedArithm {
     fn calculator(&self) -> Self::Calc {
         match self {
             EmbeddedArithm::NonFungible => EmbeddedCalc::NonFungible(empty!()),
-            EmbeddedArithm::Fungible => EmbeddedCalc::Fungible(StateValue::None),
+            EmbeddedArithm::Fungible => EmbeddedCalc::Fungible(StrictVal::Number(StrictNum::Uint(0))),
         }
     }
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum EmbeddedCalc {
-    NonFungible(Vec<StateValue>),
-    Fungible(StateValue),
+    NonFungible(Vec<StrictVal>),
+    Fungible(StrictVal),
 }
 
 impl StateCalc for EmbeddedCalc {
-    fn accumulate(&mut self, state: StateValue) -> Result<(), UncountableState> {
+    fn accumulate(&mut self, state: StrictVal) -> Result<(), UncountableState> {
         match self {
             EmbeddedCalc::NonFungible(states) => {
                 states.push(state);
                 Ok(())
             }
             EmbeddedCalc::Fungible(value) => match (state, value) {
-                (StateValue::Single { first: add }, StateValue::Single { first: val }) => {
-                    *val = fe256::from(val.to_u256() + add.to_u256());
+                (StrictVal::Number(StrictNum::Uint(add)), StrictVal::Number(StrictNum::Uint(val))) => {
+                    *val += add;
                     Ok(())
                 }
                 _ => Err(UncountableState),
@@ -254,7 +254,7 @@ impl StateCalc for EmbeddedCalc {
         }
     }
 
-    fn lessen(&mut self, state: StateValue) -> Result<(), UncountableState> {
+    fn lessen(&mut self, state: StrictVal) -> Result<(), UncountableState> {
         match self {
             EmbeddedCalc::NonFungible(states) => {
                 if let Some(pos) = states.iter().position(|s| *s == state) {
@@ -265,13 +265,11 @@ impl StateCalc for EmbeddedCalc {
                 }
             }
             EmbeddedCalc::Fungible(value) => match (state, value) {
-                (StateValue::Single { first: dec }, StateValue::Single { first: val })
-                    if dec.to_u256() > val.to_u256() =>
-                {
+                (StrictVal::Number(StrictNum::Uint(dec)), StrictVal::Number(StrictNum::Uint(val))) if dec > *val => {
                     Err(UncountableState)
                 }
-                (StateValue::Single { first: dec }, StateValue::Single { first: val }) => {
-                    *val = fe256::from(val.to_u256() - dec.to_u256());
+                (StrictVal::Number(StrictNum::Uint(dec)), StrictVal::Number(StrictNum::Uint(val))) => {
+                    *val -= dec;
                     Ok(())
                 }
                 _ => Err(UncountableState),
@@ -279,7 +277,7 @@ impl StateCalc for EmbeddedCalc {
         }
     }
 
-    fn diff(self) -> Result<Vec<StateValue>, UncountableState> {
+    fn diff(self) -> Result<Vec<StrictVal>, UncountableState> {
         Ok(match self {
             EmbeddedCalc::NonFungible(items) => items,
             EmbeddedCalc::Fungible(value) => vec![value],

@@ -507,12 +507,12 @@ pub struct UncountableState;
 
 pub trait StateCalc {
     /// Procedure which is called on [`StateCalc`] to accumulate an input state.
-    fn accumulate(&mut self, state: StateValue) -> Result<(), UncountableState>;
+    fn accumulate(&mut self, state: StrictVal) -> Result<(), UncountableState>;
 
     /// Procedure which is called on [`StateCalc`] to lessen an output state.
-    fn lessen(&mut self, state: StateValue) -> Result<(), UncountableState>;
+    fn lessen(&mut self, state: StrictVal) -> Result<(), UncountableState>;
 
     /// Procedure which is called on [`StateCalc`] to compute the difference between an input
     /// state and output state.
-    fn diff(self) -> Result<Vec<StateValue>, UncountableState>;
+    fn diff(self) -> Result<Vec<StrictVal>, UncountableState>;
 }
