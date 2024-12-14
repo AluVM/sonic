@@ -218,7 +218,6 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
         for api in self.articles.schema.custom_apis.keys() {
             let mut s = AdaptedState::default();
             s.compute(api);
-            // TODO: Store API name in map, not in API itself
             self.state
                 .aux
                 .insert(api.name().cloned().expect("unnamed aux API"), s);

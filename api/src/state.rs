@@ -26,7 +26,7 @@ use amplify::num::u256;
 use strict_types::StrictVal;
 use ultrasonic::AuthToken;
 
-pub type StateTy = u256; // TODO: Make it equal to the internal type in used field element
+pub type StateTy = u256;
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
