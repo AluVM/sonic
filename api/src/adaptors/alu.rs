@@ -114,5 +114,5 @@ impl StateCalc for () {
 
     fn lessen(&mut self, state: StrictVal) -> Result<(), UncountableState> { Err(UncountableState) }
 
-    fn diff(self) -> Result<Vec<StrictVal>, UncountableState> { Err(UncountableState) }
+    fn diff(&self) -> Result<Vec<StrictVal>, UncountableState> { Err(UncountableState) }
 }

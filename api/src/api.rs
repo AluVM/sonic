@@ -514,5 +514,5 @@ pub trait StateCalc {
 
     /// Procedure which is called on [`StateCalc`] to compute the difference between an input
     /// state and output state.
-    fn diff(self) -> Result<Vec<StrictVal>, UncountableState>;
+    fn diff(&self) -> Result<Vec<StrictVal>, UncountableState>;
 }
