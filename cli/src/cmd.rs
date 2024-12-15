@@ -145,6 +145,6 @@ fn export<'a>(stock: &Path, terminals: impl IntoIterator<Item = &'a AuthToken>, 
 
 fn accept(stock: &Path, input: &Path) -> anyhow::Result<()> {
     let mut stock = Stock::<_, 0>::load(stock);
-    stock.accept_file(input)?;
+    stock.accept_from_file(input)?;
     Ok(())
 }

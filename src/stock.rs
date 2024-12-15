@@ -493,7 +493,7 @@ pub mod fs {
             self.export(terminals, writer)
         }
 
-        pub fn accept_file(&mut self, input: impl AsRef<Path>) -> Result<(), AcceptError> {
+        pub fn accept_from_file(&mut self, input: impl AsRef<Path>) -> Result<(), AcceptError> {
             let file = File::open(input)?;
             let mut reader = StrictReader::with(StreamReader::new::<{ usize::MAX }>(file));
             self.accept(&mut reader)
