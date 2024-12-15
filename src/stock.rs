@@ -191,18 +191,6 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
 
     pub fn operation(&mut self, opid: Opid) -> Operation { self.supply.stash_mut().read(opid) }
 
-    fn recompute_state(&mut self) {
-        self.state.main.compute(&self.articles.schema.default_api);
-        self.state.aux = bmap! {};
-        for api in self.articles.schema.custom_apis.keys() {
-            let mut s = AdaptedState::default();
-            s.compute(api);
-            self.state
-                .aux
-                .insert(api.name().cloned().expect("unnamed aux API"), s);
-        }
-    }
-
     pub fn start_deed(&mut self, method: impl Into<MethodName>) -> DeedBuilder<'_, S, CAPS> {
         let builder = OpBuilder::new(self.articles.contract.contract_id(), self.articles.schema.call_id(method));
         DeedBuilder { builder, stock: self }
@@ -267,6 +255,23 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
         self.supply.trace_mut().append(opid, &transition);
 
         Ok(())
+    }
+
+    pub fn complete_update(&mut self) {
+        self.recompute_state();
+        self.save_state();
+    }
+
+    fn recompute_state(&mut self) {
+        self.state.main.compute(&self.articles.schema.default_api);
+        self.state.aux = bmap! {};
+        for api in self.articles.schema.custom_apis.keys() {
+            let mut s = AdaptedState::default();
+            s.compute(api);
+            self.state
+                .aux
+                .insert(api.name().cloned().expect("unnamed aux API"), s);
+        }
     }
 
     fn save_state(&self) {
