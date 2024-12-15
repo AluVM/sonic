@@ -23,6 +23,8 @@
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use core::borrow::Borrow;
+use core::convert::Infallible;
+use core::error::Error;
 // Used in strict encoding; once solved there, remove here
 use std::io;
 use std::io::ErrorKind;
@@ -158,16 +160,16 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
         Ok(())
     }
 
-    pub fn accept(&mut self, reader: &mut StrictReader<impl ReadRaw>) -> Result<(), AcceptError> {
-        self.accept_aux(reader, |_, _| Ok(()))
+    pub fn accept(&mut self, reader: &mut StrictReader<impl ReadRaw>) -> Result<(), AcceptError<Infallible>> {
+        self.accept_aux(reader, |_, _, _| Ok(()))
     }
 
     // TODO: Return statistics
-    pub fn accept_aux<R: ReadRaw>(
+    pub fn accept_aux<R: ReadRaw, E: Error>(
         &mut self,
         reader: &mut StrictReader<R>,
-        mut aux: impl FnMut(Opid, &mut StrictReader<R>) -> Result<(), DecodeError>,
-    ) -> Result<(), AcceptError> {
+        mut aux: impl FnMut(Opid, &Operation, &mut StrictReader<R>) -> Result<(), AuxError<E>>,
+    ) -> Result<(), AcceptError<E>> {
         let articles = Articles::<CAPS>::strict_decode(reader)?;
         self.articles.merge(articles)?;
 
@@ -177,8 +179,8 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
                 Err(DecodeError::Io(e)) if e.kind() == ErrorKind::UnexpectedEof => break,
                 Err(e) => return Err(e.into()),
             };
-            aux(op.opid(), reader)?;
-            self.apply(op)?;
+            aux(op.opid(), &op, reader)?;
+            self.apply(op).map_err(AcceptError::from_infallible)?;
         }
         self.recompute_state();
         self.save_state();
@@ -186,7 +188,7 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
     }
 
     // TODO: Return statistics
-    pub fn consume(&mut self, deeds: impl IntoIterator<Item = Operation>) -> Result<(), AcceptError> {
+    pub fn consume(&mut self, deeds: impl IntoIterator<Item = Operation>) -> Result<(), AcceptError<Infallible>> {
         for operation in deeds {
             self.apply(operation)?;
         }
@@ -243,7 +245,7 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
     ///
     /// Whether operation was already successfully included (`true`), or was already present in the
     /// stash.
-    fn apply(&mut self, operation: Operation) -> Result<bool, AcceptError> {
+    fn apply(&mut self, operation: Operation) -> Result<bool, AcceptError<Infallible>> {
         if operation.contract_id != self.contract_id() {
             return Err(AcceptError::ContractMismatch);
         }
@@ -349,7 +351,7 @@ impl<'c, S: Supply<CAPS>, const CAPS: u32> DeedBuilder<'c, S, CAPS> {
 
 #[derive(Clone, Eq, PartialEq, Debug, Display, Error, From)]
 #[display(inner)]
-pub enum AcceptError {
+pub enum AcceptError<E: Error> {
     #[display("contract id doesn't match")]
     ContractMismatch,
 
@@ -361,7 +363,39 @@ pub enum AcceptError {
 
     #[from]
     #[cfg_attr(feature = "std", from(std::io::Error))]
-    Io(DecodeError),
+    Decode(DecodeError),
+
+    Aux(E),
+}
+
+impl<E: Error> AcceptError<E> {
+    fn from_infallible(err: AcceptError<Infallible>) -> Self {
+        match err {
+            AcceptError::ContractMismatch => AcceptError::ContractMismatch,
+            AcceptError::Articles(e) => AcceptError::Articles(e),
+            AcceptError::Verify(e) => AcceptError::Verify(e),
+            AcceptError::Decode(e) => AcceptError::Decode(e),
+            AcceptError::Aux(_) => unreachable!(),
+        }
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Debug, Display, Error, From)]
+#[display(inner)]
+pub enum AuxError<E: Error> {
+    #[from]
+    Decode(DecodeError),
+
+    Verify(E),
+}
+
+impl<E: Error> From<AuxError<E>> for AcceptError<E> {
+    fn from(err: AuxError<E>) -> Self {
+        match err {
+            AuxError::Decode(e) => AcceptError::Decode(e),
+            AuxError::Verify(e) => AcceptError::Aux(e),
+        }
+    }
 }
 
 #[cfg(feature = "persist-file")]
@@ -493,7 +527,7 @@ pub mod fs {
             self.export(terminals, writer)
         }
 
-        pub fn accept_from_file(&mut self, input: impl AsRef<Path>) -> Result<(), AcceptError> {
+        pub fn accept_from_file(&mut self, input: impl AsRef<Path>) -> Result<(), AcceptError<Infallible>> {
             let file = File::open(input)?;
             let mut reader = StrictReader::with(StreamReader::new::<{ usize::MAX }>(file));
             self.accept(&mut reader)
