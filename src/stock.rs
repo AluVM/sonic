@@ -21,9 +21,9 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use alloc::collections::BTreeSet;
+use alloc::collections::{BTreeMap, BTreeSet};
+use core::borrow::Borrow;
 use core::iter;
-use std::collections::BTreeMap;
 // Used in strict encoding; once solved there, remove here
 use std::io;
 use std::io::ErrorKind;
@@ -117,24 +117,24 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
         Ok(())
     }
 
-    pub fn export<'a>(
+    pub fn export(
         &mut self,
-        terminals: impl IntoIterator<Item = &'a AuthToken>,
+        terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
         writer: StrictWriter<impl WriteRaw>,
     ) -> io::Result<()> {
         self.export_aux(terminals, writer, |_| iter::empty::<()>())
     }
 
     // TODO: Return statistics
-    pub fn export_aux<'a, Aux: StrictEncode, I: ExactSizeIterator<Item = Aux>>(
+    pub fn export_aux<Aux: StrictEncode, I: ExactSizeIterator<Item = Aux>>(
         &mut self,
-        terminals: impl IntoIterator<Item = &'a AuthToken>,
+        terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
         mut writer: StrictWriter<impl WriteRaw>,
         aux: impl Fn(Opid) -> I,
     ) -> io::Result<()> {
         let queue = terminals
             .into_iter()
-            .map(|terminal| self.state.addr(*terminal).opid)
+            .map(|terminal| self.state.addr(*terminal.borrow()).opid)
             .collect::<BTreeSet<_>>();
         let mut opids = queue.clone();
         let mut queue = queue.into_iter();
@@ -492,9 +492,9 @@ pub mod fs {
             self.export_all(writer)
         }
 
-        pub fn export_to_file<'a>(
+        pub fn export_to_file(
             &mut self,
-            terminals: impl IntoIterator<Item = &'a AuthToken>,
+            terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
             output: impl AsRef<Path>,
         ) -> io::Result<()> {
             let file = File::create_new(output)?;
