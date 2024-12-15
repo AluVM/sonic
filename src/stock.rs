@@ -130,7 +130,7 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
         &mut self,
         terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
         mut writer: StrictWriter<impl WriteRaw>,
-        aux: impl Fn(Opid) -> I,
+        mut aux: impl FnMut(Opid) -> I,
     ) -> io::Result<()> {
         let queue = terminals
             .into_iter()
@@ -171,7 +171,7 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
     pub fn accept_aux<T: StrictDecode>(
         &mut self,
         reader: &mut StrictReader<impl ReadRaw>,
-        aux: impl Fn(Opid, T),
+        mut aux: impl FnMut(Opid, T),
     ) -> Result<(), AcceptError> {
         let articles = Articles::<CAPS>::strict_decode(reader)?;
         self.articles.merge(articles)?;
