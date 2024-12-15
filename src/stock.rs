@@ -160,19 +160,8 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
         Ok(())
     }
 
-    pub fn accept(&mut self, reader: &mut StrictReader<impl ReadRaw>) -> Result<(), AcceptError<Infallible>> {
-        self.accept_aux(reader, |_| {}, |_, _, _| Ok(()))
-    }
-
-    // TODO: Return statistics
-    pub fn accept_aux<R: ReadRaw, E: Error>(
-        &mut self,
-        reader: &mut StrictReader<R>,
-        mut init: impl FnMut(&Articles<CAPS>),
-        mut aux: impl FnMut(Opid, &Operation, &mut StrictReader<R>) -> Result<(), AuxError<E>>,
-    ) -> Result<(), AcceptError<E>> {
+    pub fn import(&mut self, reader: &mut StrictReader<impl ReadRaw>) -> Result<(), AcceptError<Infallible>> {
         let articles = Articles::<CAPS>::strict_decode(reader)?;
-        init(&articles);
         self.articles.merge(articles)?;
 
         loop {
@@ -181,18 +170,7 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
                 Err(DecodeError::Io(e)) if e.kind() == ErrorKind::UnexpectedEof => break,
                 Err(e) => return Err(e.into()),
             };
-            aux(op.opid(), &op, reader)?;
             self.apply(op).map_err(AcceptError::from_infallible)?;
-        }
-        self.recompute_state();
-        self.save_state();
-        Ok(())
-    }
-
-    // TODO: Return statistics
-    pub fn consume(&mut self, deeds: impl IntoIterator<Item = Operation>) -> Result<(), AcceptError<Infallible>> {
-        for operation in deeds {
-            self.apply(operation)?;
         }
         self.recompute_state();
         self.save_state();
@@ -532,7 +510,7 @@ pub mod fs {
         pub fn accept_from_file(&mut self, input: impl AsRef<Path>) -> Result<(), AcceptError<Infallible>> {
             let file = File::open(input)?;
             let mut reader = StrictReader::with(StreamReader::new::<{ usize::MAX }>(file));
-            self.accept(&mut reader)
+            self.import(&mut reader)
         }
     }
 }
