@@ -160,6 +160,12 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
         Ok(())
     }
 
+    pub fn merge_articles(&mut self, articles: Articles<CAPS>) -> Result<(), MergeError> {
+        self.articles.merge(articles)?;
+        self.supply.save_articles(&self.articles);
+        Ok(())
+    }
+
     pub fn import(&mut self, reader: &mut StrictReader<impl ReadRaw>) -> Result<(), AcceptError> {
         let articles = Articles::<CAPS>::strict_decode(reader)?;
         self.articles.merge(articles)?;
