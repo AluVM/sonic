@@ -23,7 +23,6 @@
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use core::borrow::Borrow;
-use core::iter;
 // Used in strict encoding; once solved there, remove here
 use std::io;
 use std::io::ErrorKind;
@@ -122,15 +121,15 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
         terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
         writer: StrictWriter<impl WriteRaw>,
     ) -> io::Result<()> {
-        self.export_aux(terminals, writer, |_| iter::empty::<()>())
+        self.export_aux(terminals, writer, |_, w| Ok(w))
     }
 
     // TODO: Return statistics
-    pub fn export_aux<Aux: StrictEncode, I: ExactSizeIterator<Item = Aux>>(
+    pub fn export_aux<W: WriteRaw>(
         &mut self,
         terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
-        mut writer: StrictWriter<impl WriteRaw>,
-        mut aux: impl FnMut(Opid) -> I,
+        mut writer: StrictWriter<W>,
+        mut aux: impl FnMut(Opid, StrictWriter<W>) -> io::Result<StrictWriter<W>>,
     ) -> io::Result<()> {
         let queue = terminals
             .into_iter()
@@ -153,25 +152,21 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
                 continue;
             }
             writer = op.strict_encode(writer)?;
-            let iter = aux(opid);
-            writer = (iter.len() as u64).strict_encode(writer)?;
-            for item in iter {
-                writer = item.strict_encode(writer)?;
-            }
+            writer = aux(opid, writer)?;
         }
 
         Ok(())
     }
 
     pub fn accept(&mut self, reader: &mut StrictReader<impl ReadRaw>) -> Result<(), AcceptError> {
-        self.accept_aux(reader, |_, _: ()| {})
+        self.accept_aux(reader, |_, _| Ok(()))
     }
 
     // TODO: Return statistics
-    pub fn accept_aux<T: StrictDecode>(
+    pub fn accept_aux<R: ReadRaw>(
         &mut self,
-        reader: &mut StrictReader<impl ReadRaw>,
-        mut aux: impl FnMut(Opid, T),
+        reader: &mut StrictReader<R>,
+        mut aux: impl FnMut(Opid, &mut StrictReader<R>) -> Result<(), DecodeError>,
     ) -> Result<(), AcceptError> {
         let articles = Articles::<CAPS>::strict_decode(reader)?;
         self.articles.merge(articles)?;
@@ -182,11 +177,7 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
                 Err(DecodeError::Io(e)) if e.kind() == ErrorKind::UnexpectedEof => break,
                 Err(e) => return Err(e.into()),
             };
-            let opid = op.opid();
-            let len = u64::strict_decode(reader)?;
-            for _ in 0..len {
-                aux(opid, T::strict_decode(reader)?);
-            }
+            aux(op.opid(), reader)?;
             self.apply(op)?;
         }
         self.recompute_state();
