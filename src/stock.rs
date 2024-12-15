@@ -161,16 +161,18 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
     }
 
     pub fn accept(&mut self, reader: &mut StrictReader<impl ReadRaw>) -> Result<(), AcceptError<Infallible>> {
-        self.accept_aux(reader, |_, _, _| Ok(()))
+        self.accept_aux(reader, |_| {}, |_, _, _| Ok(()))
     }
 
     // TODO: Return statistics
     pub fn accept_aux<R: ReadRaw, E: Error>(
         &mut self,
         reader: &mut StrictReader<R>,
+        mut init: impl FnMut(&Articles<CAPS>),
         mut aux: impl FnMut(Opid, &Operation, &mut StrictReader<R>) -> Result<(), AuxError<E>>,
     ) -> Result<(), AcceptError<E>> {
         let articles = Articles::<CAPS>::strict_decode(reader)?;
+        init(&articles);
         self.articles.merge(articles)?;
 
         loop {
