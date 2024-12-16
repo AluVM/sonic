@@ -24,20 +24,34 @@
 use core::fmt::Display;
 // TODO: Move to amplify
 
+pub trait Unwrap: Expect {
+    fn unwrap_or_panic(self) -> Self::Unwrap;
+}
+
 pub trait Expect {
     type Unwrap;
-    fn unwrap_or_panic(self) -> Self::Unwrap;
     fn expect_or<D: Display>(self, msg: D) -> Self::Unwrap;
     fn expect_or_else<D: Display>(self, f: impl FnOnce() -> D) -> Self::Unwrap;
 }
 
 impl<T, E: Display> Expect for Result<T, E> {
     type Unwrap = T;
-    fn unwrap_or_panic(self) -> Self::Unwrap { self.unwrap_or_else(|err| panic!("Error: {err}")) }
     fn expect_or<D: Display>(self, msg: D) -> Self::Unwrap {
         self.unwrap_or_else(|err| panic!("Error: {msg}\nDetails: {err}"))
     }
     fn expect_or_else<D: Display>(self, f: impl FnOnce() -> D) -> Self::Unwrap {
         self.unwrap_or_else(|err| panic!("Error: {}\nDetails: {err}", f()))
+    }
+}
+
+impl<T, E: Display> Unwrap for Result<T, E> {
+    fn unwrap_or_panic(self) -> Self::Unwrap { self.unwrap_or_else(|err| panic!("Error: {err}")) }
+}
+
+impl<T> Expect for Option<T> {
+    type Unwrap = T;
+    fn expect_or<D: Display>(self, msg: D) -> Self::Unwrap { self.unwrap_or_else(|| panic!("Error: {msg}")) }
+    fn expect_or_else<D: Display>(self, f: impl FnOnce() -> D) -> Self::Unwrap {
+        self.unwrap_or_else(|| panic!("Error: {}", f()))
     }
 }
