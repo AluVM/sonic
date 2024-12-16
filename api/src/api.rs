@@ -318,7 +318,7 @@ pub struct ApiInner<Vm: ApiVm> {
 
     /// Maps error type reported by a contract verifier via `EA` value to an error description taken
     /// from the interfaces.
-    pub errors: TinyOrdMap<u128, TinyString>,
+    pub errors: TinyOrdMap<u256, TinyString>,
 }
 
 #[derive(Wrapper, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, From)]

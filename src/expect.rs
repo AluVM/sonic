@@ -21,34 +21,23 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+use core::fmt::Display;
+// TODO: Move to amplify
 
-// TODO: Activate once StrictEncoding will be no_std
-// #![cfg_attr(not(feature = "std"), no_std)]
+pub trait Expect {
+    type Unwrap;
+    fn unwrap_or_panic(self) -> Self::Unwrap;
+    fn expect_or<D: Display>(self, msg: D) -> Self::Unwrap;
+    fn expect_or_else<D: Display>(self, f: impl FnOnce() -> D) -> Self::Unwrap;
+}
 
-#[macro_use]
-extern crate core;
-extern crate alloc;
-
-#[macro_use]
-extern crate amplify;
-#[macro_use]
-extern crate strict_types;
-
-#[cfg(feature = "serde")]
-#[macro_use]
-extern crate serde;
-
-pub use sonicapi::*;
-pub use ultrasonic::*;
-
-pub mod aora;
-pub mod expect;
-
-mod state;
-mod stock;
-
-pub use state::{AdaptedState, EffectiveState, RawState, Transition};
-#[cfg(feature = "persist-file")]
-pub use stock::fs::FileSupply;
-pub use stock::{AcceptError, CallParams, DeedBuilder, Stock, Supply};
+impl<T, E: Display> Expect for Result<T, E> {
+    type Unwrap = T;
+    fn unwrap_or_panic(self) -> Self::Unwrap { self.unwrap_or_else(|err| panic!("Error: {err}")) }
+    fn expect_or<D: Display>(self, msg: D) -> Self::Unwrap {
+        self.unwrap_or_else(|err| panic!("Error: {msg}\nDetails: {err}"))
+    }
+    fn expect_or_else<D: Display>(self, f: impl FnOnce() -> D) -> Self::Unwrap {
+        self.unwrap_or_else(|err| panic!("Error: {}\nDetails: {err}", f()))
+    }
+}

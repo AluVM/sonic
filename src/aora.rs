@@ -53,6 +53,7 @@ pub mod file {
     use strict_encoding::{StreamReader, StreamWriter, StrictDecode, StrictEncode, StrictReader, StrictWriter};
 
     use super::*;
+    use crate::expect::Expect;
 
     pub struct FileAora<Id: Ord + From<[u8; 32]>, T> {
         log: File,
@@ -71,8 +72,10 @@ pub mod file {
 
         pub fn new(path: impl AsRef<Path>, name: &str) -> Self {
             let (log, idx) = Self::prepare(path, name);
-            let log = File::create_new(log).expect("unable to create append-only log file");
-            let idx = File::create_new(idx).expect("unable to create random-access index file");
+            let log = File::create_new(&log)
+                .expect_or_else(|| format!("unable to create append-only log file `{}`", log.display()));
+            let idx = File::create_new(&idx)
+                .expect_or_else(|| format!("unable to create random-access index file `{}`", idx.display()));
             Self { log, idx, index: empty!(), _phantom: PhantomData }
         }
 
@@ -81,13 +84,13 @@ pub mod file {
             let mut log = OpenOptions::new()
                 .read(true)
                 .write(true)
-                .open(log)
-                .expect("unable to open append-only log file");
+                .open(&log)
+                .expect_or_else(|| format!("unable to create append-only log file `{}`", log.display()));
             let mut idx = OpenOptions::new()
                 .read(true)
                 .write(true)
-                .open(idx)
-                .expect("unable to open random-access index file");
+                .open(&idx)
+                .expect_or_else(|| format!("unable to create random-access index file `{}`", idx.display()));
 
             let mut index = BTreeMap::new();
             loop {
