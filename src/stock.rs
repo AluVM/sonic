@@ -237,12 +237,12 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
             &self.articles.schema,
         )?;
 
-        self.apply(operation)?;
+        self.apply(operation);
 
         Ok(true)
     }
 
-    pub fn apply(&mut self, operation: Operation) -> Result<(), AcceptError> {
+    pub fn apply(&mut self, operation: Operation) {
         let opid = operation.opid();
         self.supply.stash_mut().append(opid, &operation);
 
@@ -253,8 +253,6 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
             &self.articles.schema.types,
         );
         self.supply.trace_mut().append(opid, &transition);
-
-        Ok(())
     }
 
     pub fn complete_update(&mut self) {
