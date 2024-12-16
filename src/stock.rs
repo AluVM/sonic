@@ -386,6 +386,7 @@ pub mod fs {
         pub fn new(name: &str, path: impl AsRef<Path>) -> Self {
             let mut path = path.as_ref().to_path_buf();
             path.push(name);
+            path.set_extension("contract");
             fs::create_dir_all(&path).expect("Unable to create directory to store Stock");
 
             let stash = FileAora::new(&path, "stash");

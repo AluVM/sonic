@@ -1,4 +1,4 @@
-WonderlandDAO
-*.schema
+*.contract
+*.issuer
 *.deeds
 *.articles

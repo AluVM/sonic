@@ -115,7 +115,7 @@ fn main() {
     // Creating DAO with three participants
     let issuer = Schema::new(codex, api, [libs::success()], types.type_system());
     issuer
-        .save("examples/dao/data/SimpleDAO.schema")
+        .save("examples/dao/data/SimpleDAO.issuer")
         .expect("unable to save issuer to a file");
 
     let seed = &[0xCA; 30][..];
