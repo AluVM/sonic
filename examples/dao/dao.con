@@ -35,8 +35,8 @@ contract DAO
     calc proVotes: vote_id VoteId -> U64
         count($.votes |> (key, voting) -> key =?= vote_id \/ voting =?= pro)
 
-    calc conterVotes: vote_id VoteId -> U64
-        count($.votes |> (key, voting) -> key =?= vote_id \/ voting =?= counter)
+    calc counterVotes: vote_id VoteId -> U64
+        count($.votes |> (key, voting) -> key =?= vote_id \/ voting =?= contra)
 
     op setup: () -> parties, signers
 
