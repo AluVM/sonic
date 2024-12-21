@@ -191,6 +191,10 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
 
     pub fn operation(&mut self, opid: Opid) -> Operation { self.supply.stash_mut().read(opid) }
 
+    pub fn trace(&mut self) -> impl Iterator<Item = (Opid, Transition)> + use<'_, S, CAPS> {
+        self.supply.trace_mut().iter()
+    }
+
     pub fn start_deed(&mut self, method: impl Into<MethodName>) -> DeedBuilder<'_, S, CAPS> {
         let builder = OpBuilder::new(self.articles.contract.contract_id(), self.articles.schema.call_id(method));
         DeedBuilder { builder, stock: self }
