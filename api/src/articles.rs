@@ -33,10 +33,10 @@ use crate::{Api, Schema, LIB_NAME_SONIC};
 #[strict_type(lib = LIB_NAME_SONIC)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct Articles<const CAPS: u32> {
-    pub contract: Contract<CAPS>,
-    pub contract_sigs: ContentSigs,
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub schema: Schema,
+    pub contract_sigs: ContentSigs,
+    pub contract: Contract<CAPS>,
 }
 
 impl<const CAPS: u32> StrictSerialize for Articles<CAPS> {}
