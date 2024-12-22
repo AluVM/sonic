@@ -171,6 +171,8 @@ impl Builder {
             codex_id,
             call_id: self.call_id,
             nonce: fe256::from(u256::ZERO),
+            blank1: zero!(),
+            blank2: zero!(),
             destructible: self.destructible,
             immutable: self.immutable,
             reserved: zero!(),
