@@ -148,6 +148,7 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
 
         // Write articles
         writer = self.articles.strict_encode(writer)?;
+        writer = aux(self.articles.contract.genesis_opid(), writer)?;
         // Stream operations
         for (opid, op) in self.operations() {
             if !opids.contains(&opid) {
