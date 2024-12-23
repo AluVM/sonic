@@ -18,10 +18,10 @@ name = "sonicapi"
 
 [dependencies]
 amplify.workspace = true
-baid64 = "0.4.0"
+baid64.workspace = true
 strict_encoding.workspace = true
 strict_types.workspace = true
-commit_verify = "0.12.0-alpha.3"
+commit_verify.workspace = true
 aluvm.workspace = true
 ultrasonic.workspace = true
 serde = { workspace = true, optional = true }
