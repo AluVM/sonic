@@ -714,12 +714,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "sonic-url"
+name = "sonic-call"
 version = "0.12.0-beta.4"
 dependencies = [
  "amplify",
- "strict_types",
- "ultrasonic",
+ "chrono",
+ "hypersonic",
 ]
 
 [[package]]

@@ -21,23 +21,19 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use amplify::confinement::{TinyString, TinyVec};
-use strict_types::StrictVal;
-use ultrasonic::ContractId;
+use amplify::confinement::{TinyOrdMap, TinyString};
+use chrono::{DateTime, Utc};
+use hypersonic::{ContractId, DataCell, StateName};
 
-pub trait SonicProtocol {
-    const URL_SCHEME: &'static str;
-}
-
-pub struct Request {
+/// Call request provides information for constructing [`hypersonic::CallParams`].
+///
+/// Request doesn't specify the used capabilities of the contract (blockchain, if any; type of
+/// single-use seals) since each contract is strictly committed and can be used under one and just
+/// one type of capabilities.
+pub struct CallRequest {
     // pub pop: S::Cap,
     pub contract_id: Option<ContractId>,
-    pub interface: Option<TinyString>,
     pub method: Option<TinyString>,
-    pub args: TinyVec<RequestArg>,
-}
-
-pub struct RequestArg {
-    pub name: TinyString,
-    pub value: StrictVal,
+    pub define: TinyOrdMap<StateName, DataCell>,
+    pub expiry: Option<DateTime<Utc>>,
 }

@@ -50,4 +50,4 @@ extern crate alloc;
 
 mod data;
 
-pub use data::{Request, RequestArg, SonicProtocol};
+pub use data::CallRequest;

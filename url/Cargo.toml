@@ -1,8 +1,8 @@
 [package]
-name = "sonic-url"
+name = "sonic-call"
 version.workspace = true
 authors.workspace = true
-description = "URL-based request builders and parsers for SONIC distributed contracts"
+description = "Structured calls to for SONIC distributed contracts"
 repository.workspace = true
 homepage.workspace = true
 keywords.workspace = true
@@ -15,11 +15,12 @@ exclude = [".github"]
 
 [dependencies]
 amplify.workspace = true
-strict_types.workspace = true
-ultrasonic = { workspace = true, features = ["serde"] } # TODO: Remove serde feature
+hypersonic.workspace = true
+chrono = "0.4.39"
 
 [features]
 default = ["std"]
-all = ["std"]
+all = ["std", "url"]
 
 std = []
+url = []
