@@ -65,6 +65,7 @@ fn api() -> Api {
         timestamp: 1732529307,
         name: None,
         developer: Identity::default(),
+        default_call: None,
         append_only: tiny_bmap! {
             vname!("_parties") => AppendApi {
                 sem_id: types.get("DAO.PartyId"),
@@ -104,6 +105,7 @@ fn api() -> Api {
             vname!("castVote") => 2,
         },
         errors: Default::default(),
+        reserved: Default::default(),
     })
 }
 

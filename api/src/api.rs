@@ -295,6 +295,9 @@ pub struct ApiInner<Vm: ApiVm> {
     /// Developer identity string.
     pub developer: Identity,
 
+    /// Name for the default API call (matching destructible state verifier).
+    pub default_call: Option<CallId>,
+
     /// State API defines how structured contract state is constructed out of (and converted into)
     /// UltraSONIC immutable memory cells.
     pub append_only: TinyOrdMap<StateName, AppendApi<Vm>>,
@@ -319,6 +322,9 @@ pub struct ApiInner<Vm: ApiVm> {
     /// Maps error type reported by a contract verifier via `EA` value to an error description taken
     /// from the interfaces.
     pub errors: TinyOrdMap<u256, TinyString>,
+
+    /// Reserved for the future use.
+    pub reserved: ReservedBytes<8>,
 }
 
 #[derive(Wrapper, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, From)]
