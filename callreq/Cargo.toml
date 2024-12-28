@@ -1,5 +1,5 @@
 [package]
-name = "sonic-call"
+name = "sonic-callreq"
 version.workspace = true
 authors.workspace = true
 description = "Structured calls to for SONIC distributed contracts"
@@ -16,6 +16,7 @@ exclude = [".github"]
 [dependencies]
 amplify.workspace = true
 hypersonic.workspace = true
+strict_types.workspace = true
 chrono = "0.4.39"
 
 [features]

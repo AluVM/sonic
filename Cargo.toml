@@ -1,6 +1,6 @@
 [workspace]
-members = [".", "api", "cli", "url"]
-default-members = [".", "api", "url"]
+members = [".", "api", "cli", "callreq"]
+default-members = [".", "api", "callreq"]
 resolver = "2"
 
 [workspace.package]

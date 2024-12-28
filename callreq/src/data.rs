@@ -21,19 +21,33 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use amplify::confinement::{TinyOrdMap, TinyString};
+use amplify::confinement::{ConfinedVec, TinyString};
 use chrono::{DateTime, Utc};
-use hypersonic::{ContractId, DataCell, StateName};
+use hypersonic::{AuthToken, ContractId, StateName};
+use strict_types::StrictVal;
 
 /// Call request provides information for constructing [`hypersonic::CallParams`].
 ///
 /// Request doesn't specify the used capabilities of the contract (blockchain, if any; type of
 /// single-use seals) since each contract is strictly committed and can be used under one and just
 /// one type of capabilities.
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub struct CallRequest {
-    // pub pop: S::Cap,
     pub contract_id: Option<ContractId>,
     pub method: Option<TinyString>,
-    pub define: TinyOrdMap<StateName, DataCell>,
+    pub state: Option<StateName>,
+    pub data: StrictVal,
+    pub auth: AuthToken,
     pub expiry: Option<DateTime<Utc>>,
+    pub transports: ConfinedVec<Transport, 0, 10>,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+#[non_exhaustive]
+pub enum Transport {
+    JsonRpc(String),
+    RestHttp(String),
+    WebSockets(String),
+    Storm(String),
+    UnspecifiedMeans,
 }
