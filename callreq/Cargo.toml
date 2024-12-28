@@ -17,11 +17,13 @@ exclude = [".github"]
 amplify.workspace = true
 hypersonic.workspace = true
 strict_types.workspace = true
-chrono = "0.4.39"
+indexmap.workspace = true
+chrono.workspace = true
+fluent-uri = { version = "0.3.2", optional = true }
 
 [features]
 default = ["std"]
 all = ["std", "url"]
 
-std = []
-url = []
+std = ["amplify/std", "hypersonic/std", "indexmap/std", "chrono/std", "fluent-uri/std"]
+url = ["dep:fluent-uri"]

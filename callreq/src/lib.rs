@@ -49,5 +49,7 @@
 extern crate alloc;
 
 mod data;
+#[cfg(feature = "uri")]
+mod uri;
 
 pub use data::CallRequest;
