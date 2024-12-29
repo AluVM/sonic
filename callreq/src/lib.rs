@@ -47,9 +47,11 @@
 //!   hash)&vote=pro`
 
 extern crate alloc;
+#[macro_use]
+extern crate amplify;
 
 mod data;
 #[cfg(feature = "uri")]
-mod uri;
+pub mod uri;
 
-pub use data::CallRequest;
+pub use data::{CallRequest, Endpoint};

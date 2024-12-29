@@ -65,6 +65,7 @@ fn api() -> Api {
         timestamp: 1732529307,
         name: None,
         developer: Identity::default(),
+        conforms: None,
         default_call: None,
         append_only: tiny_bmap! {
             vname!("_parties") => AppendApi {

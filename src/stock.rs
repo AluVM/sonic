@@ -23,8 +23,6 @@
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use core::borrow::Borrow;
-use core::convert::Infallible;
-use core::error::Error;
 // Used in strict encoding; once solved there, remove here
 use std::io;
 use std::io::ErrorKind;

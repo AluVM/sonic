@@ -21,33 +21,92 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use amplify::confinement::{ConfinedVec, TinyString};
+use core::str::FromStr;
+use std::convert::Infallible;
+
+use amplify::confinement::{ConfinedVec, TinyBlob};
 use chrono::{DateTime, Utc};
-use hypersonic::{AuthToken, ContractId, StateName};
-use strict_types::StrictVal;
+use hypersonic::{AuthToken, CallState, ContractId};
+use strict_types::{StrictVal, TypeName};
 
 /// Call request provides information for constructing [`hypersonic::CallParams`].
 ///
 /// Request doesn't specify the used capabilities of the contract (blockchain, if any; type of
 /// single-use seals) since each contract is strictly committed and can be used under one and just
 /// one type of capabilities.
+///
+/// # URI form
+///
+/// Call request can be represented as a URI using `contract:` scheme in the following format:
+///
+/// ```text
+/// contract:CONTRACT-ID/API/METHOD/STATE/AUTH/DATA+STON?expiry=DATETIME&lock=BASE64&endpoints=E1,
+/// E2#CHECK
+/// ```
+///
+/// NB: Parsing and producing URI form requires use of `uri` feature.
+///
+/// ## Path
+///
+/// Some path components of the URI may be skipped. In this case URI is parsed in the following way:
+/// - 3-component path, starting with `/`, provides name of the used interface standard,
+///   authentication token and state information;
+/// - 3-component path, not starting with `/`, provides contract ID and auth token, and should use a
+///   default method and name state from the contract default API;
+/// - 4-component path - contract ID and state name are given in addition to the auth token, a
+///   default method used from the contract default API;
+/// - 5-component path - all parameters except API name are given.
+///
+/// ## Query
+///
+/// Supported URI query parameters are:
+/// - `expiry`: ISO-8601 datetime string;
+/// - `lock`: Base64-encoded lock script conditions;
+/// - `endpoints`: comma-separated URLs with the endpoints for uploading a resulting
+///   deeds/consignment stream.
+///
+/// ## Fragment
+///
+/// Optional fragment may be present and should represent a checksum value for the URI string
+/// preceding the fragment.
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct CallRequest {
     pub contract_id: Option<ContractId>,
-    pub method: Option<TinyString>,
-    pub state: Option<StateName>,
-    pub data: StrictVal,
+    pub api: Option<TypeName>,
+    pub call: Option<CallState>,
     pub auth: AuthToken,
+    pub data: StrictVal,
+    pub lock: Option<TinyBlob>,
     pub expiry: Option<DateTime<Utc>>,
-    pub transports: ConfinedVec<Transport, 0, 10>,
+    pub endpoints: ConfinedVec<Endpoint, 0, 10>,
 }
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug, Display)]
+#[display(inner)]
 #[non_exhaustive]
-pub enum Transport {
+pub enum Endpoint {
     JsonRpc(String),
     RestHttp(String),
     WebSockets(String),
     Storm(String),
-    UnspecifiedMeans,
+    UnspecifiedMeans(String),
+}
+
+impl FromStr for Endpoint {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.to_lowercase();
+        if s.starts_with("http://") || s.starts_with("https://") {
+            Ok(Endpoint::RestHttp(s))
+        } else if s.starts_with("http+json-rpc://") || s.starts_with("https+json-rpc://") {
+            Ok(Endpoint::RestHttp(s))
+        } else if s.starts_with("ws://") || s.starts_with("wss://") {
+            Ok(Endpoint::WebSockets(s))
+        } else if s.starts_with("storm://") {
+            Ok(Endpoint::Storm(s))
+        } else {
+            Ok(Endpoint::UnspecifiedMeans(s.to_string()))
+        }
+    }
 }

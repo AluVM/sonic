@@ -543,6 +543,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
+name = "percent-encoding"
+version = "2.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
+
+[[package]]
 name = "ppv-lite86"
 version = "0.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -754,10 +760,12 @@ name = "sonic-callreq"
 version = "0.12.0-beta.4"
 dependencies = [
  "amplify",
+ "baid64",
  "chrono",
  "fluent-uri",
  "hypersonic",
  "indexmap",
+ "percent-encoding",
  "strict_types",
 ]
 

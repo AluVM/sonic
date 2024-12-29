@@ -267,6 +267,16 @@ impl Api {
     }
 }
 
+/// Combination of a method name and an optional state name used in API requests.
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONIC)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase", bound = ""))]
+pub struct CallState {
+    pub call_id: MethodName,
+    pub destructible: Option<StateName>,
+}
+
 /// API is an interface implementation.
 ///
 /// API should work without requiring runtime to have corresponding interfaces; it should provide
@@ -295,8 +305,14 @@ pub struct ApiInner<Vm: ApiVm> {
     /// Developer identity string.
     pub developer: Identity,
 
-    /// Name for the default API call (matching destructible state verifier).
-    pub default_call: Option<CallId>,
+    /// Interface standard to which the API conforms.
+    pub conforms: Option<TypeName>,
+
+    /// Name for the default API call and destructible state name.
+    pub default_call: Option<CallState>,
+
+    /// Reserved for the future use.
+    pub reserved: ReservedBytes<8>,
 
     /// State API defines how structured contract state is constructed out of (and converted into)
     /// UltraSONIC immutable memory cells.
@@ -322,9 +338,6 @@ pub struct ApiInner<Vm: ApiVm> {
     /// Maps error type reported by a contract verifier via `EA` value to an error description taken
     /// from the interfaces.
     pub errors: TinyOrdMap<u256, TinyString>,
-
-    /// Reserved for the future use.
-    pub reserved: ReservedBytes<8>,
 }
 
 #[derive(Wrapper, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, From)]
@@ -463,11 +476,13 @@ pub trait ApiVm {
 
 /// Reader constructs a composite state out of distinct values of all appendable state elements of
 /// the same type.
+#[allow(private_bounds)]
 pub trait StateReader: Clone + Ord + Debug + StrictDumb + StrictEncode + StrictDecode + Serde {
     fn read<'s, I: IntoIterator<Item = &'s StateAtom>>(&self, state: impl Fn(&StateName) -> I) -> StrictVal;
 }
 
 /// Adaptors convert field elements into structured data and vise verse.
+#[allow(private_bounds)]
 pub trait StateAdaptor: Clone + Ord + Debug + StrictDumb + StrictEncode + StrictDecode + Serde {
     fn convert_immutable(
         &self,
@@ -492,6 +507,7 @@ pub trait StateAdaptor: Clone + Ord + Debug + StrictDumb + StrictEncode + Strict
     }
 }
 
+#[allow(private_bounds)]
 pub trait StateArithm: Clone + Debug + StrictDumb + StrictEncode + StrictDecode + Serde {
     /// Type that performs calculations on the state
     type Calc: StateCalc;
