@@ -27,7 +27,6 @@ use baid64::base64::alphabet::Alphabet;
 use baid64::base64::engine::{GeneralPurpose, GeneralPurposeConfig};
 use baid64::base64::Engine;
 use baid64::BAID64_ALPHABET;
-use indexmap::IndexMap;
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 
 use crate::CallRequest;
@@ -47,56 +46,42 @@ const QUERY_ENCODE: &AsciiSet = &CONTROLS
     .add(b'&')
     .add(b'=');
 
-/// Information parsed from a URL representation of SONIC contract call request [`CallRequest`].
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub struct CallUri {
-    pub request: CallRequest,
-    pub unknown_query: IndexMap<String, String>,
+impl<T> CallRequest<T> {
+    pub fn has_query(&self) -> bool { !self.unknown_query.is_empty() || self.expiry.is_some() || self.lock.is_some() }
 }
 
-impl CallUri {
-    pub fn new(request: CallRequest) -> Self { Self { request, unknown_query: IndexMap::new() } }
-
-    pub fn has_query(&self) -> bool {
-        !self.unknown_query.is_empty() || self.request.expiry.is_some() || self.request.lock.is_some()
-    }
-}
-
-impl Display for CallUri {
+impl<T> Display for CallRequest<T>
+where T: Display
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if let Some(contract_id) = &self.request.contract_id {
-            write!(f, "{contract_id}")?;
-        } else {
-            f.write_str("contract:")?;
-        }
-
+        write!(f, "{}/", &self.scope)?;
         f.write_str("/")?;
-        if let Some(api) = &self.request.api {
+        if let Some(api) = &self.api {
             write!(f, "{api}/")?;
         }
-        if let Some(call) = &self.request.call {
+        if let Some(call) = &self.call {
             write!(f, "{}/", call.call_id)?;
             if let Some(state) = &call.destructible {
                 write!(f, "{state}/")?;
             }
         }
-        write!(f, "{}/{}", self.request.auth, utf8_percent_encode(&self.request.data.to_string(), QUERY_ENCODE))?;
+        write!(f, "{}/{}", self.auth, utf8_percent_encode(&self.data.to_string(), QUERY_ENCODE))?;
 
         if self.has_query() {
             f.write_str("?")?;
         }
 
-        if let Some(lock) = &self.request.lock {
+        if let Some(lock) = &self.lock {
             let alphabet = Alphabet::new(BAID64_ALPHABET).expect("invalid Baid64 alphabet");
             let engine = GeneralPurpose::new(&alphabet, GeneralPurposeConfig::new());
             write!(f, "{LOCK}={}", engine.encode(lock.to_vec()))?;
         }
-        if let Some(expiry) = &self.request.expiry {
+        if let Some(expiry) = &self.expiry {
             write!(f, "{EXPIRY}={}", expiry.to_rfc3339())?;
         }
-        if !self.request.endpoints.is_empty() {
+        if !self.endpoints.is_empty() {
             write!(f, "{ENDPOINTS}")?;
-            let mut iter = self.request.endpoints.iter();
+            let mut iter = self.endpoints.iter();
             while let Some(endpoint) = iter.next() {
                 write!(f, "{}", utf8_percent_encode(&endpoint.to_string(), QUERY_ENCODE))?;
                 if iter.by_ref().peekable().peek().is_some() {

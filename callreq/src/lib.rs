@@ -52,6 +52,6 @@ extern crate amplify;
 
 mod data;
 #[cfg(feature = "uri")]
-pub mod uri;
+mod uri;
 
 pub use data::{CallRequest, Endpoint};

@@ -27,6 +27,7 @@ use std::convert::Infallible;
 use amplify::confinement::{ConfinedVec, TinyBlob};
 use chrono::{DateTime, Utc};
 use hypersonic::{AuthToken, CallState, ContractId};
+use indexmap::IndexMap;
 use strict_types::{StrictVal, TypeName};
 
 /// Call request provides information for constructing [`hypersonic::CallParams`].
@@ -47,6 +48,9 @@ use strict_types::{StrictVal, TypeName};
 /// NB: Parsing and producing URI form requires use of `uri` feature.
 ///
 /// ## Path
+///
+/// Instead of Contract ID a string query against a set of contracts can be used; for instance,
+/// describing contract capabilities.
 ///
 /// Some path components of the URI may be skipped. In this case URI is parsed in the following way:
 /// - 3-component path, starting with `/`, provides name of the used interface standard,
@@ -70,8 +74,8 @@ use strict_types::{StrictVal, TypeName};
 /// Optional fragment may be present and should represent a checksum value for the URI string
 /// preceding the fragment.
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct CallRequest {
-    pub contract_id: Option<ContractId>,
+pub struct CallRequest<T = CallScope> {
+    pub scope: T,
     pub api: Option<TypeName>,
     pub call: Option<CallState>,
     pub auth: AuthToken,
@@ -79,6 +83,39 @@ pub struct CallRequest {
     pub lock: Option<TinyBlob>,
     pub expiry: Option<DateTime<Utc>>,
     pub endpoints: ConfinedVec<Endpoint, 0, 10>,
+    pub unknown_query: IndexMap<String, String>,
+}
+
+impl CallRequest<CallScope> {
+    pub fn unwrap_contract_with<E>(
+        self,
+        f: impl FnOnce(String) -> Result<ContractId, E>,
+    ) -> Result<CallRequest<ContractId>, E> {
+        let id = match self.scope {
+            CallScope::ContractId(id) => id,
+            CallScope::ContractQuery(query) => f(query)?,
+        };
+        Ok(CallRequest {
+            scope: id,
+            api: self.api,
+            call: self.call,
+            auth: self.auth,
+            data: self.data,
+            lock: self.lock,
+            expiry: self.expiry,
+            endpoints: self.endpoints,
+            unknown_query: self.unknown_query,
+        })
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Debug, Display)]
+pub enum CallScope {
+    #[display(inner)]
+    ContractId(ContractId),
+
+    #[display("contract:{0}")]
+    ContractQuery(String),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Display)]
