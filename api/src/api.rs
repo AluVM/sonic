@@ -273,8 +273,16 @@ impl Api {
 #[strict_type(lib = LIB_NAME_SONIC)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase", bound = ""))]
 pub struct CallState {
-    pub call_id: MethodName,
+    pub method: MethodName,
     pub destructible: Option<StateName>,
+}
+
+impl CallState {
+    pub fn new(method: MethodName) -> Self { Self { method, destructible: None } }
+
+    pub fn with(method: MethodName, destructible: StateName) -> Self {
+        Self { method, destructible: Some(destructible) }
+    }
 }
 
 /// API is an interface implementation.

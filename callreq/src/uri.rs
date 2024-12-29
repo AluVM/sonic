@@ -60,7 +60,7 @@ where T: Display
             write!(f, "{api}/")?;
         }
         if let Some(call) = &self.call {
-            write!(f, "{}/", call.call_id)?;
+            write!(f, "{}/", call.method)?;
             if let Some(state) = &call.destructible {
                 write!(f, "{state}/")?;
             }
