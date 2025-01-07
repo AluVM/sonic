@@ -26,9 +26,32 @@ use std::convert::Infallible;
 
 use amplify::confinement::{ConfinedVec, TinyBlob};
 use chrono::{DateTime, Utc};
-use hypersonic::{AuthToken, CallState, ContractId};
 use indexmap::IndexMap;
-use strict_types::{StrictVal, TypeName};
+use strict_types::{StrictType, StrictVal, TypeName, VariantName};
+use ultrasonic::{AuthToken, ContractId};
+
+use crate::LIB_NAME_SONIC;
+
+pub type StateName = VariantName;
+pub type MethodName = VariantName;
+
+/// Combination of a method name and an optional state name used in API requests.
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONIC)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase", bound = ""))]
+pub struct CallState {
+    pub method: MethodName,
+    pub destructible: Option<StateName>,
+}
+
+impl CallState {
+    pub fn new(method: MethodName) -> Self { Self { method, destructible: None } }
+
+    pub fn with(method: MethodName, destructible: StateName) -> Self {
+        Self { method, destructible: Some(destructible) }
+    }
+}
 
 /// Call request provides information for constructing [`hypersonic::CallParams`].
 ///

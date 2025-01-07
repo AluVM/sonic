@@ -21,11 +21,12 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+use amplify::confinement;
 use chrono::{DateTime, Utc};
-use hypersonic::{AuthToken, CallState, MethodName, StateName};
 use strict_types::{StrictVal, TypeName};
+use ultrasonic::AuthToken;
 
-use crate::{CallRequest, Endpoint};
+use crate::{CallRequest, CallState, Endpoint, MethodName, StateName};
 
 impl<T> CallRequest<T> {
     pub fn new(scope: T, auth: AuthToken, data: StrictVal) -> Self {
@@ -70,8 +71,8 @@ impl<T> CallRequest<T> {
         self
     }
 
-    pub fn add_endpoint(mut self, endpoint: Endpoint) -> Self {
-        self.endpoints.push(endpoint);
-        self
+    pub fn add_endpoint(mut self, endpoint: Endpoint) -> Result<Self, confinement::Error> {
+        self.endpoints.push(endpoint)?;
+        Ok(self)
     }
 }

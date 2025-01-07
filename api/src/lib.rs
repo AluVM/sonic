@@ -51,16 +51,15 @@ mod util;
 
 pub use adaptors::{alu, embedded};
 pub use api::{
-    Api, ApiId, ApiInner, ApiVm, AppendApi, CallState, DestructibleApi, MethodName, StateAdaptor, StateArithm,
-    StateCalc, StateName, StateReader, UncountableState,
+    Api, ApiId, ApiInner, ApiVm, AppendApi, DestructibleApi, StateAdaptor, StateArithm, StateCalc, StateReader,
+    UncountableState,
 };
 pub use articles::{Articles, MergeError};
 pub use builders::{Builder, BuilderRef, CoreParams, IssueParams, NamedState, OpBuilder, OpBuilderRef};
 pub use schema::Schema;
+pub use sonic_callreq::*;
 pub use state::{DataCell, StateAtom, StateTy, StructData};
 pub use util::{sigs, AnnotationName, Annotations};
-
-pub const LIB_NAME_SONIC: &str = "SONIC";
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[repr(u8)]

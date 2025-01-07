@@ -41,7 +41,8 @@ use amplify::confinement::{ConfinedBlob, TinyOrdMap, TinyString, U16 as U16MAX};
 use amplify::num::u256;
 use amplify::Bytes32;
 use commit_verify::{CommitId, ReservedBytes};
-use strict_types::{SemId, StrictDecode, StrictDumb, StrictEncode, StrictVal, TypeName, TypeSystem, VariantName};
+use sonic_callreq::{CallState, MethodName, StateName};
+use strict_types::{SemId, StrictDecode, StrictDumb, StrictEncode, StrictVal, TypeName, TypeSystem};
 use ultrasonic::{CallId, CodexId, Identity, StateData, StateValue};
 
 use crate::embedded::EmbeddedProc;
@@ -49,9 +50,6 @@ use crate::{StateAtom, VmType, LIB_NAME_SONIC};
 
 pub(super) const USED_FIEL_BYTES: usize = u256::BYTES as usize - 2;
 pub(super) const TOTAL_BYTES: usize = USED_FIEL_BYTES * 3;
-
-pub type StateName = VariantName;
-pub type MethodName = VariantName;
 
 #[derive(Clone, Debug, From)]
 #[derive(CommitEncode)]
@@ -264,24 +262,6 @@ impl Api {
                 Box::new(calc)
             }
         }
-    }
-}
-
-/// Combination of a method name and an optional state name used in API requests.
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
-#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONIC)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase", bound = ""))]
-pub struct CallState {
-    pub method: MethodName,
-    pub destructible: Option<StateName>,
-}
-
-impl CallState {
-    pub fn new(method: MethodName) -> Self { Self { method, destructible: None } }
-
-    pub fn with(method: MethodName, destructible: StateName) -> Self {
-        Self { method, destructible: Some(destructible) }
     }
 }
 

@@ -22,6 +22,7 @@ commit_verify = "=0.12.0-beta.4"
 aluvm = "=0.12.0-beta.4"
 ultrasonic = "=0.12.0-beta.4"
 sonic-api = { version = "=0.12.0-beta.4", path = "api" }
+sonic-callreq = { version = "=0.12.0-beta.4", path = "callreq" }
 hypersonic = { version = "=0.12.0-beta.4", path = "." }
 baid64 = "0.4.1"
 indexmap = "2.6.0"
@@ -59,6 +60,7 @@ commit_verify.workspace = true
 aluvm.workspace = true
 ultrasonic.workspace = true
 sonic-api.workspace = true
+sonic-callreq.workspace = true
 indexmap.workspace = true
 serde = { workspace = true, optional = true }
 serde_yaml = { workspace = true, optional = true }
@@ -67,7 +69,7 @@ serde_yaml = { workspace = true, optional = true }
 default = ["std"]
 all = ["stl", "std", "serde", "persist-file"]
 
-std = ["sonic-api/std"]
+std = ["sonic-api/std", "sonic-callreq/std"]
 stl = ["commit_verify/stl", "ultrasonic/stl", "strict_types/armor"]
 
 persist-file = ["std", "serde", "dep:serde_yaml"]
@@ -78,6 +80,7 @@ serde = [
     "commit_verify/serde",
     "ultrasonic/serde",
     "sonic-api/serde",
+    "sonic-callreq/serde",
     "indexmap/serde",
 ]
 

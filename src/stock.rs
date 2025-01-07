@@ -28,7 +28,8 @@ use std::io;
 use std::io::ErrorKind;
 
 use aluvm::LibSite;
-use sonicapi::{CoreParams, MergeError, MethodName, NamedState, OpBuilder, StateName};
+use sonic_callreq::{MethodName, StateName};
+use sonicapi::{CoreParams, MergeError, NamedState, OpBuilder};
 use strict_encoding::{
     DecodeError, ReadRaw, StrictDecode, StrictEncode, StrictReader, StrictWriter, TypeName, WriteRaw,
 };

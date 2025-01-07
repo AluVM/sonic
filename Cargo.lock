@@ -424,6 +424,7 @@ dependencies = [
  "serde",
  "serde_yaml",
  "sonic-api",
+ "sonic-callreq",
  "strict_encoding",
  "strict_types",
  "ultrasonic",
@@ -748,6 +749,7 @@ dependencies = [
  "getrandom",
  "rand",
  "serde",
+ "sonic-callreq",
  "strict_encoding",
  "strict_types",
  "ultrasonic",
@@ -763,10 +765,12 @@ dependencies = [
  "baid64",
  "chrono",
  "fluent-uri",
- "hypersonic",
  "indexmap",
  "percent-encoding",
+ "serde",
+ "strict_encoding",
  "strict_types",
+ "ultrasonic",
 ]
 
 [[package]]

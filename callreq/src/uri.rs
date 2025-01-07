@@ -34,12 +34,11 @@ use baid64::{Baid64ParseError, BAID64_ALPHABET};
 use chrono::{DateTime, Utc};
 use fluent_uri::error::ParseError;
 use fluent_uri::Uri;
-use hypersonic::CallState;
 use indexmap::IndexMap;
 use percent_encoding::{percent_decode, utf8_percent_encode, AsciiSet, CONTROLS};
 use strict_types::{InvalidRString, StrictVal};
 
-use crate::{CallRequest, Endpoint};
+use crate::{CallRequest, CallState, Endpoint};
 
 const URI_SCHEME: &str = "contract";
 const LOCK: &str = "expiry";

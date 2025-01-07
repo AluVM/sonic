@@ -49,11 +49,18 @@
 extern crate alloc;
 #[macro_use]
 extern crate amplify;
-extern crate core;
+#[macro_use]
+extern crate strict_encoding;
+
+#[cfg(feature = "serde")]
+#[macro_use]
+extern crate serde;
 
 mod data;
 #[cfg(feature = "uri")]
 mod uri;
 mod builder;
 
-pub use data::{CallRequest, Endpoint};
+pub use data::{CallRequest, CallState, Endpoint, MethodName, StateName};
+
+pub const LIB_NAME_SONIC: &str = "SONIC";
