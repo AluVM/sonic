@@ -26,6 +26,9 @@ extern crate amplify;
 #[macro_use]
 extern crate strict_types;
 
+use std::fs;
+use std::path::Path;
+
 use aluvm::{CoreConfig, LibSite};
 use amplify::num::u256;
 use commit_verify::{Digest, Sha256};
@@ -98,7 +101,7 @@ fn api() -> Api {
             vname!("parties") => EmbeddedReaders::MapV2U(vname!("_parties")),
             vname!("votings") => EmbeddedReaders::MapV2U(vname!("_votings")),
             vname!("votes") => EmbeddedReaders::SetV(vname!("_votes")),
-            vname!("votingCount") => EmbeddedReaders::Count(vname!("votings")),
+            vname!("votingCount") => EmbeddedReaders::Count(vname!("_votings")),
         },
         verifiers: tiny_bmap! {
             vname!("setup") => 0,
@@ -148,6 +151,11 @@ fn main() {
 
         .finish::<0>("WonderlandDAO", 1732529307);
     let opid = articles.contract.genesis_opid();
+
+    let contract_path = Path::new("examples/dao/data/WonderlandDAO.contract");
+    if contract_path.exists() {
+        fs::remove_dir_all(contract_path).expect("unable to remove contract file");
+    }
 
     let mut stock = Stock::new(articles, "examples/dao/data");
 
@@ -206,6 +214,11 @@ fn main() {
     }
 
     // Now anybody accessing this file can figure out who is on duty today, by the decision of DAO.
+    let deeds_path = Path::new("examples/dao/data/voting.deeds");
+    if deeds_path.exists() {
+        fs::remove_file(deeds_path).expect("unable to remove contract file");
+    }
+
     stock
         .export_to_file([alice_auth2, bob_auth2, carol_auth2], "examples/dao/data/voting.deeds")
         .expect("unable to save deeds to a file");
