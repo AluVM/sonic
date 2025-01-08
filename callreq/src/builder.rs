@@ -24,11 +24,10 @@
 use amplify::confinement;
 use chrono::{DateTime, Utc};
 use strict_types::{StrictVal, TypeName};
-use ultrasonic::AuthToken;
 
 use crate::{CallRequest, CallState, Endpoint, MethodName, StateName};
 
-impl<T, A: Into<AuthToken>> CallRequest<T, A> {
+impl<T, A> CallRequest<T, A> {
     pub fn new(scope: T, auth: A, data: StrictVal) -> Self {
         Self {
             scope,

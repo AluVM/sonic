@@ -97,7 +97,7 @@ impl CallState {
 /// Optional fragment may be present and should represent a checksum value for the URI string
 /// preceding the fragment.
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct CallRequest<T = CallScope, A: Into<AuthToken> = AuthToken> {
+pub struct CallRequest<T = CallScope, A = AuthToken> {
     pub scope: T,
     pub api: Option<TypeName>,
     pub call: Option<CallState>,
@@ -109,7 +109,7 @@ pub struct CallRequest<T = CallScope, A: Into<AuthToken> = AuthToken> {
     pub unknown_query: IndexMap<String, String>,
 }
 
-impl<A: Into<AuthToken>> CallRequest<CallScope, A> {
+impl<A> CallRequest<CallScope, A> {
     pub fn unwrap_contract_with<E>(
         self,
         f: impl FnOnce(String) -> Result<ContractId, E>,

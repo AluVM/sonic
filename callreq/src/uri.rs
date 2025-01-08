@@ -37,7 +37,6 @@ use fluent_uri::Uri;
 use indexmap::IndexMap;
 use percent_encoding::{percent_decode, utf8_percent_encode, AsciiSet, CONTROLS};
 use strict_types::{InvalidRString, StrictVal};
-use ultrasonic::AuthToken;
 
 use crate::{CallRequest, CallState, Endpoint};
 
@@ -57,11 +56,11 @@ const QUERY_ENCODE: &AsciiSet = &CONTROLS
     .add(b'&')
     .add(b'=');
 
-impl<T, A: Into<AuthToken>> CallRequest<T, A> {
+impl<T, A> CallRequest<T, A> {
     pub fn has_query(&self) -> bool { !self.unknown_query.is_empty() || self.expiry.is_some() || self.lock.is_some() }
 }
 
-impl<T, A: Into<AuthToken>> Display for CallRequest<T, A>
+impl<T, A> Display for CallRequest<T, A>
 where
     T: Display,
     A: Display,
@@ -115,7 +114,7 @@ where
     }
 }
 
-impl<T, A: Into<AuthToken>> FromStr for CallRequest<T, A>
+impl<T, A> FromStr for CallRequest<T, A>
 where
     T: FromStr,
     A: FromStr,
