@@ -30,13 +30,14 @@ use amplify::confinement::{ConfinedVec, TinyBlob};
 use baid64::base64::alphabet::Alphabet;
 use baid64::base64::engine::{GeneralPurpose, GeneralPurposeConfig};
 use baid64::base64::{DecodeError, Engine};
-use baid64::{Baid64ParseError, BAID64_ALPHABET};
+use baid64::BAID64_ALPHABET;
 use chrono::{DateTime, Utc};
 use fluent_uri::error::ParseError;
 use fluent_uri::Uri;
 use indexmap::IndexMap;
 use percent_encoding::{percent_decode, utf8_percent_encode, AsciiSet, CONTROLS};
 use strict_types::{InvalidRString, StrictVal};
+use ultrasonic::AuthToken;
 
 use crate::{CallRequest, CallState, Endpoint};
 
@@ -56,12 +57,14 @@ const QUERY_ENCODE: &AsciiSet = &CONTROLS
     .add(b'&')
     .add(b'=');
 
-impl<T> CallRequest<T> {
+impl<T, A: Into<AuthToken>> CallRequest<T, A> {
     pub fn has_query(&self) -> bool { !self.unknown_query.is_empty() || self.expiry.is_some() || self.lock.is_some() }
 }
 
-impl<T> Display for CallRequest<T>
-where T: Display
+impl<T, A: Into<AuthToken>> Display for CallRequest<T, A>
+where
+    T: Display,
+    A: Display,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}/", &self.scope)?;
@@ -112,12 +115,14 @@ where T: Display
     }
 }
 
-impl<T> FromStr for CallRequest<T>
+impl<T, A: Into<AuthToken>> FromStr for CallRequest<T, A>
 where
     T: FromStr,
+    A: FromStr,
     T::Err: Error,
+    A::Err: Error,
 {
-    type Err = CallReqParseError<T::Err>;
+    type Err = CallReqParseError<T::Err, A::Err>;
 
     /// # Special conditions
     ///
@@ -149,7 +154,8 @@ where
             .pop_back()
             .ok_or(CallReqParseError::PathNoAuth)?
             .as_str()
-            .parse()?;
+            .parse()
+            .map_err(CallReqParseError::AuthInvalid)?;
 
         let api = path
             .pop_front()
@@ -238,7 +244,7 @@ where
 
 #[derive(Debug, Display, Error, From)]
 #[display(doc_comments)]
-pub enum CallReqParseError<E: Error> {
+pub enum CallReqParseError<E1: Error, E2: Error> {
     #[from]
     #[display(inner)]
     Uri(ParseError),
@@ -250,7 +256,7 @@ pub enum CallReqParseError<E: Error> {
     Authority,
 
     #[display(inner)]
-    Scope(E),
+    Scope(E1),
 
     /// contract call request scope (first path component) is missed.
     ScopeMissed,
@@ -261,9 +267,8 @@ pub enum CallReqParseError<E: Error> {
     /// contract call request URI misses beneficiary authority token.
     PathNoAuth,
 
-    #[from]
     /// invalid beneficiary authentication token - {0}.
-    AuthInvalid(Baid64ParseError),
+    AuthInvalid(E2),
 
     /// invalid API name - {0}.
     ApiInvalid(InvalidRString),

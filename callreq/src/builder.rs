@@ -28,8 +28,8 @@ use ultrasonic::AuthToken;
 
 use crate::{CallRequest, CallState, Endpoint, MethodName, StateName};
 
-impl<T> CallRequest<T> {
-    pub fn new(scope: T, auth: AuthToken, data: StrictVal) -> Self {
+impl<T, A: Into<AuthToken>> CallRequest<T, A> {
+    pub fn new(scope: T, auth: A, data: StrictVal) -> Self {
         Self {
             scope,
             api: None,
