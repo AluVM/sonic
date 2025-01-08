@@ -92,6 +92,7 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
         me
     }
 
+    #[allow(clippy::field_reassign_with_default)]
     pub fn open(articles: Articles<CAPS>, persistence: S) -> Self {
         let mut state = EffectiveState::default();
         state.raw = persistence.load_raw_state();
@@ -137,8 +138,7 @@ impl<S: Supply<CAPS>, const CAPS: u32> Stock<S, CAPS> {
             .map(|terminal| self.state.addr(*terminal.borrow()).opid)
             .collect::<BTreeSet<_>>();
         let mut opids = queue.clone();
-        let mut queue = queue.into_iter();
-        while let Some(opid) = queue.next() {
+        for opid in queue {
             let st = self.supply.trace_mut().read(opid);
             opids.extend(st.destroyed.into_keys().map(|a| a.opid));
         }
@@ -304,7 +304,7 @@ pub struct DeedBuilder<'c, S: Supply<CAPS>, const CAPS: u32> {
     pub(super) stock: &'c mut Stock<S, CAPS>,
 }
 
-impl<'c, S: Supply<CAPS>, const CAPS: u32> DeedBuilder<'c, S, CAPS> {
+impl<S: Supply<CAPS>, const CAPS: u32> DeedBuilder<'_, S, CAPS> {
     pub fn reading(mut self, addr: CellAddr) -> Self {
         self.builder = self.builder.access(addr);
         self

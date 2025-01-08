@@ -157,6 +157,7 @@ impl FromStr for Endpoint {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = s.to_lowercase();
+        #[allow(clippy::if_same_then_else)] // Some wierd clippy bug
         if s.starts_with("http://") || s.starts_with("https://") {
             Ok(Endpoint::RestHttp(s))
         } else if s.starts_with("http+json-rpc://") || s.starts_with("https+json-rpc://") {

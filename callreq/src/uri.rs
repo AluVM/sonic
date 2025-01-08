@@ -87,7 +87,7 @@ where
         if let Some(lock) = &self.lock {
             let alphabet = Alphabet::new(BAID64_ALPHABET).expect("invalid Baid64 alphabet");
             let engine = GeneralPurpose::new(&alphabet, GeneralPurposeConfig::new());
-            write!(f, "{LOCK}={}", engine.encode(lock.to_vec()))?;
+            write!(f, "{LOCK}={}", engine.encode(lock))?;
         }
         if let Some(expiry) = &self.expiry {
             write!(f, "{EXPIRY}={}", expiry.to_rfc3339())?;

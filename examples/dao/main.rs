@@ -122,7 +122,7 @@ fn main() {
         .expect("unable to save issuer to a file");
 
     let seed = &[0xCA; 30][..];
-    let mut auth = Sha256::digest(&seed);
+    let mut auth = Sha256::digest(seed);
     let mut next_auth = || -> AuthToken {
         auth = Sha256::digest(&*auth);
         let mut buf = [0u8; 30];
@@ -207,7 +207,7 @@ fn main() {
 
     // Now anybody accessing this file can figure out who is on duty today, by the decision of DAO.
     stock
-        .export_to_file(&[alice_auth2, bob_auth2, carol_auth2], "examples/dao/data/voting.deeds")
+        .export_to_file([alice_auth2, bob_auth2, carol_auth2], "examples/dao/data/voting.deeds")
         .expect("unable to save deeds to a file");
 }
 

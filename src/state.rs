@@ -154,7 +154,7 @@ impl AdaptedState {
         let empty = bmap![];
         self.computed = bmap! {};
         for reader in api.readers() {
-            let val = api.read(reader, |name| match self.immutable(&name) {
+            let val = api.read(reader, |name| match self.immutable(name) {
                 None => empty.values(),
                 Some(src) => src.values(),
             });

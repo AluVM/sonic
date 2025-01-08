@@ -172,7 +172,7 @@ pub mod file {
         _phantom: PhantomData<(Id, T)>,
     }
 
-    impl<'file, Id: From<[u8; 32]>, T: StrictDecode> Iterator for Iter<'file, Id, T> {
+    impl<Id: From<[u8; 32]>, T: StrictDecode> Iterator for Iter<'_, Id, T> {
         type Item = (Id, T);
 
         fn next(&mut self) -> Option<Self::Item> {

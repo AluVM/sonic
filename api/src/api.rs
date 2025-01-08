@@ -252,6 +252,7 @@ impl Api {
                     .calculator();
                 Box::new(calc)
             }
+            #[allow(clippy::let_unit_value)]
             Api::Alu(api) => {
                 let calc = api
                     .destructible

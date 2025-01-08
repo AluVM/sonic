@@ -105,7 +105,7 @@ fn issue(schema: &Path, form: &Path, output: Option<&Path>) -> anyhow::Result<()
     let params = serde_yaml::from_reader::<_, IssueParams>(file)?;
 
     let path = output.unwrap_or(form);
-    let output = path.with_file_name(&format!("{}.articles", params.name));
+    let output = path.with_file_name(format!("{}.articles", params.name));
 
     let articles = schema.issue::<0>(params);
     articles.save(output)?;
