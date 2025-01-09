@@ -28,8 +28,8 @@ use chrono::{DateTime, Utc};
 use strict_encoding::TypeName;
 use strict_types::{StrictVal, TypeSystem};
 use ultrasonic::{
-    fe256, AuthToken, CallId, CellAddr, CodexId, Contract, ContractId, ContractMeta, ContractName, Genesis, Identity,
-    Input, Operation, StateCell, StateData, StateValue,
+    fe256, AuthToken, CallId, CellAddr, CodexId, ConstU32, Contract, ContractId, ContractMeta, ContractName, Genesis,
+    Identity, Input, Operation, StateCell, StateData, StateValue,
 };
 
 use crate::{Api, Articles, DataCell, MethodName, Schema, StateAtom, StateName};
@@ -54,19 +54,23 @@ pub struct CoreParams {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct IssueParams {
     pub name: TypeName,
+    pub testnet: bool,
     pub timestamp: Option<DateTime<Utc>>,
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub core: CoreParams,
 }
 
 impl Schema {
-    pub fn start_issue(self, method: impl Into<MethodName>) -> IssueBuilder {
+    pub fn start_issue(self, method: impl Into<MethodName>, testnet: bool) -> IssueBuilder {
         let builder = Builder::new(self.call_id(method));
-        IssueBuilder { builder, schema: self }
+        IssueBuilder { builder, schema: self, testnet }
     }
 
+    pub fn start_issue_mainnet(self, method: impl Into<MethodName>) -> IssueBuilder { self.start_issue(method, false) }
+    pub fn start_issue_testnet(self, method: impl Into<MethodName>) -> IssueBuilder { self.start_issue(method, true) }
+
     pub fn issue<const CAPS: u32>(self, params: IssueParams) -> Articles<CAPS> {
-        let mut builder = self.start_issue(params.core.method);
+        let mut builder = self.start_issue(params.core.method, params.testnet);
 
         for NamedState { name, state } in params.core.global {
             builder = builder.append(name, state.verified, state.unverified)
@@ -84,6 +88,7 @@ impl Schema {
 pub struct IssueBuilder {
     builder: Builder,
     schema: Schema,
+    testnet: bool,
 }
 
 impl IssueBuilder {
@@ -109,7 +114,8 @@ impl IssueBuilder {
 
     pub fn finish<const CAPS: u32>(self, name: impl Into<TypeName>, timestamp: i64) -> Articles<CAPS> {
         let meta = ContractMeta {
-            capabilities: default!(),
+            capabilities: ConstU32::<CAPS>::new(),
+            testnet: self.testnet,
             reserved: zero!(),
             timestamp,
             name: ContractName::Named(name.into()),

@@ -135,7 +135,7 @@ fn main() {
     let carol_auth = next_auth();
 
     let articles = issuer
-        .start_issue("setup")
+        .start_issue_testnet("setup")
         // Alice
         .append("_parties", svnum!(0u64), Some(ston!(name "alice", identity "Alice Wonderland")))
         .assign("signers", alice_auth, svnum!(0u64), None)
