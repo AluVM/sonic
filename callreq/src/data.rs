@@ -46,10 +46,13 @@ pub struct CallState {
 }
 
 impl CallState {
-    pub fn new(method: MethodName) -> Self { Self { method, destructible: None } }
+    pub fn new(method: impl Into<MethodName>) -> Self { Self { method: method.into(), destructible: None } }
 
-    pub fn with(method: MethodName, destructible: StateName) -> Self {
-        Self { method, destructible: Some(destructible) }
+    pub fn with(method: impl Into<MethodName>, destructible: impl Into<StateName>) -> Self {
+        Self {
+            method: method.into(),
+            destructible: Some(destructible.into()),
+        }
     }
 }
 
