@@ -34,7 +34,7 @@ use ultrasonic::{
 
 use crate::{Api, Articles, DataCell, MethodName, Schema, StateAtom, StateName};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct NamedState<T> {
     pub name: StateName,
@@ -42,7 +42,7 @@ pub struct NamedState<T> {
     pub state: T,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct CoreParams {
     pub method: MethodName,
@@ -50,7 +50,7 @@ pub struct CoreParams {
     pub owned: Vec<NamedState<DataCell>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct IssueParams {
     pub name: TypeName,
