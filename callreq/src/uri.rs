@@ -28,7 +28,7 @@ use core::str::FromStr;
 
 use amplify::confinement::{ConfinedVec, TinyBlob};
 use baid64::base64::alphabet::Alphabet;
-use baid64::base64::engine::{GeneralPurpose, GeneralPurposeConfig};
+use baid64::base64::engine::{DecodePaddingMode, GeneralPurpose, GeneralPurposeConfig};
 use baid64::base64::{DecodeError, Engine};
 use baid64::BAID64_ALPHABET;
 use chrono::{DateTime, Utc};
@@ -85,7 +85,7 @@ where
 
         if let Some(lock) = &self.lock {
             let alphabet = Alphabet::new(BAID64_ALPHABET).expect("invalid Baid64 alphabet");
-            let engine = GeneralPurpose::new(&alphabet, GeneralPurposeConfig::new());
+            let engine = GeneralPurpose::new(&alphabet, GeneralPurposeConfig::new().with_encode_padding(false));
             write!(f, "{LOCK}={}", engine.encode(lock))?;
         }
         if let Some(expiry) = &self.expiry {
@@ -204,7 +204,10 @@ where
             .shift_remove(LOCK)
             .map(|lock| {
                 let alphabet = Alphabet::new(BAID64_ALPHABET).expect("invalid Baid64 alphabet");
-                let engine = GeneralPurpose::new(&alphabet, GeneralPurposeConfig::new());
+                let engine = GeneralPurpose::new(
+                    &alphabet,
+                    GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::RequireNone),
+                );
                 let lock = engine
                     .decode(lock.as_bytes())
                     .map_err(CallReqParseError::LockInvalidEncoding)?;
