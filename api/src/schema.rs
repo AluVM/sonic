@@ -81,7 +81,7 @@ impl Schema {
     pub fn call_id(&self, method: impl Into<MethodName>) -> CallId {
         self.default_api
             .verifier(method)
-            .expect("unknown issue method absent in Codex API")
+            .expect("calling to method absent in Codex API")
     }
 
     pub fn merge(&mut self, other: Self) -> Result<bool, MergeError> {
