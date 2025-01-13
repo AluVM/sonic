@@ -32,7 +32,7 @@ use commit_verify::{Digest, Sha256};
 use hypersonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc, EmbeddedReaders};
 use hypersonic::{Api, ApiInner, AppendApi, DestructibleApi, Schema, Stock};
 use strict_types::{SemId, StrictVal};
-use ultrasonic::{AuthToken, CellAddr, Codex, Identity, FIELD_ORDER_SECP};
+use ultrasonic::{AuthToken, CellAddr, Codex, Consensus, Identity, FIELD_ORDER_SECP};
 
 fn codex() -> Codex {
     let lib = libs::success();
@@ -135,7 +135,7 @@ fn main() {
     let carol_auth = next_auth();
 
     let articles = issuer
-        .start_issue_testnet("setup")
+        .start_issue_testnet("setup", Consensus::None)
         // Alice
         .append("_parties", svnum!(0u64), Some(ston!(name "alice", identity "Alice Wonderland")))
         .assign("signers", alice_auth, svnum!(0u64), None)
@@ -146,7 +146,7 @@ fn main() {
         .append("_parties", svnum!(2u64), Some(ston!(name "carol", identity "Carol Caterpillar")))
         .assign("signers", carol_auth, svnum!(2u64), None)
 
-        .finish::<0>("WonderlandDAO", 1732529307);
+        .finish("WonderlandDAO", 1732529307);
     let opid = articles.contract.genesis_opid();
 
     let mut stock = Stock::new(articles, "examples/dao/data");

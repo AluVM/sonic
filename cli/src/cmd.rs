@@ -107,7 +107,7 @@ fn issue(schema: &Path, form: &Path, output: Option<&Path>) -> anyhow::Result<()
     let path = output.unwrap_or(form);
     let output = path.with_file_name(format!("{}.articles", params.name));
 
-    let articles = schema.issue::<0>(params);
+    let articles = schema.issue(params);
     articles.save(output)?;
 
     Ok(())
@@ -116,20 +116,20 @@ fn issue(schema: &Path, form: &Path, output: Option<&Path>) -> anyhow::Result<()
 fn process(articles: &Path, stock: Option<&Path>) -> anyhow::Result<()> {
     let path = stock.unwrap_or(articles);
 
-    let articles = Articles::<0>::load(articles)?;
+    let articles = Articles::load(articles)?;
     Stock::new(articles, path);
 
     Ok(())
 }
 
 fn state(path: &Path) {
-    let stock = Stock::<_, 0>::load(path);
+    let stock = Stock::load(path);
     let val = serde_yaml::to_string(&stock.state().main).expect("unable to generate YAML");
     println!("{val}");
 }
 
 fn call(stock: &Path, form: &Path) -> anyhow::Result<()> {
-    let mut stock = Stock::<_, 0>::load(stock);
+    let mut stock = Stock::load(stock);
     let file = File::open(form)?;
     let call = serde_yaml::from_reader::<_, CallParams>(file)?;
     let opid = stock.call(call);
@@ -138,13 +138,13 @@ fn call(stock: &Path, form: &Path) -> anyhow::Result<()> {
 }
 
 fn export<'a>(stock: &Path, terminals: impl IntoIterator<Item = &'a AuthToken>, output: &Path) -> anyhow::Result<()> {
-    let mut stock = Stock::<_, 0>::load(stock);
+    let mut stock = Stock::load(stock);
     stock.export_to_file(terminals, output)?;
     Ok(())
 }
 
 fn accept(stock: &Path, input: &Path) -> anyhow::Result<()> {
-    let mut stock = Stock::<_, 0>::load(stock);
+    let mut stock = Stock::load(stock);
     stock.accept_from_file(input)?;
     Ok(())
 }
