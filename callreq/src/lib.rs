@@ -62,6 +62,6 @@ mod data;
 mod uri;
 mod builder;
 
-pub use data::{CallRequest, CallState, Endpoint, MethodName, StateName};
+pub use data::{CallRequest, CallScope, CallState, Endpoint, MethodName, StateName};
 
 pub const LIB_NAME_SONIC: &str = "SONIC";
