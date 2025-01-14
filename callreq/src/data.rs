@@ -21,10 +21,12 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+use core::fmt::Display;
 use core::str::FromStr;
 use std::convert::Infallible;
 
 use amplify::confinement::{ConfinedVec, TinyBlob};
+use baid64::Baid64ParseError;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use strict_types::{StrictType, StrictVal, TypeName, VariantName};
@@ -112,10 +114,10 @@ pub struct CallRequest<T = CallScope, A = AuthToken> {
     pub unknown_query: IndexMap<String, String>,
 }
 
-impl<A> CallRequest<CallScope, A> {
+impl<Q: Display + FromStr, A> CallRequest<CallScope<Q>, A> {
     pub fn unwrap_contract_with<E>(
         self,
-        f: impl FnOnce(String) -> Result<ContractId, E>,
+        f: impl FnOnce(Q) -> Result<ContractId, E>,
     ) -> Result<CallRequest<ContractId, A>, E> {
         let id = match self.scope {
             CallScope::ContractId(id) => id,
@@ -136,12 +138,27 @@ impl<A> CallRequest<CallScope, A> {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Display)]
-pub enum CallScope {
+pub enum CallScope<Q: Display + FromStr = String> {
     #[display(inner)]
     ContractId(ContractId),
 
     #[display("contract:{0}")]
-    ContractQuery(String),
+    ContractQuery(Q),
+}
+
+impl<Q: Display + FromStr> FromStr for CallScope<Q> {
+    type Err = Baid64ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match ContractId::from_str(s) {
+            Err(err1) => {
+                let s = s.trim_start_matches("contract:");
+                let query = Q::from_str(s).map_err(|_| err1)?;
+                Ok(Self::ContractQuery(query))
+            }
+            Ok(id) => Ok(Self::ContractId(id)),
+        }
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Display)]
