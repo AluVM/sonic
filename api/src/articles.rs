@@ -32,17 +32,17 @@ use crate::{Api, Schema, LIB_NAME_SONIC};
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_SONIC)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
-pub struct Articles<const CAPS: u32> {
+pub struct Articles {
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub schema: Schema,
     pub contract_sigs: ContentSigs,
-    pub contract: Contract<CAPS>,
+    pub contract: Contract,
 }
 
-impl<const CAPS: u32> StrictSerialize for Articles<CAPS> {}
-impl<const CAPS: u32> StrictDeserialize for Articles<CAPS> {}
+impl StrictSerialize for Articles {}
+impl StrictDeserialize for Articles {}
 
-impl<const CAPS: u32> Articles<CAPS> {
+impl Articles {
     pub fn contract_id(&self) -> ContractId { self.contract.contract_id() }
 
     pub fn api(&self, name: &TypeName) -> &Api { self.schema.api(name) }
@@ -77,7 +77,7 @@ mod _fs {
 
     use super::Articles;
 
-    impl<const CAPS: u32> Articles<CAPS> {
+    impl Articles {
         pub fn load(path: impl AsRef<Path>) -> Result<Self, DeserializeError> {
             Self::strict_deserialize_from_file::<{ usize::MAX }>(path)
         }
