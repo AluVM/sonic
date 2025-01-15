@@ -125,6 +125,13 @@ impl Api {
         }
     }
 
+    pub fn default_call(&self) -> Option<&CallState> {
+        match self {
+            Api::Embedded(api) => api.default_call.as_ref(),
+            Api::Alu(api) => api.default_call.as_ref(),
+        }
+    }
+
     pub fn verifier(&self, method: impl Into<MethodName>) -> Option<CallId> {
         let method = method.into();
         match self {
