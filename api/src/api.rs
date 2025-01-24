@@ -499,7 +499,8 @@ pub trait StateAdaptor: Clone + Ord + Debug + StrictDumb + StrictEncode + Strict
 
 #[allow(private_bounds)]
 pub trait StateArithm: Clone + Debug + StrictDumb + StrictEncode + StrictDecode + Serde {
-    /// Returns a calculator object used to perform calculations on the state.
+    /// Calculator allows to perform calculations on the state (ordering and sorting, coin
+    /// selection, change calculation).
     fn calculator(&self) -> Box<dyn StateCalc>;
 }
 
@@ -508,20 +509,19 @@ pub trait StateArithm: Clone + Debug + StrictDumb + StrictEncode + StrictDecode 
 pub struct UncountableState;
 
 pub trait StateCalc {
-    /// Procedure which converts [`StrictVal`] corresponding to this type into a weight in range
-    /// `-126..127` representing how much this specific state fulfills certain state requirement.
-    ///
-    /// This is used in selecting state required to fulfill input for a provided contract
-    /// [`Request`].
-    fn measure(&self, state: &StrictVal, target: &StrictVal) -> Option<i8>;
+    /// Compares two state values (useful in sorting).
+    fn compare(&self, a: &StrictVal, b: &StrictVal) -> Option<Ordering>;
 
     /// Procedure which is called on [`StateCalc`] to accumulate an input state.
-    fn accumulate(&mut self, state: StrictVal) -> Result<(), UncountableState>;
+    fn accumulate(&mut self, state: &StrictVal) -> Result<(), UncountableState>;
 
     /// Procedure which is called on [`StateCalc`] to lessen an output state.
-    fn lessen(&mut self, state: StrictVal) -> Result<(), UncountableState>;
+    fn lessen(&mut self, state: &StrictVal) -> Result<(), UncountableState>;
 
     /// Procedure which is called on [`StateCalc`] to compute the difference between an input
     /// state and output state.
     fn diff(&self) -> Result<Vec<StrictVal>, UncountableState>;
+
+    /// Detect whether the supplied state is enough to satisfy some target requirements.
+    fn is_satisfied(&self, state: &StrictVal) -> bool;
 }

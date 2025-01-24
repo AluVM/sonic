@@ -21,6 +21,8 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+use core::cmp::Ordering;
+
 use amplify::confinement::ConfinedBlob;
 use amplify::num::u256;
 use strict_encoding::{StreamReader, StrictDecode, StrictEncode};
@@ -214,27 +216,18 @@ pub enum EmbeddedCalc {
 }
 
 impl StateCalc for EmbeddedCalc {
-    fn measure(&self, state: &StrictVal, target: &StrictVal) -> Option<i8> {
-        let res = match (state, target) {
-            (val, tgt) if val == tgt => return Some(0),
-            (StrictVal::Number(StrictNum::Uint(val)), StrictVal::Number(StrictNum::Uint(tgt))) => {
-                (*tgt as i128 - *val as i128) / (*tgt as i128)
-            }
+    fn compare(&self, state: &StrictVal, target: &StrictVal) -> Option<Ordering> {
+        match (state, target) {
+            (val, tgt) if val == tgt => return Some(Ordering::Equal),
+            (StrictVal::Number(StrictNum::Uint(val)), StrictVal::Number(StrictNum::Uint(tgt))) => Some(val.cmp(&tgt)),
             _ => return None,
-        };
-        if res > i8::MAX as i128 {
-            Some(i8::MAX)
-        } else if res < i8::MIN as i128 {
-            Some(i8::MIN)
-        } else {
-            Some(res as i8)
         }
     }
 
-    fn accumulate(&mut self, state: StrictVal) -> Result<(), UncountableState> {
+    fn accumulate(&mut self, state: &StrictVal) -> Result<(), UncountableState> {
         match self {
             EmbeddedCalc::NonFungible(states) => {
-                states.push(state);
+                states.push(state.clone());
                 Ok(())
             }
             EmbeddedCalc::Fungible(value) => match (state, value) {
@@ -247,10 +240,10 @@ impl StateCalc for EmbeddedCalc {
         }
     }
 
-    fn lessen(&mut self, state: StrictVal) -> Result<(), UncountableState> {
+    fn lessen(&mut self, state: &StrictVal) -> Result<(), UncountableState> {
         match self {
             EmbeddedCalc::NonFungible(states) => {
-                if let Some(pos) = states.iter().position(|s| *s == state) {
+                if let Some(pos) = states.iter().position(|s| s == state) {
                     states.remove(pos);
                     Ok(())
                 } else {
@@ -258,7 +251,7 @@ impl StateCalc for EmbeddedCalc {
                 }
             }
             EmbeddedCalc::Fungible(value) => match (state, value) {
-                (StrictVal::Number(StrictNum::Uint(dec)), StrictVal::Number(StrictNum::Uint(val))) if dec > *val => {
+                (StrictVal::Number(StrictNum::Uint(dec)), StrictVal::Number(StrictNum::Uint(val))) if dec > val => {
                     Err(UncountableState)
                 }
                 (StrictVal::Number(StrictNum::Uint(dec)), StrictVal::Number(StrictNum::Uint(val))) => {
@@ -275,5 +268,24 @@ impl StateCalc for EmbeddedCalc {
             EmbeddedCalc::NonFungible(items) => items.clone(),
             EmbeddedCalc::Fungible(value) => vec![value.clone()],
         })
+    }
+
+    fn is_satisfied(&self, target: &StrictVal) -> bool {
+        match self {
+            EmbeddedCalc::NonFungible(items) => items.iter().any(|item| *item == *target),
+            EmbeddedCalc::Fungible(value) => {
+                if value == target {
+                    true
+                } else if let StrictVal::Number(StrictNum::Uint(val)) = value {
+                    if let StrictVal::Number(StrictNum::Uint(tgt)) = target {
+                        val >= tgt
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+        }
     }
 }

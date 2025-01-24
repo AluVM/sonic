@@ -21,6 +21,8 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+use std::cmp::Ordering;
+
 use aluvm::LibSite;
 use amplify::confinement::ConfinedBlob;
 use strict_types::{SemId, StrictDumb, StrictVal, TypeSystem};
@@ -106,11 +108,13 @@ impl StateArithm for AluVMArithm {
 }
 
 impl StateCalc for () {
-    fn measure(&self, state: &StrictVal, target: &StrictVal) -> Option<i8> { todo!() }
+    fn compare(&self, a: &StrictVal, b: &StrictVal) -> Option<Ordering> { todo!() }
 
-    fn accumulate(&mut self, state: StrictVal) -> Result<(), UncountableState> { Err(UncountableState) }
+    fn accumulate(&mut self, state: &StrictVal) -> Result<(), UncountableState> { Err(UncountableState) }
 
-    fn lessen(&mut self, state: StrictVal) -> Result<(), UncountableState> { Err(UncountableState) }
+    fn lessen(&mut self, state: &StrictVal) -> Result<(), UncountableState> { Err(UncountableState) }
 
     fn diff(&self) -> Result<Vec<StrictVal>, UncountableState> { Err(UncountableState) }
+
+    fn is_satisfied(&self, state: &StrictVal) -> bool { todo!() }
 }
