@@ -250,25 +250,19 @@ impl Api {
     pub fn calculate(&self, name: impl Into<StateName>) -> Box<dyn StateCalc> {
         let name = name.into();
         match self {
-            Api::Embedded(api) => {
-                let calc = api
-                    .destructible
-                    .get(&name)
-                    .expect("state name is unknown for the API")
-                    .arithmetics
-                    .calculator();
-                Box::new(calc)
-            }
+            Api::Embedded(api) => api
+                .destructible
+                .get(&name)
+                .expect("state name is unknown for the API")
+                .arithmetics
+                .calculator(),
             #[allow(clippy::let_unit_value)]
-            Api::Alu(api) => {
-                let calc = api
-                    .destructible
-                    .get(&name)
-                    .expect("state name is unknown for the API")
-                    .arithmetics
-                    .calculator();
-                Box::new(calc)
-            }
+            Api::Alu(api) => api
+                .destructible
+                .get(&name)
+                .expect("state name is unknown for the API")
+                .arithmetics
+                .calculator(),
         }
     }
 }
@@ -505,18 +499,8 @@ pub trait StateAdaptor: Clone + Ord + Debug + StrictDumb + StrictEncode + Strict
 
 #[allow(private_bounds)]
 pub trait StateArithm: Clone + Debug + StrictDumb + StrictEncode + StrictDecode + Serde {
-    /// Type that performs calculations on the state
-    type Calc: StateCalc;
-
-    /// Procedure which converts [`StateValue`] corresponding to this type into a weight in range
-    /// `-126..127` representing how much this specific state fulfills certain state requirement.
-    ///
-    /// This is used in selecting state required to fulfill input for a provided contract
-    /// [`Request`].
-    fn measure(&self, state: StateValue, target: StateValue) -> Option<i8>;
-
     /// Returns a calculator object used to perform calculations on the state.
-    fn calculator(&self) -> Self::Calc;
+    fn calculator(&self) -> Box<dyn StateCalc>;
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Display, Error)]
@@ -524,6 +508,13 @@ pub trait StateArithm: Clone + Debug + StrictDumb + StrictEncode + StrictDecode 
 pub struct UncountableState;
 
 pub trait StateCalc {
+    /// Procedure which converts [`StateValue`] corresponding to this type into a weight in range
+    /// `-126..127` representing how much this specific state fulfills certain state requirement.
+    ///
+    /// This is used in selecting state required to fulfill input for a provided contract
+    /// [`Request`].
+    fn measure(&self, state: StateValue, target: StateValue) -> Option<i8>;
+
     /// Procedure which is called on [`StateCalc`] to accumulate an input state.
     fn accumulate(&mut self, state: StrictVal) -> Result<(), UncountableState>;
 

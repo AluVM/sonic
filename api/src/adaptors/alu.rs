@@ -102,14 +102,12 @@ impl StrictDumb for AluVMArithm {
 }
 
 impl StateArithm for AluVMArithm {
-    type Calc = ();
-
-    fn measure(&self, state: StateValue, target: StateValue) -> Option<i8> { todo!() }
-
-    fn calculator(&self) -> Self::Calc { todo!() }
+    fn calculator(&self) -> Box<dyn StateCalc> { todo!() }
 }
 
 impl StateCalc for () {
+    fn measure(&self, state: StateValue, target: StateValue) -> Option<i8> { todo!() }
+
     fn accumulate(&mut self, state: StrictVal) -> Result<(), UncountableState> { Err(UncountableState) }
 
     fn lessen(&mut self, state: StrictVal) -> Result<(), UncountableState> { Err(UncountableState) }

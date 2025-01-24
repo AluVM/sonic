@@ -199,8 +199,21 @@ pub enum EmbeddedArithm {
 }
 
 impl StateArithm for EmbeddedArithm {
-    type Calc = EmbeddedCalc;
+    fn calculator(&self) -> Box<dyn StateCalc> {
+        match self {
+            EmbeddedArithm::NonFungible => Box::new(EmbeddedCalc::NonFungible(empty!())),
+            EmbeddedArithm::Fungible => Box::new(EmbeddedCalc::Fungible(StrictVal::Number(StrictNum::Uint(0)))),
+        }
+    }
+}
 
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum EmbeddedCalc {
+    NonFungible(Vec<StrictVal>),
+    Fungible(StrictVal),
+}
+
+impl StateCalc for EmbeddedCalc {
     fn measure(&self, state: StateValue, target: StateValue) -> Option<i8> {
         let res = match (state, target) {
             (StateValue::Single { first: val }, StateValue::Single { first: tgt })
@@ -223,21 +236,6 @@ impl StateArithm for EmbeddedArithm {
         }
     }
 
-    fn calculator(&self) -> Self::Calc {
-        match self {
-            EmbeddedArithm::NonFungible => EmbeddedCalc::NonFungible(empty!()),
-            EmbeddedArithm::Fungible => EmbeddedCalc::Fungible(StrictVal::Number(StrictNum::Uint(0))),
-        }
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub enum EmbeddedCalc {
-    NonFungible(Vec<StrictVal>),
-    Fungible(StrictVal),
-}
-
-impl StateCalc for EmbeddedCalc {
     fn accumulate(&mut self, state: StrictVal) -> Result<(), UncountableState> {
         match self {
             EmbeddedCalc::NonFungible(states) => {
