@@ -513,7 +513,7 @@ pub trait StateCalc {
     ///
     /// This is used in selecting state required to fulfill input for a provided contract
     /// [`Request`].
-    fn measure(&self, state: StateValue, target: StateValue) -> Option<i8>;
+    fn measure(&self, state: &StateValue, target: &StateValue) -> Option<i8>;
 
     /// Procedure which is called on [`StateCalc`] to accumulate an input state.
     fn accumulate(&mut self, state: StrictVal) -> Result<(), UncountableState>;

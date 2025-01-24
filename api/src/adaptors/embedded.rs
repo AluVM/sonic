@@ -214,7 +214,7 @@ pub enum EmbeddedCalc {
 }
 
 impl StateCalc for EmbeddedCalc {
-    fn measure(&self, state: StateValue, target: StateValue) -> Option<i8> {
+    fn measure(&self, state: &StateValue, target: &StateValue) -> Option<i8> {
         let res = match (state, target) {
             (StateValue::Single { first: val }, StateValue::Single { first: tgt })
                 if val.to_u256() == tgt.to_u256() =>
