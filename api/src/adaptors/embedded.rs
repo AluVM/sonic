@@ -214,25 +214,20 @@ pub enum EmbeddedCalc {
 }
 
 impl StateCalc for EmbeddedCalc {
-    fn measure(&self, state: &StateValue, target: &StateValue) -> Option<i8> {
+    fn measure(&self, state: &StrictVal, target: &StrictVal) -> Option<i8> {
         let res = match (state, target) {
-            (StateValue::Single { first: val }, StateValue::Single { first: tgt })
-                if val.to_u256() == tgt.to_u256() =>
-            {
-                return Some(0)
-            }
-            (StateValue::Single { first: val }, StateValue::Single { first: tgt }) if val.to_u256() < tgt.to_u256() => {
-                (tgt.to_u256() - val.to_u256()) / tgt.to_u256()
-            }
-            (StateValue::Single { first: val }, StateValue::Single { first: tgt }) if val.to_u256() > tgt.to_u256() => {
-                (val.to_u256() - tgt.to_u256()) / tgt.to_u256()
+            (val, tgt) if val == tgt => return Some(0),
+            (StrictVal::Number(StrictNum::Uint(val)), StrictVal::Number(StrictNum::Uint(tgt))) => {
+                (*tgt as i128 - *val as i128) / (*tgt as i128)
             }
             _ => return None,
         };
-        if res > u256::from(u64::MAX) {
+        if res > i8::MAX as i128 {
             Some(i8::MAX)
+        } else if res < i8::MIN as i128 {
+            Some(i8::MIN)
         } else {
-            Some(res.low_u64().ilog2() as i8)
+            Some(res as i8)
         }
     }
 

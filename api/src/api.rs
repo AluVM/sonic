@@ -508,12 +508,12 @@ pub trait StateArithm: Clone + Debug + StrictDumb + StrictEncode + StrictDecode 
 pub struct UncountableState;
 
 pub trait StateCalc {
-    /// Procedure which converts [`StateValue`] corresponding to this type into a weight in range
+    /// Procedure which converts [`StrictVal`] corresponding to this type into a weight in range
     /// `-126..127` representing how much this specific state fulfills certain state requirement.
     ///
     /// This is used in selecting state required to fulfill input for a provided contract
     /// [`Request`].
-    fn measure(&self, state: &StateValue, target: &StateValue) -> Option<i8>;
+    fn measure(&self, state: &StrictVal, target: &StrictVal) -> Option<i8>;
 
     /// Procedure which is called on [`StateCalc`] to accumulate an input state.
     fn accumulate(&mut self, state: StrictVal) -> Result<(), UncountableState>;

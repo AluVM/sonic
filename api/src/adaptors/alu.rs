@@ -106,7 +106,7 @@ impl StateArithm for AluVMArithm {
 }
 
 impl StateCalc for () {
-    fn measure(&self, state: &StateValue, target: &StateValue) -> Option<i8> { todo!() }
+    fn measure(&self, state: &StrictVal, target: &StrictVal) -> Option<i8> { todo!() }
 
     fn accumulate(&mut self, state: StrictVal) -> Result<(), UncountableState> { Err(UncountableState) }
 
