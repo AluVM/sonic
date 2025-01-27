@@ -525,3 +525,15 @@ pub trait StateCalc {
     /// Detect whether the supplied state is enough to satisfy some target requirements.
     fn is_satisfied(&self, state: &StrictVal) -> bool;
 }
+
+impl StateCalc for Box<dyn StateCalc> {
+    fn compare(&self, a: &StrictVal, b: &StrictVal) -> Option<Ordering> { self.as_ref().compare(a, b) }
+
+    fn accumulate(&mut self, state: &StrictVal) -> Result<(), UncountableState> { self.as_mut().accumulate(state) }
+
+    fn lessen(&mut self, state: &StrictVal) -> Result<(), UncountableState> { self.as_mut().lessen(state) }
+
+    fn diff(&self) -> Result<Vec<StrictVal>, UncountableState> { self.as_ref().diff() }
+
+    fn is_satisfied(&self, state: &StrictVal) -> bool { self.as_ref().is_satisfied(state) }
+}
