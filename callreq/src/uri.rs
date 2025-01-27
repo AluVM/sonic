@@ -67,7 +67,6 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}/", &self.scope)?;
-        f.write_str("/")?;
         if let Some(api) = &self.api {
             write!(f, "{api}/")?;
         }
