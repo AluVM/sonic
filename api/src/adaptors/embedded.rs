@@ -266,7 +266,16 @@ impl StateCalc for EmbeddedCalc {
     fn diff(&self) -> Result<Vec<StrictVal>, UncountableState> {
         Ok(match self {
             EmbeddedCalc::NonFungible(items) => items.clone(),
-            EmbeddedCalc::Fungible(value) => vec![value.clone()],
+            EmbeddedCalc::Fungible(value) => match value {
+                StrictVal::Number(StrictNum::Uint(val)) => {
+                    if val.eq(&u64::MIN) {
+                        vec![]
+                    } else {
+                        vec![value.clone()]
+                    }
+                }
+                _ => return Err(UncountableState),
+            },
         })
     }
 
