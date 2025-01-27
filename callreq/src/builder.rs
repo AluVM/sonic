@@ -28,7 +28,7 @@ use strict_types::{StrictVal, TypeName};
 use crate::{CallRequest, CallState, Endpoint, MethodName, StateName};
 
 impl<T, A> CallRequest<T, A> {
-    pub fn new(scope: T, auth: A, data: StrictVal) -> Self {
+    pub fn new(scope: T, auth: A, data: Option<StrictVal>) -> Self {
         Self {
             scope,
             api: None,

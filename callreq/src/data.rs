@@ -107,7 +107,7 @@ pub struct CallRequest<T = CallScope, A = AuthToken> {
     pub api: Option<TypeName>,
     pub call: Option<CallState>,
     pub auth: A,
-    pub data: StrictVal,
+    pub data: Option<StrictVal>,
     pub lock: Option<TinyBlob>,
     pub expiry: Option<DateTime<Utc>>,
     pub endpoints: ConfinedVec<Endpoint, 0, 10>,

@@ -29,7 +29,7 @@
 //!
 //! # URL Representation
 //!
-//! `contract:[//USER@NODE:PORT/]CONTRACT_ID[/API][/METHOD?ARGS]`
+//! `contract:[//USER@NODE:PORT/]CONTRACT_ID[/API][/METHOD[/STATE]]/[VALUE][?ARGS]`
 //!
 //! A contract calls are URIs and URLS, which may have multiple forms (depending on the backend).
 //! Here are the examples for the `castVote` call for the DAO contract from the examples directory:

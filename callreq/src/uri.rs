@@ -77,7 +77,11 @@ where
                 write!(f, "{state}/")?;
             }
         }
-        write!(f, "{}/{}", self.auth, utf8_percent_encode(&self.data.to_string(), QUERY_ENCODE))?;
+
+        if let Some(data) = &self.data {
+            write!(f, "{}@", utf8_percent_encode(&data.to_string(), QUERY_ENCODE))?;
+        }
+        write!(f, "{}/", self.auth)?;
 
         if self.has_query() {
             f.write_str("?")?;
@@ -148,13 +152,14 @@ where
             .parse()
             .map_err(CallReqParseError::Scope)?;
 
-        let data = StrictVal::str(path.pop_back().ok_or(CallReqParseError::PathNoData)?);
-        let auth = path
+        let value_auth = path
             .pop_back()
             .ok_or(CallReqParseError::PathNoAuth)?
-            .as_str()
-            .parse()
-            .map_err(CallReqParseError::AuthInvalid)?;
+            .as_str();
+        let (data, auth) =
+            if let Some((data, auth)) = value_auth.split_once('@') { (Some(data), auth) } else { (None, (value_auth)) };
+        let data = data.map(StrictVal::str);
+        let auth = auth.parse().map_err(CallReqParseError::AuthInvalid)?;
 
         let api = path
             .pop_front()
@@ -262,9 +267,6 @@ pub enum CallReqParseError<E1: Error, E2: Error> {
 
     /// contract call request scope (first path component) is missed.
     ScopeMissed,
-
-    /// contract call request URI misses data assignment component
-    PathNoData,
 
     /// contract call request URI misses beneficiary authority token.
     PathNoAuth,
