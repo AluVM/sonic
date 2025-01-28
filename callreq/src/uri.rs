@@ -161,8 +161,12 @@ where
             .ok_or(CallReqParseError::PathNoAuth)?
             .as_str();
         let (data, auth) =
-            if let Some((data, auth)) = value_auth.split_once('@') { (Some(data), auth) } else { (None, (value_auth)) };
-        let data = data.map(StrictVal::str);
+            if let Some((data, auth)) = value_auth.split_once('@') { (Some(data), auth) } else { (None, value_auth) };
+        let data = data.map(|data| {
+            u64::from_str(data)
+                .map(StrictVal::num)
+                .unwrap_or_else(|_| StrictVal::str(data))
+        });
         let auth = auth.parse().map_err(CallReqParseError::AuthInvalid)?;
 
         let api = path
@@ -321,7 +325,7 @@ mod test {
             req.scope,
             ContractId::from_str("contract:qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw").unwrap()
         );
-        assert_eq!(req.data, Some(StrictVal::str("10")));
+        assert_eq!(req.data, Some(StrictVal::num(10u64)));
         assert_eq!(req.auth, AuthToken::from_str("at:5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA").unwrap());
     }
 }
