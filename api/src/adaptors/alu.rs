@@ -30,7 +30,7 @@ use ultrasonic::{StateData, StateValue};
 
 use crate::api::TOTAL_BYTES;
 use crate::{
-    ApiVm, StateAdaptor, StateArithm, StateAtom, StateCalc, StateName, StateReader, UncountableState, VmType,
+    ApiVm, StateAdaptor, StateArithm, StateAtom, StateCalc, StateCalcError, StateName, StateReader, VmType,
     LIB_NAME_SONIC,
 };
 
@@ -110,11 +110,11 @@ impl StateArithm for AluVMArithm {
 impl StateCalc for () {
     fn compare(&self, a: &StrictVal, b: &StrictVal) -> Option<Ordering> { todo!() }
 
-    fn accumulate(&mut self, state: &StrictVal) -> Result<(), UncountableState> { Err(UncountableState) }
+    fn accumulate(&mut self, state: &StrictVal) -> Result<(), StateCalcError> { Err(StateCalcError::UncountableState) }
 
-    fn lessen(&mut self, state: &StrictVal) -> Result<(), UncountableState> { Err(UncountableState) }
+    fn lessen(&mut self, state: &StrictVal) -> Result<(), StateCalcError> { Err(StateCalcError::UncountableState) }
 
-    fn diff(&self) -> Result<Vec<StrictVal>, UncountableState> { Err(UncountableState) }
+    fn diff(&self) -> Result<Vec<StrictVal>, StateCalcError> { Err(StateCalcError::UncountableState) }
 
     fn is_satisfied(&self, state: &StrictVal) -> bool { todo!() }
 }

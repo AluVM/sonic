@@ -51,8 +51,8 @@ mod util;
 
 pub use adaptors::{alu, embedded};
 pub use api::{
-    Api, ApiId, ApiInner, ApiVm, AppendApi, DestructibleApi, StateAdaptor, StateArithm, StateCalc, StateReader,
-    UncountableState,
+    Api, ApiId, ApiInner, ApiVm, AppendApi, DestructibleApi, StateAdaptor, StateArithm, StateCalc, StateCalcError,
+    StateReader,
 };
 pub use articles::{Articles, MergeError};
 pub use builders::{Builder, BuilderRef, CoreParams, IssueParams, NamedState, OpBuilder, OpBuilderRef};

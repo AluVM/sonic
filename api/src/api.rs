@@ -505,22 +505,28 @@ pub trait StateArithm: Clone + Debug + StrictDumb + StrictEncode + StrictDecode 
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Display, Error)]
-#[display("state can't be computed")]
-pub struct UncountableState;
+#[display(doc_comments)]
+pub enum StateCalcError {
+    /// integer overflow during state computation.
+    Overflow,
+
+    /// state can't be computed.
+    UncountableState,
+}
 
 pub trait StateCalc {
     /// Compares two state values (useful in sorting).
     fn compare(&self, a: &StrictVal, b: &StrictVal) -> Option<Ordering>;
 
     /// Procedure which is called on [`StateCalc`] to accumulate an input state.
-    fn accumulate(&mut self, state: &StrictVal) -> Result<(), UncountableState>;
+    fn accumulate(&mut self, state: &StrictVal) -> Result<(), StateCalcError>;
 
     /// Procedure which is called on [`StateCalc`] to lessen an output state.
-    fn lessen(&mut self, state: &StrictVal) -> Result<(), UncountableState>;
+    fn lessen(&mut self, state: &StrictVal) -> Result<(), StateCalcError>;
 
     /// Procedure which is called on [`StateCalc`] to compute the difference between an input
     /// state and output state.
-    fn diff(&self) -> Result<Vec<StrictVal>, UncountableState>;
+    fn diff(&self) -> Result<Vec<StrictVal>, StateCalcError>;
 
     /// Detect whether the supplied state is enough to satisfy some target requirements.
     fn is_satisfied(&self, state: &StrictVal) -> bool;
@@ -529,11 +535,11 @@ pub trait StateCalc {
 impl StateCalc for Box<dyn StateCalc> {
     fn compare(&self, a: &StrictVal, b: &StrictVal) -> Option<Ordering> { self.as_ref().compare(a, b) }
 
-    fn accumulate(&mut self, state: &StrictVal) -> Result<(), UncountableState> { self.as_mut().accumulate(state) }
+    fn accumulate(&mut self, state: &StrictVal) -> Result<(), StateCalcError> { self.as_mut().accumulate(state) }
 
-    fn lessen(&mut self, state: &StrictVal) -> Result<(), UncountableState> { self.as_mut().lessen(state) }
+    fn lessen(&mut self, state: &StrictVal) -> Result<(), StateCalcError> { self.as_mut().lessen(state) }
 
-    fn diff(&self) -> Result<Vec<StrictVal>, UncountableState> { self.as_ref().diff() }
+    fn diff(&self) -> Result<Vec<StrictVal>, StateCalcError> { self.as_ref().diff() }
 
     fn is_satisfied(&self, state: &StrictVal) -> bool { self.as_ref().is_satisfied(state) }
 }

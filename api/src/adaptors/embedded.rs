@@ -22,6 +22,7 @@
 // the License.
 
 use core::cmp::Ordering;
+use core::str::FromStr;
 
 use amplify::confinement::ConfinedBlob;
 use amplify::num::u256;
@@ -33,7 +34,7 @@ use ultrasonic::{StateData, StateValue};
 
 use crate::api::{TOTAL_BYTES, USED_FIEL_BYTES};
 use crate::{
-    ApiVm, StateAdaptor, StateArithm, StateAtom, StateCalc, StateName, StateReader, StateTy, UncountableState, VmType,
+    ApiVm, StateAdaptor, StateArithm, StateAtom, StateCalc, StateCalcError, StateName, StateReader, StateTy, VmType,
     LIB_NAME_SONIC,
 };
 
@@ -218,52 +219,68 @@ pub enum EmbeddedCalc {
 impl StateCalc for EmbeddedCalc {
     fn compare(&self, state: &StrictVal, target: &StrictVal) -> Option<Ordering> {
         match (state, target) {
-            (val, tgt) if val == tgt => return Some(Ordering::Equal),
+            (val, tgt) if val == tgt => Some(Ordering::Equal),
+            // TODO: Remove unsafe once rust supports `if let` guards
+            (StrictVal::Number(StrictNum::Uint(val)), StrictVal::String(s)) if u64::from_str(s).is_ok() => {
+                Some(val.cmp(&unsafe { u64::from_str(s).unwrap_unchecked() }))
+            }
             (StrictVal::Number(StrictNum::Uint(val)), StrictVal::Number(StrictNum::Uint(tgt))) => Some(val.cmp(&tgt)),
-            _ => return None,
+            _ => None,
         }
     }
 
-    fn accumulate(&mut self, state: &StrictVal) -> Result<(), UncountableState> {
+    fn accumulate(&mut self, state: &StrictVal) -> Result<(), StateCalcError> {
         match self {
             EmbeddedCalc::NonFungible(states) => {
                 states.push(state.clone());
                 Ok(())
             }
-            EmbeddedCalc::Fungible(value) => match (state, value) {
-                (StrictVal::Number(StrictNum::Uint(add)), StrictVal::Number(StrictNum::Uint(val))) => {
-                    *val += add;
-                    Ok(())
-                }
-                _ => Err(UncountableState),
-            },
+            EmbeddedCalc::Fungible(value) => {
+                let (val, add) = match (state, value) {
+                    // TODO: Remove unsafe once rust supports `if let` guards
+                    (StrictVal::String(s), StrictVal::Number(StrictNum::Uint(val))) if u64::from_str(s).is_ok() => {
+                        let add = unsafe { u64::from_str(s).unwrap_unchecked() };
+                        (val, add)
+                    }
+                    (StrictVal::Number(StrictNum::Uint(add)), StrictVal::Number(StrictNum::Uint(val))) => (val, *add),
+                    _ => return Err(StateCalcError::UncountableState),
+                };
+                *val = val.checked_add(add).ok_or(StateCalcError::Overflow)?;
+                Ok(())
+            }
         }
     }
 
-    fn lessen(&mut self, state: &StrictVal) -> Result<(), UncountableState> {
+    fn lessen(&mut self, state: &StrictVal) -> Result<(), StateCalcError> {
         match self {
             EmbeddedCalc::NonFungible(states) => {
                 if let Some(pos) = states.iter().position(|s| s == state) {
                     states.remove(pos);
                     Ok(())
                 } else {
-                    Err(UncountableState)
+                    Err(StateCalcError::UncountableState)
                 }
             }
-            EmbeddedCalc::Fungible(value) => match (state, value) {
-                (StrictVal::Number(StrictNum::Uint(dec)), StrictVal::Number(StrictNum::Uint(val))) if dec > val => {
-                    Err(UncountableState)
+            EmbeddedCalc::Fungible(value) => {
+                let (val, dec) = match (state, value) {
+                    // TODO: Remove unsafe once rust supports `if let` guards
+                    (StrictVal::String(s), StrictVal::Number(StrictNum::Uint(val))) if u64::from_str(s).is_ok() => {
+                        let dec = unsafe { u64::from_str(s).unwrap_unchecked() };
+                        (val, dec)
+                    }
+                    (StrictVal::Number(StrictNum::Uint(dec)), StrictVal::Number(StrictNum::Uint(val))) => (val, *dec),
+                    _ => return Err(StateCalcError::UncountableState),
+                };
+                if dec > *val {
+                    return Err(StateCalcError::Overflow);
                 }
-                (StrictVal::Number(StrictNum::Uint(dec)), StrictVal::Number(StrictNum::Uint(val))) => {
-                    *val -= dec;
-                    Ok(())
-                }
-                _ => Err(UncountableState),
-            },
+                *val -= dec;
+                Ok(())
+            }
         }
     }
 
-    fn diff(&self) -> Result<Vec<StrictVal>, UncountableState> {
+    fn diff(&self) -> Result<Vec<StrictVal>, StateCalcError> {
         Ok(match self {
             EmbeddedCalc::NonFungible(items) => items.clone(),
             EmbeddedCalc::Fungible(value) => match value {
@@ -274,7 +291,7 @@ impl StateCalc for EmbeddedCalc {
                         vec![value.clone()]
                     }
                 }
-                _ => return Err(UncountableState),
+                _ => return Err(StateCalcError::UncountableState),
             },
         })
     }
