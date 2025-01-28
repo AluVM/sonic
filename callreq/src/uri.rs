@@ -151,6 +151,11 @@ where
             .parse()
             .map_err(CallReqParseError::Scope)?;
 
+        let empty = path.pop_back().ok_or(CallReqParseError::PathNoAuth)?;
+        if !empty.is_empty() {
+            return Err(CallReqParseError::PathLastNoEmpty);
+        }
+
         let value_auth = path
             .pop_back()
             .ok_or(CallReqParseError::PathNoAuth)?
@@ -267,6 +272,9 @@ pub enum CallReqParseError<E1: Error, E2: Error> {
     /// contract call request scope (first path component) is missed.
     ScopeMissed,
 
+    /// contract call request path must end with `/`
+    PathLastNoEmpty,
+
     /// contract call request URI misses beneficiary authority token.
     PathNoAuth,
 
@@ -294,4 +302,26 @@ pub enum CallReqParseError<E1: Error, E2: Error> {
 
     /// invalid query parameter {0}.
     QueryParamInvalid(String),
+}
+
+#[cfg(test)]
+mod test {
+    use ultrasonic::{AuthToken, ContractId};
+
+    use super::*;
+
+    #[test]
+    fn parse() {
+        let req = CallRequest::<ContractId, AuthToken>::from_str(
+            "contract:qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw/10@at:\
+             5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA/",
+        )
+        .unwrap();
+        assert_eq!(
+            req.scope,
+            ContractId::from_str("contract:qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw").unwrap()
+        );
+        assert_eq!(req.data, Some(StrictVal::str("10")));
+        assert_eq!(req.auth, AuthToken::from_str("at:5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA").unwrap());
+    }
 }
