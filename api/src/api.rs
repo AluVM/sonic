@@ -189,6 +189,10 @@ impl Api {
     }
 
     pub fn convert_destructible(&self, value: StateValue, sys: &TypeSystem) -> Option<(StateName, StrictVal)> {
+        // Here we do not yet known which state we are using, since it is encoded inside the field element
+        // of `StateValue`. Thus, we are trying all available convertors until they succeed, since the
+        // convertors check the state type. Then, we use the state name associated with the succeeded
+        // convertor.
         match self {
             Api::Embedded(api) => {
                 for (name, adaptor) in &api.destructible {
@@ -387,7 +391,9 @@ mod _baid4 {
 #[strict_type(lib = LIB_NAME_SONIC)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct AppendApi<Vm: ApiVm> {
+    /// Semantic type id for verifiable part of the state.
     pub sem_id: SemId,
+    /// Semantic type id for non-verifiable part of the state.
     pub raw_sem_id: SemId,
 
     pub published: bool,

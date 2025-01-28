@@ -148,6 +148,8 @@ impl EmbeddedImmutable {
 
         let mut cursor = StreamReader::cursor::<TOTAL_BYTES>(buf);
         let val = sys.strict_read_type(sem_id, &mut cursor).ok()?;
+        // We do not check here that we have reached the end of the buffer, since it may be filled with
+        // zeros up to the field element length.
         Some(val.unbox())
     }
 
