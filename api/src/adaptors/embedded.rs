@@ -226,7 +226,7 @@ impl StateCalc for EmbeddedCalc {
             (StrictVal::Number(StrictNum::Uint(val)), StrictVal::String(s)) if u64::from_str(s).is_ok() => {
                 Some(val.cmp(&unsafe { u64::from_str(s).unwrap_unchecked() }))
             }
-            (StrictVal::Number(StrictNum::Uint(val)), StrictVal::Number(StrictNum::Uint(tgt))) => Some(val.cmp(&tgt)),
+            (StrictVal::Number(StrictNum::Uint(val)), StrictVal::Number(StrictNum::Uint(tgt))) => Some(val.cmp(tgt)),
             _ => None,
         }
     }

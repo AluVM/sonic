@@ -30,9 +30,7 @@ use std::io::ErrorKind;
 use aluvm::LibSite;
 use sonic_callreq::{MethodName, StateName};
 use sonicapi::{CoreParams, MergeError, NamedState, OpBuilder};
-use strict_encoding::{
-    DecodeError, ReadRaw, StrictDecode, StrictEncode, StrictReader, StrictWriter, TypeName, WriteRaw,
-};
+use strict_encoding::{DecodeError, ReadRaw, StrictDecode, StrictEncode, StrictReader, StrictWriter, WriteRaw};
 use strict_types::StrictVal;
 use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Operation, Opid};
 
@@ -52,11 +50,8 @@ pub trait Supply {
     fn save_articles(&self, obj: &Articles);
     fn load_articles(&self) -> Articles;
 
-    fn save_raw_state(&self, state: &RawState);
-    fn load_raw_state(&self) -> RawState;
-
-    fn save_state(&self, name: Option<&TypeName>, state: &AdaptedState);
-    fn load_state(&self, name: Option<&TypeName>) -> AdaptedState;
+    fn save_state(&self, state: &RawState);
+    fn load_state(&self) -> RawState;
 }
 
 /// Append-only, random-accessed deeds & trace; updatable and rollback-enabled state.
@@ -95,15 +90,10 @@ impl<S: Supply> Stock<S> {
     #[allow(clippy::field_reassign_with_default)]
     pub fn open(articles: Articles, persistence: S) -> Self {
         let mut state = EffectiveState::default();
-        state.raw = persistence.load_raw_state();
-        state.main = persistence.load_state(None);
-        for api in articles.schema.custom_apis.keys() {
-            let name = api.name().expect("custom state must be named");
-            state
-                .aux
-                .insert(name.clone(), persistence.load_state(Some(name)));
-        }
-        Self { articles, state, supply: persistence }
+        state.raw = persistence.load_state();
+        let mut me = Self { articles, state, supply: persistence };
+        me.recompute_state();
+        me
     }
 
     pub fn contract_id(&self) -> ContractId { self.articles.contract_id() }
@@ -274,13 +264,7 @@ impl<S: Supply> Stock<S> {
         }
     }
 
-    fn save_state(&self) {
-        self.supply.save_raw_state(&self.state.raw);
-        self.supply.save_state(None, &self.state.main);
-        for (name, aux) in &self.state.aux {
-            self.supply.save_state(Some(name), aux);
-        }
-    }
+    fn save_state(&self) { self.supply.save_state(&self.state.raw); }
 
     pub fn save(&self) {
         self.supply.save_articles(&self.articles);
@@ -369,7 +353,8 @@ pub mod fs {
     use std::fs::{self, File};
     use std::path::{Path, PathBuf};
 
-    use strict_encoding::{StreamReader, StreamWriter};
+    use amplify::confinement::U64 as U64MAX;
+    use strict_encoding::{StreamReader, StreamWriter, StrictDeserialize, StrictSerialize};
     use ultrasonic::ContractName;
 
     use super::*;
@@ -383,7 +368,7 @@ pub mod fs {
 
     impl FileSupply {
         const FILENAME_ARTICLES: &'static str = "contract.articles";
-        const FILENAME_STATE_RAW: &'static str = "state.raw.yaml";
+        const FILENAME_STATE_RAW: &'static str = "state.dat";
 
         pub fn new(name: &str, path: impl AsRef<Path>) -> Self {
             let mut path = path.as_ref().to_path_buf();
@@ -427,38 +412,16 @@ pub mod fs {
             Articles::load(path).expect("unable to load articles")
         }
 
-        fn save_raw_state(&self, state: &RawState) {
+        fn save_state(&self, state: &RawState) {
             let path = self.path.clone().join(Self::FILENAME_STATE_RAW);
-            let file = File::create(path).expect("unable to create state file");
-            serde_yaml::to_writer(file, state).expect("unable to serialize state");
+            state
+                .strict_serialize_to_file::<U64MAX>(path)
+                .expect("unable to serialize state");
         }
 
-        fn load_raw_state(&self) -> RawState {
+        fn load_state(&self) -> RawState {
             let path = self.path.clone().join(Self::FILENAME_STATE_RAW);
-            let file = File::open(path).expect("unable to create state file");
-            serde_yaml::from_reader(file).expect("unable to serialize state")
-        }
-
-        fn save_state(&self, name: Option<&TypeName>, state: &AdaptedState) {
-            let name = match name {
-                None => "state",
-                Some(n) => n.as_str(),
-            };
-            let mut path = self.path.clone().join(name);
-            path.set_extension("yaml");
-            let file = fs::File::create(path).expect("unable to create state file");
-            serde_yaml::to_writer(file, state).expect("unable to serialize state");
-        }
-
-        fn load_state(&self, name: Option<&TypeName>) -> AdaptedState {
-            let name = match name {
-                None => "state",
-                Some(n) => n.as_str(),
-            };
-            let mut path = self.path.clone().join(name);
-            path.set_extension("yaml");
-            let file = fs::File::open(path).expect("unable to create state file");
-            serde_yaml::from_reader(file).expect("unable to serialize state")
+            RawState::strict_deserialize_from_file::<U64MAX>(path).expect("unable to load state")
         }
     }
 

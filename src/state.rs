@@ -23,10 +23,9 @@
 
 use alloc::collections::BTreeMap;
 
-use amplify::confinement::SmallOrdMap;
-use indexmap::IndexMap;
+use amplify::confinement::{LargeOrdMap, SmallOrdMap};
 use sonicapi::{Api, StateAtom, StateName};
-use strict_encoding::TypeName;
+use strict_encoding::{StrictDeserialize, StrictSerialize, TypeName};
 use strict_types::{StrictVal, TypeSystem};
 use ultrasonic::{AuthToken, CellAddr, Memory, Operation, Opid, StateCell, StateData, StateValue};
 
@@ -88,13 +87,18 @@ impl EffectiveState {
 }
 
 #[derive(Clone, Debug, Default)]
+#[derive(StrictType, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONIC)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct RawState {
     /// Tokens of authority
-    pub auth: IndexMap<AuthToken, CellAddr>,
-    pub immutable: BTreeMap<CellAddr, StateData>,
-    pub owned: BTreeMap<CellAddr, StateCell>,
+    pub auth: LargeOrdMap<AuthToken, CellAddr>,
+    pub immutable: LargeOrdMap<CellAddr, StateData>,
+    pub owned: LargeOrdMap<CellAddr, StateCell>,
 }
+
+impl StrictSerialize for RawState {}
+impl StrictDeserialize for RawState {}
 
 impl Memory for RawState {
     fn read_once(&self, addr: CellAddr) -> Option<StateCell> { self.owned.get(&addr).copied() }
@@ -110,8 +114,12 @@ impl RawState {
         let mut transition = Transition::new(opid);
 
         for input in op.destroying {
-            let res = self.owned.remove(&input.addr).expect("unknown input");
-            self.auth.shift_remove(&res.auth);
+            let res = self
+                .owned
+                .remove(&input.addr)
+                .expect("zero-sized confinement is allowed")
+                .expect("unknown input");
+            self.auth.remove(&res.auth).expect("zero-sized is allowed");
 
             let res = transition
                 .destroyed
@@ -122,16 +130,20 @@ impl RawState {
 
         for (no, cell) in op.destructible.into_iter().enumerate() {
             let addr = CellAddr::new(opid, no as u16);
-            self.auth.insert(cell.auth, addr);
-            self.owned.insert(addr, cell);
+            self.auth
+                .insert(cell.auth, addr)
+                .expect("too many authentication tokens");
+            self.owned.insert(addr, cell).expect("state too large");
         }
 
-        self.immutable.extend(
-            op.immutable
-                .into_iter()
-                .enumerate()
-                .map(|(no, data)| (CellAddr::new(opid, no as u16), data)),
-        );
+        self.immutable
+            .extend(
+                op.immutable
+                    .into_iter()
+                    .enumerate()
+                    .map(|(no, data)| (CellAddr::new(opid, no as u16), data)),
+            )
+            .expect("exceed state size limit");
 
         transition
     }
