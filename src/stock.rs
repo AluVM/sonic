@@ -35,7 +35,7 @@ use strict_types::StrictVal;
 use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Operation, Opid};
 
 use crate::aora::Aora;
-use crate::{AdaptedState, Articles, EffectiveState, RawState, Transition};
+use crate::{Articles, EffectiveState, RawState, Transition};
 
 pub trait Supply {
     type Stash: Aora<Id = Opid, Item = Operation>;
@@ -87,13 +87,10 @@ impl<S: Supply> Stock<S> {
         me
     }
 
-    #[allow(clippy::field_reassign_with_default)]
     pub fn open(articles: Articles, persistence: S) -> Self {
-        let mut state = EffectiveState::default();
-        state.raw = persistence.load_state();
-        let mut me = Self { articles, state, supply: persistence };
-        me.recompute_state();
-        me
+        let raw = persistence.load_state();
+        let state = EffectiveState::with(raw, &articles.schema);
+        Self { articles, state, supply: persistence }
     }
 
     pub fn contract_id(&self) -> ContractId { self.articles.contract_id() }
@@ -246,22 +243,16 @@ impl<S: Supply> Stock<S> {
         );
         self.supply.trace_mut().append(opid, &transition);
     }
-
+    
     pub fn complete_update(&mut self) {
         self.recompute_state();
         self.save_state();
     }
 
+    /// Recalculates computable part of the state
     fn recompute_state(&mut self) {
-        self.state.main.compute(&self.articles.schema.default_api);
-        self.state.aux = bmap! {};
-        for api in self.articles.schema.custom_apis.keys() {
-            let mut s = AdaptedState::default();
-            s.compute(api);
-            self.state
-                .aux
-                .insert(api.name().cloned().expect("unnamed aux API"), s);
-        }
+        self.state
+            .recompute(&self.articles.schema.default_api, self.articles.schema.custom_apis.keys());
     }
 
     fn save_state(&self) { self.supply.save_state(&self.state.raw); }

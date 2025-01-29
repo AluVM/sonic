@@ -24,7 +24,7 @@
 use alloc::collections::BTreeMap;
 
 use amplify::confinement::{LargeOrdMap, SmallOrdMap};
-use sonicapi::{Api, StateAtom, StateName};
+use sonicapi::{Api, Schema, StateAtom, StateName};
 use strict_encoding::{StrictDeserialize, StrictSerialize, TypeName};
 use strict_types::{StrictVal, TypeSystem};
 use ultrasonic::{AuthToken, CellAddr, Memory, Operation, Opid, StateCell, StateData, StateValue};
@@ -54,6 +54,22 @@ pub struct EffectiveState {
 }
 
 impl EffectiveState {
+    /// NB: Do not forget to call `recompute state` after.
+    pub fn with<'a>(raw: RawState, schema: &Schema) -> Self {
+        let mut me = Self { raw, main: none!(), aux: none!() };
+        me.main = AdaptedState::with(&me.raw, &schema.default_api, &schema.types);
+        me.aux.clear();
+        for api in schema.custom_apis.keys() {
+            let Some(name) = api.name() else {
+                continue;
+            };
+            let state = AdaptedState::with(&me.raw, api, &schema.types);
+            me.aux.insert(name.clone(), state);
+        }
+        me.recompute(&schema.default_api, schema.custom_apis.keys());
+        me
+    }
+
     #[inline]
     pub fn addr(&self, auth: AuthToken) -> CellAddr { self.raw.addr(auth) }
 
@@ -63,6 +79,18 @@ impl EffectiveState {
             .computed
             .get(&name)
             .unwrap_or_else(|| panic!("Computed state {name} is not known"))
+    }
+
+    /// Re-evaluates computable part of the state
+    pub(crate) fn recompute<'a>(&mut self, default_api: &Api, custom_apis: impl IntoIterator<Item = &'a Api>) {
+        self.main.compute(default_api);
+        self.aux = bmap! {};
+        for api in custom_apis {
+            let mut s = AdaptedState::default();
+            s.compute(api);
+            self.aux
+                .insert(api.name().cloned().expect("unnamed aux API"), s);
+        }
     }
 
     #[must_use]
@@ -158,6 +186,21 @@ pub struct AdaptedState {
 }
 
 impl AdaptedState {
+    pub fn with(raw: &RawState, api: &Api, sys: &TypeSystem) -> Self {
+        let mut me = AdaptedState::default();
+        for (addr, state) in &raw.immutable {
+            if let Some((name, atom)) = api.convert_immutable(state, sys) {
+                me.immutable.entry(name).or_default().insert(*addr, atom);
+            }
+        }
+        for (addr, state) in &raw.owned {
+            if let Some((name, atom)) = api.convert_destructible(state.data, sys) {
+                me.owned.entry(name).or_default().insert(*addr, atom);
+            }
+        }
+        me
+    }
+
     pub fn immutable(&self, name: &StateName) -> Option<&BTreeMap<CellAddr, StateAtom>> { self.immutable.get(name) }
 
     pub fn owned(&self, name: &StateName) -> Option<&BTreeMap<CellAddr, StrictVal>> { self.owned.get(name) }
