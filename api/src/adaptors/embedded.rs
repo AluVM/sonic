@@ -147,10 +147,21 @@ impl EmbeddedImmutable {
         debug_assert!(i <= 4);
 
         let mut cursor = StreamReader::cursor::<TOTAL_BYTES>(buf);
-        let val = sys.strict_read_type(sem_id, &mut cursor).ok()?;
         // We do not check here that we have reached the end of the buffer, since it may be filled with
         // zeros up to the field element length.
-        Some(val.unbox())
+        let mut val = sys.strict_read_type(sem_id, &mut cursor).ok()?.unbox();
+
+        loop {
+            if let StrictVal::Tuple(ref mut vec) = val {
+                if vec.len() == 1 {
+                    val = vec.remove(0);
+                    continue;
+                }
+            }
+            break;
+        }
+
+        Some(val)
     }
 
     fn build_value(&self, ser: ConfinedBlob<0, TOTAL_BYTES>) -> StateValue {

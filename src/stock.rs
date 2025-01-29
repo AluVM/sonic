@@ -243,7 +243,7 @@ impl<S: Supply> Stock<S> {
         );
         self.supply.trace_mut().append(opid, &transition);
     }
-    
+
     pub fn complete_update(&mut self) {
         self.recompute_state();
         self.save_state();
