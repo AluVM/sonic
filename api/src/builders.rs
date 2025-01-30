@@ -28,8 +28,8 @@ use chrono::{DateTime, Utc};
 use strict_encoding::TypeName;
 use strict_types::{StrictVal, TypeSystem};
 use ultrasonic::{
-    fe256, AuthToken, CallId, CellAddr, CodexId, Consensus, Contract, ContractId, ContractMeta, ContractName, Genesis,
-    Identity, Input, Operation, StateCell, StateData, StateValue,
+    fe256, AuthToken, CallId, CellAddr, Codex, CodexId, Consensus, Contract, ContractId, ContractMeta, ContractName,
+    Genesis, Identity, Input, Operation, StateCell, StateData, StateValue,
 };
 
 use crate::{Api, Articles, DataCell, MethodName, Schema, StateAtom, StateName};
@@ -62,20 +62,37 @@ pub struct IssueParams {
 }
 
 impl Schema {
-    pub fn start_issue(self, method: impl Into<MethodName>, consensus: Consensus, testnet: bool) -> IssueBuilder {
+    pub fn start_issue(
+        self,
+        codex: Codex,
+        method: impl Into<MethodName>,
+        consensus: Consensus,
+        testnet: bool,
+    ) -> IssueBuilder {
+        assert_eq!(self.codex_id, codex.codex_id(), "schema codex id doesn't match issued contract id");
         let builder = Builder::new(self.call_id(method));
-        IssueBuilder { builder, schema: self, testnet, consensus }
+        IssueBuilder { builder, codex, schema: self, testnet, consensus }
     }
 
-    pub fn start_issue_mainnet(self, method: impl Into<MethodName>, consensus: Consensus) -> IssueBuilder {
-        self.start_issue(method, consensus, false)
+    pub fn start_issue_mainnet(
+        self,
+        codex: Codex,
+        method: impl Into<MethodName>,
+        consensus: Consensus,
+    ) -> IssueBuilder {
+        self.start_issue(codex, method, consensus, false)
     }
-    pub fn start_issue_testnet(self, method: impl Into<MethodName>, consensus: Consensus) -> IssueBuilder {
-        self.start_issue(method, consensus, true)
+    pub fn start_issue_testnet(
+        self,
+        codex: Codex,
+        method: impl Into<MethodName>,
+        consensus: Consensus,
+    ) -> IssueBuilder {
+        self.start_issue(codex, method, consensus, true)
     }
 
-    pub fn issue(self, params: IssueParams) -> Articles {
-        let mut builder = self.start_issue(params.core.method, params.consensus, params.testnet);
+    pub fn issue(self, codex: Codex, params: IssueParams) -> Articles {
+        let mut builder = self.start_issue(codex, params.core.method, params.consensus, params.testnet);
 
         for NamedState { name, state } in params.core.global {
             builder = builder.append(name, state.verified, state.unverified)
@@ -92,6 +109,7 @@ impl Schema {
 #[derive(Clone, Debug)]
 pub struct IssueBuilder {
     builder: Builder,
+    codex: Codex,
     schema: Schema,
     testnet: bool,
     consensus: Consensus,
@@ -127,13 +145,8 @@ impl IssueBuilder {
             name: ContractName::Named(name.into()),
             issuer: Identity::default(),
         };
-        let genesis = self.builder.issue_genesis(self.schema.codex.codex_id());
-        let contract = Contract {
-            version: default!(),
-            meta,
-            codex: self.schema.codex.clone(),
-            genesis,
-        };
+        let genesis = self.builder.issue_genesis(self.schema.codex_id);
+        let contract = Contract { version: default!(), meta, codex: self.codex, genesis };
         Articles { contract, contract_sigs: none!(), schema: self.schema }
     }
 }
