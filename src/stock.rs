@@ -219,7 +219,7 @@ impl<S: Supply> Stock<S> {
             return Ok(false);
         }
 
-        self.articles.schema.codex.verify(
+        self.articles.contract.codex.verify(
             self.articles.contract.contract_id(),
             &operation,
             &self.state.raw,

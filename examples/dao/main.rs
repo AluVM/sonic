@@ -119,7 +119,7 @@ fn main() {
     let api = api();
 
     // Creating DAO with three participants
-    let issuer = Schema::new(codex, api, [libs::success()], types.type_system());
+    let issuer = Schema::new(codex.codex_id(), api, [libs::success()], types.type_system());
     issuer
         .save("examples/dao/data/SimpleDAO.issuer")
         .expect("unable to save issuer to a file");
@@ -138,7 +138,7 @@ fn main() {
     let carol_auth = next_auth();
 
     let articles = issuer
-        .start_issue_testnet("setup", Consensus::None)
+        .start_issue_testnet(codex, "setup", Consensus::None)
         // Alice
         .append("_parties", svnum!(0u64), Some(ston!(name "alice", identity "Alice Wonderland")))
         .assign("signers", alice_auth, svnum!(0u64), None)
