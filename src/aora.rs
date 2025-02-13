@@ -141,6 +141,9 @@ pub mod file {
                 return;
             }
             let id = id.into();
+            self.log
+                .seek(SeekFrom::End(0))
+                .expect("unable to seek to the end of the log");
             let pos = self
                 .log
                 .stream_position()
