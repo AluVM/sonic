@@ -132,6 +132,7 @@ impl<S: Supply> Stock<S> {
             let st = self.supply.trace_mut().read(opid);
             opids.extend(st.destroyed.into_keys().map(|a| a.opid));
         }
+        opids.remove(&self.articles.contract.genesis_opid());
 
         // TODO: Include all operations defining published state
 
