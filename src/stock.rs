@@ -127,24 +127,24 @@ impl<S: Supply> Stock<S> {
             .into_iter()
             .map(|terminal| self.state.addr(*terminal.borrow()).opid)
             .collect::<BTreeSet<_>>();
+        let genesis_opid = self.articles.contract.genesis_opid();
+        queue.remove(&genesis_opid);
         let mut opids = queue.clone();
         while let Some(opid) = queue.pop_first() {
             let st = self.supply.trace_mut().read(opid);
             for prev in st.destroyed.into_keys().map(|a| a.opid) {
-                if opids.contains(&prev) {
-                    continue;
+                if !opids.contains(&prev) && prev != genesis_opid {
+                    opids.insert(prev);
+                    queue.insert(prev);
                 }
-                opids.insert(prev);
-                queue.insert(prev);
             }
         }
-        opids.remove(&self.articles.contract.genesis_opid());
 
         // TODO: Include all operations defining published state
 
         // Write articles
         writer = self.articles.strict_encode(writer)?;
-        writer = aux(self.articles.contract.genesis_opid(), writer)?;
+        writer = aux(genesis_opid, writer)?;
         // Stream operations
         for (opid, op) in self.operations() {
             if !opids.remove(&opid) {
