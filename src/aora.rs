@@ -30,13 +30,19 @@ pub trait Aora {
     type Item: Sized;
     type Id: Into<[u8; 32]> + From<[u8; 32]>;
 
+    /// Adds item to the append-only log. If the item is already in the log, does noting.
+    ///
+    /// # Panic
+    ///
+    /// Panics if item under the given id is different from another item under the same id already
+    /// present in the log
     fn append(&mut self, id: Self::Id, item: &Self::Item);
     fn extend(&mut self, iter: impl IntoIterator<Item = (Self::Id, impl Borrow<Self::Item>)>) {
         for (id, item) in iter {
             self.append(id, item.borrow());
         }
     }
-    fn has(&self, id: Self::Id) -> bool;
+    fn has(&self, id: &Self::Id) -> bool;
     fn read(&mut self, id: Self::Id) -> Self::Item;
     fn iter(&mut self) -> impl Iterator<Item = (Self::Id, Self::Item)>;
 }
@@ -119,11 +125,21 @@ pub mod file {
         }
     }
 
-    impl<Id: Ord + From<[u8; 32]> + Into<[u8; 32]>, T: StrictEncode + StrictDecode> Aora for FileAora<Id, T> {
+    impl<Id: Ord + From<[u8; 32]> + Into<[u8; 32]>, T: Eq + StrictEncode + StrictDecode> Aora for FileAora<Id, T> {
         type Item = T;
         type Id = Id;
 
         fn append(&mut self, id: Self::Id, item: &T) {
+            if self.has(&id) {
+                let old = self.read(id);
+                if &old != item {
+                    panic!(
+                        "item under the given id is different from another item under the same id already present in \
+                         the log"
+                    );
+                }
+                return;
+            }
             let id = id.into();
             let pos = self
                 .log
@@ -141,7 +157,7 @@ pub mod file {
             self.index.insert(id.into(), pos);
         }
 
-        fn has(&self, id: Self::Id) -> bool { self.index.contains_key(&id) }
+        fn has(&self, id: &Self::Id) -> bool { self.index.contains_key(id) }
 
         fn read(&mut self, id: Self::Id) -> T {
             let pos = self.index.get(&id).expect("unknown item");
