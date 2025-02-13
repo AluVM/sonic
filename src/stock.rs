@@ -123,14 +123,20 @@ impl<S: Supply> Stock<S> {
         mut writer: StrictWriter<W>,
         mut aux: impl FnMut(Opid, StrictWriter<W>) -> io::Result<StrictWriter<W>>,
     ) -> io::Result<()> {
-        let queue = terminals
+        let mut queue = terminals
             .into_iter()
             .map(|terminal| self.state.addr(*terminal.borrow()).opid)
             .collect::<BTreeSet<_>>();
         let mut opids = queue.clone();
-        for opid in queue {
+        while let Some(opid) = queue.pop_first() {
             let st = self.supply.trace_mut().read(opid);
-            opids.extend(st.destroyed.into_keys().map(|a| a.opid));
+            for prev in st.destroyed.into_keys().map(|a| a.opid) {
+                if opids.contains(&prev) {
+                    continue;
+                }
+                opids.insert(prev);
+                queue.insert(prev);
+            }
         }
         opids.remove(&self.articles.contract.genesis_opid());
 
