@@ -140,12 +140,22 @@ impl<S: Supply> Stock<S> {
         writer = aux(self.articles.contract.genesis_opid(), writer)?;
         // Stream operations
         for (opid, op) in self.operations() {
-            if !opids.contains(&opid) {
+            if !opids.remove(&opid) {
                 continue;
             }
             writer = op.strict_encode(writer)?;
             writer = aux(opid, writer)?;
         }
+
+        debug_assert!(
+            opids.is_empty(),
+            "Missing operations: {}",
+            opids
+                .into_iter()
+                .map(|opid| opid.to_string())
+                .collect::<Vec<_>>()
+                .join("\n -")
+        );
 
         Ok(())
     }
