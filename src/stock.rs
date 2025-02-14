@@ -37,6 +37,8 @@ use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Operation, Opid};
 use crate::aora::Aora;
 use crate::{Articles, EffectiveState, RawState, Transition};
 
+/// Persistence API for keeping and accessing the contract.
+///
 /// NB: Methods in the trait do not error; instead, they must perform all operations asynchronously,
 /// for instance in a separate thread or using channels; and in case of error the error must be
 /// reported elsewhere (via logging, or using a dedicated error reporting microservice).
