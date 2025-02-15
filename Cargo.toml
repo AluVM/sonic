@@ -4,7 +4,7 @@ default-members = [".", "api", "callreq"]
 resolver = "2"
 
 [workspace.package]
-version = "0.12.0-beta.4"
+version = "0.12.0-beta.5"
 authors = ["Dr Maxim Orlovsky <orlovsky@ubideco.org>"]
 repository = "https://github.com/AluVM/sonare"
 homepage = "https://ubideco.org/SONARE"
@@ -17,13 +17,13 @@ rust-version = "1.82.0" # Due to precise capturing with `use`
 [workspace.dependencies]
 amplify = "~4.8.0"
 strict_encoding = "~2.8.1"
-strict_types = "~2.8.1"
-commit_verify = "=0.12.0-beta.4"
-aluvm = "=0.12.0-beta.4"
-ultrasonic = "=0.12.0-beta.4"
-sonic-api = { version = "=0.12.0-beta.4", path = "api" }
-sonic-callreq = { version = "=0.12.0-beta.4", path = "callreq" }
-hypersonic = { version = "=0.12.0-beta.4", path = "." }
+strict_types = "~2.8.2"
+commit_verify = "=0.12.0-beta.5"
+aluvm = "=0.12.0-beta.5"
+ultrasonic = "=0.12.0-beta.5"
+sonic-api = { version = "=0.12.0-beta.5", path = "api" }
+sonic-callreq = { version = "=0.12.0-beta.5", path = "callreq" }
+hypersonic = { version = "=0.12.0-beta.5", path = "." }
 baid64 = "0.4.1"
 indexmap = "2.6.0"
 chrono = "0.4.38"
@@ -91,6 +91,3 @@ wasm-bindgen-test = "0.3"
 
 [package.metadata.docs.rs]
 features = ["all"]
-
-[patch.crates-io]
-ultrasonic = { git = "https://github.com/AluVM/ultrasonic", branch = "master" }
