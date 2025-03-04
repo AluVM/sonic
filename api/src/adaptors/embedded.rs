@@ -173,7 +173,7 @@ impl EmbeddedImmutable {
             elems.push(u256::from_le_bytes(buf));
         }
 
-        StateValue::from(elems)
+        StateValue::from_iter(elems)
     }
 }
 

@@ -91,3 +91,8 @@ wasm-bindgen-test = "0.3"
 
 [package.metadata.docs.rs]
 features = ["all"]
+
+[patch.crates-io]
+aluvm = { git = "https://github.com/AluVM/aluvm", branch = "master" }
+zk-aluvm = { git = "https://github.com/AluVM/zk-aluvm", branch = "master" }
+ultrasonic = { git = "https://github.com/AluVM/ultrasonic", branch = "master" }
