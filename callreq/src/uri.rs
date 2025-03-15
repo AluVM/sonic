@@ -41,7 +41,7 @@ use strict_types::{InvalidRString, StrictVal};
 use crate::{CallRequest, CallState, Endpoint};
 
 const URI_SCHEME: &str = "contract";
-const LOCK: &str = "expiry";
+const LOCK: &str = "lock";
 const EXPIRY: &str = "expiry";
 const ENDPOINTS: &str = "endpoints";
 const ENDPOINT_SEP: char = ',';
