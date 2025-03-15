@@ -397,6 +397,10 @@ pub mod fs {
             Self { path, stash, trace }
         }
 
+        pub fn path(&self) -> &Path {
+            &self.path
+        }
+
         pub fn open(path: impl AsRef<Path>) -> Self {
             let path = path.as_ref().to_path_buf();
             let stash = FileAora::open(&path, "stash");
