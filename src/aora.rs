@@ -56,16 +56,30 @@ pub mod file {
     use std::marker::PhantomData;
     use std::path::{Path, PathBuf};
 
-    use strict_encoding::{StreamReader, StreamWriter, StrictDecode, StrictEncode, StrictReader, StrictWriter};
+    use amplify::confinement::ConfinedVec;
+    use strict_encoding::{
+        ReadRaw, StreamReader, StreamWriter, StrictDecode, StrictDumb, StrictEncode, StrictReader, StrictType,
+        StrictWriter, TypedWrite,
+    };
 
     use super::*;
     use crate::expect::Expect;
+    use crate::LIB_NAME_SONIC;
 
     pub struct FileAora<Id: Ord + From<[u8; 32]>, T> {
         log: File,
         idx: File,
         index: BTreeMap<Id, u64>,
         _phantom: PhantomData<T>,
+    }
+
+    #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug)]
+    #[derive(StrictType, StrictEncode, StrictDumb, StrictDecode)]
+    #[strict_type(lib = LIB_NAME_SONIC)]
+    #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+    struct FileAoraBlob<T: Eq + StrictEncode + StrictDecode + StrictDumb> {
+        index: ConfinedVec<[u8; 32]>,
+        items: ConfinedVec<T>,
     }
 
     impl<Id: Ord + From<[u8; 32]>, T> FileAora<Id, T> {
@@ -185,6 +199,38 @@ pub mod file {
         }
     }
 
+    impl<Id: Ord + From<[u8; 32]> + Into<[u8; 32]> + Clone, T: Eq + StrictEncode + StrictDecode + StrictDumb>
+        FileAora<Id, T>
+    {
+        pub fn export<W: TypedWrite>(&mut self, mut writer: W) -> io::Result<W> {
+            let index = ConfinedVec::<[u8; 32]>::from_checked(
+                self.index
+                    .keys()
+                    .map(|id| id.clone().into())
+                    .collect::<Vec<_>>(),
+            );
+
+            let data = ConfinedVec::from_checked(self.iter().map(|(_, item)| item).collect());
+
+            let blob = FileAoraBlob { index, items: data };
+
+            writer = blob.strict_encode(writer)?;
+
+            Ok(writer)
+        }
+
+        pub fn import(&mut self, reader: &mut StrictReader<impl ReadRaw>) -> io::Result<()> {
+            let blob =
+                FileAoraBlob::<T>::strict_decode(reader).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+
+            for (i, id) in blob.index.iter().enumerate() {
+                self.append((*id).into(), &blob.items[i]);
+            }
+
+            Ok(())
+        }
+    }
+
     pub struct Iter<'file, Id: From<[u8; 32]>, T: StrictDecode> {
         log: StrictReader<StreamReader<&'file File>>,
         idx: &'file File,
@@ -203,5 +249,272 @@ pub mod file {
             let item = T::strict_decode(&mut self.log).ok()?;
             Some((id.into(), item))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use amplify::confinement::ConfinedString;
+    use sonicapi::LIB_NAME_SONIC;
+    use strict_encoding::{StreamReader, StreamWriter, StrictReader, StrictWriter};
+    use tempfile::tempdir;
+
+    use super::file::FileAora;
+    use super::*;
+
+    // Test type that implements all required traits
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+    #[strict_type(lib = LIB_NAME_SONIC)]
+    #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+    struct TestItem {
+        value: u32,
+        data: ConfinedString,
+    }
+
+    // Helper function to create a temporary FileAora instance
+    fn setup_test_aora() -> (tempfile::TempDir, FileAora<[u8; 32], TestItem>) {
+        let dir = tempdir().unwrap();
+        let aora = FileAora::new(&dir, "test");
+        (dir, aora)
+    }
+
+    #[test]
+    fn test_new_creates_files() {
+        let dir = tempdir().unwrap();
+        let name = "test_create";
+
+        // Explicitly create log and idx paths
+        let path = dir.as_ref();
+        let log = path.join(format!("{name}.log"));
+        let idx = path.join(format!("{name}.idx"));
+        let (log_path, idx_path) = (log, idx);
+
+        // Files shouldn't exist before creation
+        assert!(!log_path.exists());
+        assert!(!idx_path.exists());
+
+        // Files shouldn't exist before creation
+        assert!(!log_path.exists());
+        assert!(!idx_path.exists());
+
+        // Create new instance
+        let _aora = FileAora::<[u8; 32], TestItem>::new(&dir, name);
+
+        // Files should exist after creation
+        assert!(log_path.exists());
+        assert!(idx_path.exists());
+    }
+
+    #[test]
+    fn test_open_existing() {
+        let (dir, mut aora) = setup_test_aora();
+
+        // Add some data
+        let id1 = [1u8; 32];
+        let item1 = TestItem {
+            value: 42,
+            data: ConfinedString::from_checked("test1".to_string()),
+        };
+        aora.append(id1, &item1);
+
+        // Create new instance by opening existing files
+        let mut opened_aora = FileAora::<[u8; 32], TestItem>::open(&dir, "test");
+
+        // Verify the data is still there
+        assert!(opened_aora.has(&id1));
+        assert_eq!(opened_aora.read(id1), item1);
+    }
+
+    #[test]
+    fn test_append_and_read() {
+        let (_, mut aora) = setup_test_aora();
+
+        let id1 = [1u8; 32];
+        let item1 = TestItem {
+            value: 42,
+            data: ConfinedString::from_checked("test1".to_string()),
+        };
+
+        // Append and verify
+        aora.append(id1, &item1);
+        assert!(aora.has(&id1));
+        assert_eq!(aora.read(id1), item1);
+
+        // Append another item
+        let id2 = [2u8; 32];
+        let item2 = TestItem {
+            value: 100,
+            data: ConfinedString::from_checked("test2".to_string()),
+        };
+        aora.append(id2, &item2);
+
+        // Verify both items exist
+        assert!(aora.has(&id1));
+        assert!(aora.has(&id2));
+        assert_eq!(aora.read(id1), item1);
+        assert_eq!(aora.read(id2), item2);
+    }
+
+    #[test]
+    fn test_append_same_item_twice() {
+        let (_, mut aora) = setup_test_aora();
+
+        let id = [1u8; 32];
+        let item = TestItem {
+            value: 42,
+            data: ConfinedString::from_checked("test".to_string()),
+        };
+
+        // First append
+        aora.append(id, &item);
+
+        // Second append with same data should be fine
+        aora.append(id, &item);
+
+        // Verify still only one item exists
+        assert_eq!(aora.iter().count(), 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "item under the given id is different")]
+    fn test_append_conflicting_item() {
+        let (_, mut aora) = setup_test_aora();
+
+        let id = [1u8; 32];
+        let item1 = TestItem {
+            value: 42,
+            data: ConfinedString::from_checked("test1".to_string()),
+        };
+        let item2 = TestItem {
+            value: 42,
+            data: ConfinedString::from_checked("test2".to_string()),
+        };
+
+        aora.append(id, &item1);
+        aora.append(id, &item2); // This should panic
+    }
+
+    #[test]
+    fn test_extend() {
+        let (_, mut aora) = setup_test_aora();
+
+        let items = vec![
+            ([1u8; 32], TestItem {
+                value: 1,
+                data: ConfinedString::from_checked("one".to_string()),
+            }),
+            ([2u8; 32], TestItem {
+                value: 2,
+                data: ConfinedString::from_checked("two".to_string()),
+            }),
+            ([3u8; 32], TestItem {
+                value: 3,
+                data: ConfinedString::from_checked("three".to_string()),
+            }),
+        ];
+
+        aora.extend(items.iter().map(|(id, item)| (*id, item)));
+
+        assert_eq!(aora.iter().count(), 3);
+        assert!(aora.has(&[1u8; 32]));
+        assert!(aora.has(&[2u8; 32]));
+        assert!(aora.has(&[3u8; 32]));
+    }
+
+    #[test]
+    fn test_iter() {
+        let (_, mut aora) = setup_test_aora();
+
+        let items = vec![
+            ([1u8; 32], TestItem {
+                value: 1,
+                data: ConfinedString::from_checked("one".to_string()),
+            }),
+            ([2u8; 32], TestItem {
+                value: 2,
+                data: ConfinedString::from_checked("two".to_string()),
+            }),
+            ([3u8; 32], TestItem {
+                value: 3,
+                data: ConfinedString::from_checked("three".to_string()),
+            }),
+        ];
+
+        for (id, item) in &items {
+            aora.append(*id, item);
+        }
+
+        let mut iter = aora.iter();
+        for (expected_id, expected_item) in items {
+            let (actual_id, actual_item) = iter.next().unwrap();
+            assert_eq!(actual_id, expected_id);
+            assert_eq!(actual_item, expected_item);
+        }
+
+        assert!(iter.next().is_none());
+    }
+
+    #[test]
+    fn test_export_import() {
+        let (_dir, mut aora) = setup_test_aora();
+
+        // Add some data
+        let items = vec![
+            ([1u8; 32], TestItem {
+                value: 1,
+                data: ConfinedString::from_checked("one".to_string()),
+            }),
+            ([2u8; 32], TestItem {
+                value: 2,
+                data: ConfinedString::from_checked("two".to_string()),
+            }),
+            ([3u8; 32], TestItem {
+                value: 3,
+                data: ConfinedString::from_checked("three".to_string()),
+            }),
+        ];
+
+        for (id, item) in &items {
+            aora.append(*id, item);
+        }
+
+        // Export to a vector
+        let file = tempfile::NamedTempFile::new().unwrap();
+        let writer = StrictWriter::with(StreamWriter::new::<{ usize::MAX }>(file.as_file()));
+
+        let _ = aora.export(writer).expect("unable to export data");
+
+        // Create a new AORA and import the data
+        let (_, mut new_aora) = setup_test_aora();
+        let mut reader =
+            StrictReader::with(StreamReader::new::<{ usize::MAX }>(file.reopen().expect("unable to reopen file")));
+
+        new_aora.import(&mut reader).expect("unable to import data");
+
+        // Verify all data was imported correctly
+        for (id, item) in items {
+            assert!(new_aora.has(&id));
+            assert_eq!(new_aora.read(id), item);
+        }
+    }
+
+    #[test]
+    fn test_empty_iter() {
+        let (_, mut aora) = setup_test_aora();
+        assert_eq!(aora.iter().count(), 0);
+    }
+
+    #[test]
+    fn test_has_nonexistent() {
+        let (_, aora) = setup_test_aora();
+        assert!(!aora.has(&[1u8; 32]));
+    }
+
+    #[test]
+    #[should_panic(expected = "unknown item")]
+    fn test_read_nonexistent() {
+        let (_, mut aora) = setup_test_aora();
+        aora.read([1u8; 32]);
     }
 }
