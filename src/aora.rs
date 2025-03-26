@@ -399,8 +399,7 @@ mod tests {
     fn test_extend() {
         let (_, mut aora) = setup_test_aora();
 
-        let items = vec![
-            ([1u8; 32], TestItem {
+        let items = [([1u8; 32], TestItem {
                 value: 1,
                 data: ConfinedString::from_checked("one".to_string()),
             }),
@@ -411,8 +410,7 @@ mod tests {
             ([3u8; 32], TestItem {
                 value: 3,
                 data: ConfinedString::from_checked("three".to_string()),
-            }),
-        ];
+            })];
 
         aora.extend(items.iter().map(|(id, item)| (*id, item)));
 
