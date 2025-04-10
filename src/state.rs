@@ -29,7 +29,6 @@ use strict_encoding::{StrictDeserialize, StrictSerialize, TypeName};
 use strict_types::{StrictVal, TypeSystem};
 use ultrasonic::{AuthToken, CellAddr, Memory, Operation, Opid, StateCell, StateData, StateValue};
 
-use crate::expect::Expect;
 use crate::LIB_NAME_SONIC;
 
 /// State transitions keeping track of the operation reference plus the state destroyed by the
@@ -139,7 +138,7 @@ impl RawState {
         *self
             .auth
             .get(&auth)
-            .expect_or_else(|| format!("undefined token of authority {auth}"))
+            .unwrap_or_else(|| panic!("undefined token of authority {auth}"))
     }
 
     #[must_use]

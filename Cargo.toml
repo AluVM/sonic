@@ -24,6 +24,7 @@ ultrasonic = "=0.12.0-beta.5"
 sonic-api = { version = "=0.12.0-beta.5", path = "api" }
 sonic-callreq = { version = "=0.12.0-beta.5", path = "callreq" }
 hypersonic = { version = "=0.12.0-beta.5", path = "." }
+aora = "0.2.0"
 baid64 = "0.4.1"
 indexmap = "2.6.0"
 chrono = "0.4.38"
@@ -61,6 +62,7 @@ aluvm.workspace = true
 ultrasonic.workspace = true
 sonic-api.workspace = true
 sonic-callreq.workspace = true
+aora.workspace = true
 serde = { workspace = true, optional = true }
 
 [features]

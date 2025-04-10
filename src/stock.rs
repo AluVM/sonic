@@ -28,13 +28,13 @@ use std::io;
 use std::io::ErrorKind;
 
 use aluvm::LibSite;
+use aora::Aora;
 use sonic_callreq::{MethodName, StateName};
 use sonicapi::{CoreParams, MergeError, NamedState, OpBuilder};
 use strict_encoding::{DecodeError, ReadRaw, StrictDecode, StrictEncode, StrictReader, StrictWriter, WriteRaw};
 use strict_types::StrictVal;
 use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Operation, Opid};
 
-use crate::aora::Aora;
 use crate::{Articles, EffectiveState, RawState, Transition};
 
 /// Persistence API for keeping and accessing the contract.
@@ -369,11 +369,11 @@ pub mod fs {
     use std::path::{Path, PathBuf};
 
     use amplify::confinement::U64 as U64MAX;
+    use aora::file::FileAora;
     use strict_encoding::{StreamReader, StreamWriter, StrictDeserialize, StrictSerialize};
     use ultrasonic::ContractName;
 
     use super::*;
-    use crate::aora::file::FileAora;
 
     pub struct FileSupply {
         path: PathBuf,
@@ -397,9 +397,7 @@ pub mod fs {
             Self { path, stash, trace }
         }
 
-        pub fn path(&self) -> &Path {
-            &self.path
-        }
+        pub fn path(&self) -> &Path { &self.path }
 
         pub fn open(path: impl AsRef<Path>) -> Self {
             let path = path.as_ref().to_path_buf();

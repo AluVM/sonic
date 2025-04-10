@@ -42,9 +42,6 @@ extern crate serde;
 pub use sonicapi::*;
 pub use ultrasonic::*;
 
-pub mod aora;
-pub mod expect;
-
 mod state;
 mod stock;
 
