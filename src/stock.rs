@@ -239,25 +239,39 @@ impl<S: Supply> Stock<S> {
 
         let opid = operation.opid();
 
-        if self.supply.stash().has(&opid) {
-            return Ok(false);
+        let present = self.supply.stash().has(&opid);
+        if !present {
+            self.articles.schema.codex.verify(
+                self.articles.contract.contract_id(),
+                &operation,
+                &self.state.raw,
+                &self.articles.schema,
+            )?;
         }
+        self.apply_internal(opid, operation, present);
 
-        self.articles.schema.codex.verify(
-            self.articles.contract.contract_id(),
-            &operation,
-            &self.state.raw,
-            &self.articles.schema,
-        )?;
-
-        self.apply(operation);
-
-        Ok(true)
+        Ok(present)
     }
 
-    pub fn apply(&mut self, operation: Operation) {
+    /// Adds operation which was already checked to the stock. This does the following:
+    /// - includes raw operation to stash;
+    /// - computes state modification and applies it to the state;
+    /// - saves removed state as a [`Transition`] and adds it to the execution trace.
+    ///
+    /// # Returns
+    ///
+    /// State invalidated by the operation in form of a [`Transition`].
+    // TODO: Introduce type [`ValidOperation`] and use it here.
+    pub fn apply(&mut self, operation: Operation) -> Transition {
         let opid = operation.opid();
-        self.supply.stash_mut().append(opid, &operation);
+        let present = self.supply.stash().has(&opid);
+        self.apply_internal(opid, operation, present)
+    }
+
+    fn apply_internal(&mut self, opid: Opid, operation: Operation, present: bool) -> Transition {
+        if !present {
+            self.supply.stash_mut().append(opid, &operation);
+        }
 
         let transition = self.state.apply(
             operation,
@@ -266,6 +280,7 @@ impl<S: Supply> Stock<S> {
             &self.articles.schema.types,
         );
         self.supply.trace_mut().append(opid, &transition);
+        transition
     }
 
     pub fn complete_update(&mut self) {
