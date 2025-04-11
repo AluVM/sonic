@@ -33,7 +33,7 @@ use sonic_callreq::{MethodName, StateName};
 use sonicapi::{CoreParams, MergeError, NamedState, OpBuilder};
 use strict_encoding::{DecodeError, ReadRaw, StrictDecode, StrictEncode, StrictReader, StrictWriter, WriteRaw};
 use strict_types::StrictVal;
-use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Operation, Opid};
+use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Operation, Opid, VerifiedOperation};
 
 use crate::{Articles, EffectiveState, RawState, Transition};
 
@@ -70,7 +70,7 @@ pub struct Stock<S: Supply> {
 }
 
 impl<S: Supply> Stock<S> {
-    pub fn create(articles: Articles, persistence: S) -> Self {
+    pub fn create(articles: Articles, persistence: S) -> Result<Self, CallError> {
         let mut state = EffectiveState::default();
 
         let genesis = articles
@@ -78,9 +78,15 @@ impl<S: Supply> Stock<S> {
             .genesis
             .to_operation(articles.contract.contract_id());
 
+        let verified =
+            articles
+                .schema
+                .codex
+                .verify(articles.contract.contract_id(), genesis, &state.raw, &articles.schema)?;
+
         // We do not need state transition for geneis.
         let _ = state.apply(
-            genesis,
+            verified,
             &articles.schema.default_api,
             articles.schema.custom_apis.keys(),
             &articles.schema.types,
@@ -89,7 +95,7 @@ impl<S: Supply> Stock<S> {
         let mut me = Self { articles, state, supply: persistence };
         me.recompute_state();
         me.save();
-        me
+        Ok(me)
     }
 
     pub fn open(articles: Articles, persistence: S) -> Self {
@@ -241,14 +247,14 @@ impl<S: Supply> Stock<S> {
 
         let present = self.supply.stash().has(&opid);
         if !present {
-            self.articles.schema.codex.verify(
+            let verified = self.articles.schema.codex.verify(
                 self.articles.contract.contract_id(),
-                &operation,
+                operation,
                 &self.state.raw,
                 &self.articles.schema,
             )?;
+            self.apply_internal(opid, verified, present);
         }
-        self.apply_internal(opid, operation, present);
 
         Ok(present)
     }
@@ -262,15 +268,17 @@ impl<S: Supply> Stock<S> {
     ///
     /// State invalidated by the operation in form of a [`Transition`].
     // TODO: Introduce type [`ValidOperation`] and use it here.
-    pub fn apply(&mut self, operation: Operation) -> Transition {
+    pub fn apply(&mut self, operation: VerifiedOperation) -> Transition {
         let opid = operation.opid();
         let present = self.supply.stash().has(&opid);
         self.apply_internal(opid, operation, present)
     }
 
-    fn apply_internal(&mut self, opid: Opid, operation: Operation, present: bool) -> Transition {
+    fn apply_internal(&mut self, opid: Opid, operation: VerifiedOperation, present: bool) -> Transition {
         if !present {
-            self.supply.stash_mut().append(opid, &operation);
+            self.supply
+                .stash_mut()
+                .append(opid, operation.as_operation());
         }
 
         let transition = self.state.apply(
@@ -458,7 +466,7 @@ pub mod fs {
     }
 
     impl Stock<FileSupply> {
-        pub fn new(articles: Articles, path: impl AsRef<Path>) -> Self {
+        pub fn new(articles: Articles, path: impl AsRef<Path>) -> Result<Self, CallError> {
             let name = match &articles.contract.meta.name {
                 ContractName::Unnamed => articles.contract_id().to_string(),
                 ContractName::Named(name) => name.to_string(),

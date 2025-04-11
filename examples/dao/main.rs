@@ -37,7 +37,8 @@ use commit_verify::{Digest, Sha256};
 use hypersonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc, EmbeddedReaders};
 use hypersonic::{Api, ApiInner, AppendApi, DestructibleApi, Schema, Stock};
 use strict_types::{SemId, StrictVal};
-use ultrasonic::{AuthToken, CellAddr, Codex, Consensus, Identity, FIELD_ORDER_SECP};
+use ultrasonic::aluvm::FIELD_ORDER_SECP;
+use ultrasonic::{AuthToken, CellAddr, Codex, Consensus, Identity};
 
 fn codex() -> Codex {
     let lib = libs::success();
@@ -159,7 +160,7 @@ fn main() {
         fs::remove_dir_all(contract_path).expect("unable to remove contract file");
     }
 
-    let mut stock = Stock::new(articles, "examples/dao/data");
+    let mut stock = Stock::new(articles, "examples/dao/data").expect("invalid articles");
 
     // Proposing vote
     let votings = stock

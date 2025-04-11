@@ -27,7 +27,7 @@ use amplify::confinement::{LargeOrdMap, SmallOrdMap};
 use sonicapi::{Api, Schema, StateAtom, StateName};
 use strict_encoding::{StrictDeserialize, StrictSerialize, TypeName};
 use strict_types::{StrictVal, TypeSystem};
-use ultrasonic::{AuthToken, CellAddr, Memory, Operation, Opid, StateCell, StateData, StateValue};
+use ultrasonic::{AuthToken, CellAddr, Memory, Opid, StateCell, StateData, StateValue, VerifiedOperation};
 
 use crate::LIB_NAME_SONIC;
 
@@ -96,7 +96,7 @@ impl EffectiveState {
     #[must_use]
     pub(crate) fn apply<'a>(
         &mut self,
-        op: Operation,
+        op: VerifiedOperation,
         default_api: &Api,
         custom_apis: impl IntoIterator<Item = &'a Api>,
         sys: &TypeSystem,
@@ -142,8 +142,9 @@ impl RawState {
     }
 
     #[must_use]
-    pub fn apply(&mut self, op: Operation) -> Transition {
+    pub fn apply(&mut self, op: VerifiedOperation) -> Transition {
         let opid = op.opid();
+        let op = op.into_operation();
         let mut transition = Transition::new(opid);
 
         for input in op.destroying {
@@ -222,8 +223,9 @@ impl AdaptedState {
         }
     }
 
-    pub(self) fn apply(&mut self, op: &Operation, api: &Api, sys: &TypeSystem) {
+    pub(self) fn apply(&mut self, op: &VerifiedOperation, api: &Api, sys: &TypeSystem) {
         let opid = op.opid();
+        let op = op.as_operation();
         for (no, state) in op.immutable.iter().enumerate() {
             if let Some((name, atom)) = api.convert_immutable(state, sys) {
                 self.immutable

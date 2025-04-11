@@ -5,7 +5,7 @@ version = 3
 [[package]]
 name = "aluvm"
 version = "0.12.0-beta.5"
-source = "git+https://github.com/AluVM/aluvm?branch=master#fa3b501e4810f6a8fd423814708bff729bea16c8"
+source = "git+https://github.com/AluVM/aluvm?branch=master#3e8f8ea500bcd91b3b7bd3ec2caeafad18542bf2"
 dependencies = [
  "amplify",
  "ascii-armor",
@@ -940,7 +940,7 @@ checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 [[package]]
 name = "ultrasonic"
 version = "0.12.0-beta.5"
-source = "git+https://github.com/AluVM/ultrasonic?branch=master#d1c01890c834c5abcb31c8e6f1677c8dc80a59bd"
+source = "git+https://github.com/AluVM/ultrasonic?branch=master#07c16915f96f7c7606c7ed00dd09f2e3eea57cb9"
 dependencies = [
  "amplify",
  "baid64",
@@ -1238,7 +1238,7 @@ dependencies = [
 [[package]]
 name = "zk-aluvm"
 version = "0.12.0-beta.5"
-source = "git+https://github.com/AluVM/zk-aluvm?branch=master#3d6c3b347ade3b5c8eede621c7cbbe49be50722a"
+source = "git+https://github.com/AluVM/zk-aluvm?branch=master#5d627f8389337665adeeae2b42c35b0d7e6e7f02"
 dependencies = [
  "aluvm",
  "amplify",
