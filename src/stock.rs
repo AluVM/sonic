@@ -23,6 +23,7 @@
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use core::borrow::Borrow;
+use std::collections::VecDeque;
 // Used in strict encoding; once solved there, remove here
 use std::io;
 use std::io::ErrorKind;
@@ -43,14 +44,18 @@ use crate::{Articles, EffectiveState, RawState, Transition};
 /// for instance in a separate thread or using channels; and in case of error the error must be
 /// reported elsewhere (via logging, or using a dedicated error reporting microservice).
 pub trait Supply {
-    type Stash: Aora<Id = Opid, Item = Operation>;
-    type Trace: Aora<Id = Opid, Item = Transition>;
+    type Stash: Aora<Opid, Operation>;
+    type Trace: Aora<Opid, Transition>;
+    // Map of operations which spent a given output
+    type Spent: Aora<CellAddr, Opid, 34>;
 
     fn stash(&self) -> &Self::Stash;
     fn trace(&self) -> &Self::Trace;
+    fn spent(&self) -> &Self::Spent;
 
     fn stash_mut(&mut self) -> &mut Self::Stash;
     fn trace_mut(&mut self) -> &mut Self::Trace;
+    fn spent_mut(&mut self) -> &mut Self::Spent;
 
     fn save_articles(&self, obj: &Articles);
     fn load_articles(&self) -> Articles;
@@ -139,7 +144,7 @@ impl<S: Supply> Stock<S> {
         queue.remove(&genesis_opid);
         let mut opids = queue.clone();
         while let Some(opid) = queue.pop_first() {
-            let st = self.supply.trace_mut().read(opid);
+            let st = self.supply.trace_mut().read(&opid);
             for prev in st.destroyed.into_keys().map(|a| a.opid) {
                 if !opids.contains(&prev) && prev != genesis_opid {
                     opids.insert(prev);
@@ -198,8 +203,41 @@ impl<S: Supply> Stock<S> {
         Ok(())
     }
 
-    pub fn rollback(&self, ops: impl IntoIterator<Item = Opid>) { todo!() }
-    pub fn forward(&self, ops: impl IntoIterator<Item = Opid>) { todo!() }
+    pub fn rollback(&mut self, opids: impl IntoIterator<Item = Opid>) {
+        let mut chain = opids.into_iter().collect::<VecDeque<_>>();
+        // Get all subsequent operations
+        loop {
+            let mut count = 0usize;
+            for mut index in 0..chain.len() {
+                let opid = chain[index];
+                let op = self.supply.stash_mut().read(&opid);
+                for no in 0..op.destructible.len_u16() {
+                    let addr = CellAddr::new(opid, no);
+                    if !self.supply.spent().has(&addr) {
+                        continue;
+                    }
+                    let spent = self.supply.spent_mut().read(&addr);
+                    chain.push_front(spent);
+                    count += 1;
+                    index += 1;
+                }
+            }
+            if count == 0 {
+                break;
+            }
+        }
+
+        let articles = self.supply.load_articles();
+        for opid in chain {
+            let transition = self.supply.trace_mut().read(&opid);
+            self.state.rollback(
+                transition,
+                &articles.schema.default_api,
+                articles.schema.custom_apis.keys(),
+                &articles.schema.types,
+            );
+        }
+    }
 
     pub fn has_operation(&self, opid: Opid) -> bool { self.supply.stash().has(&opid) }
 
@@ -207,7 +245,7 @@ impl<S: Supply> Stock<S> {
         self.supply.stash_mut().iter()
     }
 
-    pub fn operation(&mut self, opid: Opid) -> Operation { self.supply.stash_mut().read(opid) }
+    pub fn operation(&mut self, opid: Opid) -> Operation { self.supply.stash_mut().read(&opid) }
 
     pub fn trace(&mut self) -> impl Iterator<Item = (Opid, Transition)> + use<'_, S> { self.supply.trace_mut().iter() }
 
@@ -403,6 +441,7 @@ pub mod fs {
         path: PathBuf,
         stash: FileAora<Opid, Operation>,
         trace: FileAora<Opid, Transition>,
+        spent: FileAora<CellAddr, Opid, 34>,
     }
 
     impl FileSupply {
@@ -417,8 +456,9 @@ pub mod fs {
 
             let stash = FileAora::new(&path, "stash");
             let trace = FileAora::new(&path, "trace");
+            let spent = FileAora::new(&path, "spent");
 
-            Self { path, stash, trace }
+            Self { path, stash, trace, spent }
         }
 
         pub fn path(&self) -> &Path { &self.path }
@@ -427,21 +467,27 @@ pub mod fs {
             let path = path.as_ref().to_path_buf();
             let stash = FileAora::open(&path, "stash");
             let trace = FileAora::open(&path, "trace");
-            Self { path, stash, trace }
+            let spent = FileAora::open(&path, "spent");
+            Self { path, stash, trace, spent }
         }
     }
 
     impl Supply for FileSupply {
         type Stash = FileAora<Opid, Operation>;
         type Trace = FileAora<Opid, Transition>;
+        type Spent = FileAora<CellAddr, Opid, 34>;
 
         fn stash(&self) -> &Self::Stash { &self.stash }
 
         fn trace(&self) -> &Self::Trace { &self.trace }
 
+        fn spent(&self) -> &Self::Spent { &self.spent }
+
         fn stash_mut(&mut self) -> &mut Self::Stash { &mut self.stash }
 
         fn trace_mut(&mut self) -> &mut Self::Trace { &mut self.trace }
+
+        fn spent_mut(&mut self) -> &mut Self::Spent { &mut self.spent }
 
         fn save_articles(&self, obj: &Articles) {
             let path = self.path.clone().join(Self::FILENAME_ARTICLES);

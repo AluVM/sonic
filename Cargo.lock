@@ -141,8 +141,7 @@ checksum = "dcfed56ad506cb2c684a14971b8861fdc3baaaae314b9e5f9bb532cbe3ba7a4f"
 [[package]]
 name = "aora"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af74e73cb0f9a203496bb414101b6382a1f3c4254a6dafdc69b45fc85edc9538"
+source = "git+https://github.com/rust-amplify/aora?branch=master#875c4556cb074a25af709ee391afb9306a52a551"
 dependencies = [
  "strict_encoding",
 ]
@@ -940,7 +939,7 @@ checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 [[package]]
 name = "ultrasonic"
 version = "0.12.0-beta.5"
-source = "git+https://github.com/AluVM/ultrasonic?branch=master#07c16915f96f7c7606c7ed00dd09f2e3eea57cb9"
+source = "git+https://github.com/AluVM/ultrasonic?branch=master#bf3a155acf9804b21a3178e5602927f892e3b38c"
 dependencies = [
  "amplify",
  "baid64",
