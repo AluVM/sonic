@@ -199,6 +199,7 @@ impl<S: Supply> Stock<S> {
     }
 
     pub fn rollback(&self, ops: impl IntoIterator<Item = Opid>) { todo!() }
+    pub fn forward(&self, ops: impl IntoIterator<Item = Opid>) { todo!() }
 
     pub fn has_operation(&self, opid: Opid) -> bool { self.supply.stash().has(&opid) }
 
