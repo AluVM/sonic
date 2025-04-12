@@ -239,6 +239,15 @@ impl<S: Supply> Stock<S> {
         }
     }
 
+    pub fn forward(&mut self, opids: impl IntoIterator<Item = Opid>) -> Result<(), AcceptError> {
+        // TODO: Ensure operations are come in the right order
+        for opid in opids {
+            let op = self.supply.stash_mut().read(&opid);
+            self.apply_verify(op)?;
+        }
+        Ok(())
+    }
+
     pub fn has_operation(&self, opid: Opid) -> bool { self.supply.stash().has(&opid) }
 
     pub fn operations(&mut self) -> impl Iterator<Item = (Opid, Operation)> + use<'_, S> {
@@ -277,7 +286,7 @@ impl<S: Supply> Stock<S> {
     ///
     /// Whether operation was already successfully included (`true`), or was already present in the
     /// stash.
-    pub fn apply_verify(&mut self, operation: Operation) -> Result<bool, AcceptError> {
+    fn apply_verify(&mut self, operation: Operation) -> Result<bool, AcceptError> {
         if operation.contract_id != self.contract_id() {
             return Err(AcceptError::ContractMismatch);
         }
