@@ -196,7 +196,7 @@ impl<S: Supply> Stock<S> {
                 Err(DecodeError::Io(e)) if e.kind() == ErrorKind::UnexpectedEof => break,
                 Err(e) => return Err(e.into()),
             };
-            self.check_apply(op)?;
+            self.apply_verify(op)?;
         }
         self.recompute_state();
         self.save_state();
@@ -277,7 +277,7 @@ impl<S: Supply> Stock<S> {
     ///
     /// Whether operation was already successfully included (`true`), or was already present in the
     /// stash.
-    fn check_apply(&mut self, operation: Operation) -> Result<bool, AcceptError> {
+    pub fn apply_verify(&mut self, operation: Operation) -> Result<bool, AcceptError> {
         if operation.contract_id != self.contract_id() {
             return Err(AcceptError::ContractMismatch);
         }
@@ -399,7 +399,7 @@ impl<S: Supply> DeedBuilder<'_, S> {
     pub fn commit(self) -> Opid {
         let deed = self.builder.finalize();
         let opid = deed.opid();
-        if let Err(err) = self.stock.check_apply(deed) {
+        if let Err(err) = self.stock.apply_verify(deed) {
             panic!("Invalid operation data: {err}");
         }
         self.stock.recompute_state();
