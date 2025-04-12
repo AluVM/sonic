@@ -22,6 +22,7 @@
 // the License.
 
 use alloc::collections::BTreeMap;
+use std::mem;
 
 use amplify::confinement::{LargeOrdMap, SmallOrdMap};
 use sonicapi::{Api, Schema, StateAtom, StateName};
@@ -208,8 +209,16 @@ impl RawState {
     pub(self) fn rollback(&mut self, transition: Transition) {
         let opid = transition.opid;
 
-        self.immutable.retain(|addr, _| addr.opid != opid);
-        self.owned.retain(|addr, _| addr.opid != opid);
+        let mut immutable = mem::take(&mut self.immutable);
+        let mut owned = mem::take(&mut self.owned);
+        immutable = LargeOrdMap::from_iter_checked(immutable.into_iter().filter(|(addr, _)| addr.opid != opid));
+        owned = LargeOrdMap::from_iter_checked(owned.into_iter().filter(|(addr, _)| addr.opid != opid));
+        self.immutable = immutable;
+        self.owned = owned;
+
+        // TODO: Use `retain` instead of the above workaround once supported by amplify
+        // self.immutable.retain(|addr, _| addr.opid != opid);
+        // self.owned.retain(|addr, _| addr.opid != opid);
 
         for (addr, cell) in transition.destroyed {
             self.owned
