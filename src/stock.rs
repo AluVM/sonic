@@ -29,7 +29,7 @@ use std::io;
 use std::io::ErrorKind;
 
 use aluvm::LibSite;
-use aora::Aora;
+use aora::AoraMap;
 use sonic_callreq::{MethodName, StateName};
 use sonicapi::{CoreParams, MergeError, NamedState, OpBuilder};
 use strict_encoding::{DecodeError, ReadRaw, StrictDecode, StrictEncode, StrictReader, StrictWriter, WriteRaw};
@@ -44,10 +44,10 @@ use crate::{Articles, EffectiveState, RawState, Transition};
 /// for instance in a separate thread or using channels; and in case of error the error must be
 /// reported elsewhere (via logging, or using a dedicated error reporting microservice).
 pub trait Supply {
-    type Stash: Aora<Opid, Operation>;
-    type Trace: Aora<Opid, Transition>;
+    type Stash: AoraMap<Opid, Operation>;
+    type Trace: AoraMap<Opid, Transition>;
     // Map of operations which spent a given output
-    type Spent: Aora<CellAddr, Opid, 34>;
+    type Spent: AoraMap<CellAddr, Opid, 34>;
 
     fn stash(&self) -> &Self::Stash;
     fn trace(&self) -> &Self::Trace;
@@ -144,7 +144,7 @@ impl<S: Supply> Stock<S> {
         queue.remove(&genesis_opid);
         let mut opids = queue.clone();
         while let Some(opid) = queue.pop_first() {
-            let st = self.supply.trace_mut().read(&opid);
+            let st = self.supply.trace_mut().get_expect(opid);
             for prev in st.destroyed.into_keys().map(|a| a.opid) {
                 if !opids.contains(&prev) && prev != genesis_opid {
                     opids.insert(prev);
@@ -210,13 +210,13 @@ impl<S: Supply> Stock<S> {
             let mut count = 0usize;
             for mut index in 0..chain.len() {
                 let opid = chain[index];
-                let op = self.supply.stash_mut().read(&opid);
+                let op = self.supply.stash_mut().get_expect(opid);
                 for no in 0..op.destructible.len_u16() {
                     let addr = CellAddr::new(opid, no);
-                    if !self.supply.spent().has(&addr) {
+                    if !self.supply.spent().contains_key(addr) {
                         continue;
                     }
-                    let spent = self.supply.spent_mut().read(&addr);
+                    let spent = self.supply.spent_mut().get_expect(addr);
                     chain.push_front(spent);
                     count += 1;
                     index += 1;
@@ -229,7 +229,7 @@ impl<S: Supply> Stock<S> {
 
         let articles = self.supply.load_articles();
         for opid in chain {
-            let transition = self.supply.trace_mut().read(&opid);
+            let transition = self.supply.trace_mut().get_expect(opid);
             self.state.rollback(
                 transition,
                 &articles.schema.default_api,
@@ -242,19 +242,19 @@ impl<S: Supply> Stock<S> {
     pub fn forward(&mut self, opids: impl IntoIterator<Item = Opid>) -> Result<(), AcceptError> {
         // TODO: Ensure operations are come in the right order
         for opid in opids {
-            let op = self.supply.stash_mut().read(&opid);
+            let op = self.supply.stash_mut().get_expect(opid);
             self.apply_verify(op)?;
         }
         Ok(())
     }
 
-    pub fn has_operation(&self, opid: Opid) -> bool { self.supply.stash().has(&opid) }
+    pub fn has_operation(&self, opid: Opid) -> bool { self.supply.stash().contains_key(opid) }
 
     pub fn operations(&mut self) -> impl Iterator<Item = (Opid, Operation)> + use<'_, S> {
         self.supply.stash_mut().iter()
     }
 
-    pub fn operation(&mut self, opid: Opid) -> Operation { self.supply.stash_mut().read(&opid) }
+    pub fn operation(&mut self, opid: Opid) -> Operation { self.supply.stash_mut().get_expect(opid) }
 
     pub fn trace(&mut self) -> impl Iterator<Item = (Opid, Transition)> + use<'_, S> { self.supply.trace_mut().iter() }
 
@@ -293,7 +293,7 @@ impl<S: Supply> Stock<S> {
 
         let opid = operation.opid();
 
-        let present = self.supply.stash().has(&opid);
+        let present = self.supply.stash().contains_key(opid);
         if !present {
             let verified = self.articles.schema.codex.verify(
                 self.articles.contract.contract_id(),
@@ -318,7 +318,7 @@ impl<S: Supply> Stock<S> {
     // TODO: Introduce type [`ValidOperation`] and use it here.
     pub fn apply(&mut self, operation: VerifiedOperation) -> Transition {
         let opid = operation.opid();
-        let present = self.supply.stash().has(&opid);
+        let present = self.supply.stash().contains_key(opid);
         self.apply_internal(opid, operation, present)
     }
 
@@ -326,7 +326,7 @@ impl<S: Supply> Stock<S> {
         if !present {
             self.supply
                 .stash_mut()
-                .append(opid, operation.as_operation());
+                .insert(opid, operation.as_operation());
         }
 
         let transition = self.state.apply(
@@ -335,7 +335,7 @@ impl<S: Supply> Stock<S> {
             self.articles.schema.custom_apis.keys(),
             &self.articles.schema.types,
         );
-        self.supply.trace_mut().append(opid, &transition);
+        self.supply.trace_mut().insert(opid, &transition);
         transition
     }
 
@@ -440,7 +440,7 @@ pub mod fs {
     use std::path::{Path, PathBuf};
 
     use amplify::confinement::U64 as U64MAX;
-    use aora::file::FileAora;
+    use aora::file::FileAoraMap;
     use strict_encoding::{StreamReader, StreamWriter, StrictDeserialize, StrictSerialize};
     use ultrasonic::ContractName;
 
@@ -448,9 +448,9 @@ pub mod fs {
 
     pub struct FileSupply {
         path: PathBuf,
-        stash: FileAora<Opid, Operation>,
-        trace: FileAora<Opid, Transition>,
-        spent: FileAora<CellAddr, Opid, 34>,
+        stash: FileAoraMap<Opid, Operation>,
+        trace: FileAoraMap<Opid, Transition>,
+        spent: FileAoraMap<CellAddr, Opid, 34>,
     }
 
     impl FileSupply {
@@ -463,9 +463,9 @@ pub mod fs {
             path.set_extension("contract");
             fs::create_dir_all(&path).expect("Unable to create directory to store Stock");
 
-            let stash = FileAora::new(&path, "stash");
-            let trace = FileAora::new(&path, "trace");
-            let spent = FileAora::new(&path, "spent");
+            let stash = FileAoraMap::new(&path, "stash");
+            let trace = FileAoraMap::new(&path, "trace");
+            let spent = FileAoraMap::new(&path, "spent");
 
             Self { path, stash, trace, spent }
         }
@@ -474,17 +474,17 @@ pub mod fs {
 
         pub fn open(path: impl AsRef<Path>) -> Self {
             let path = path.as_ref().to_path_buf();
-            let stash = FileAora::open(&path, "stash");
-            let trace = FileAora::open(&path, "trace");
-            let spent = FileAora::open(&path, "spent");
+            let stash = FileAoraMap::open(&path, "stash");
+            let trace = FileAoraMap::open(&path, "trace");
+            let spent = FileAoraMap::open(&path, "spent");
             Self { path, stash, trace, spent }
         }
     }
 
     impl Supply for FileSupply {
-        type Stash = FileAora<Opid, Operation>;
-        type Trace = FileAora<Opid, Transition>;
-        type Spent = FileAora<CellAddr, Opid, 34>;
+        type Stash = FileAoraMap<Opid, Operation>;
+        type Trace = FileAoraMap<Opid, Transition>;
+        type Spent = FileAoraMap<CellAddr, Opid, 34>;
 
         fn stash(&self) -> &Self::Stash { &self.stash }
 
