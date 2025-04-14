@@ -182,14 +182,12 @@ impl<Q: Display + FromStr> FromStr for CallScope<Q> {
     }
 }
 
-#[cfg(feature = "serde")]
 impl<Q: Display + FromStr> TryFrom<String> for CallScope<Q> {
     type Error = Baid64ParseError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> { Self::from_str(&value) }
 }
 
-#[cfg(feature = "serde")]
 impl<Q: Display + FromStr + Clone> From<CallScope<Q>> for String {
     fn from(value: CallScope<Q>) -> Self { value.to_string() }
 }
@@ -224,14 +222,12 @@ impl FromStr for Endpoint {
     }
 }
 
-#[cfg(feature = "serde")]
 impl TryFrom<String> for Endpoint {
     type Error = Infallible;
 
     fn try_from(value: String) -> Result<Self, Self::Error> { Self::from_str(&value) }
 }
 
-#[cfg(feature = "serde")]
 impl From<Endpoint> for String {
     fn from(value: Endpoint) -> Self { value.to_string() }
 }
