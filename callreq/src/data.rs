@@ -102,6 +102,14 @@ impl CallState {
 /// Optional fragment may be present and should represent a checksum value for the URI string
 /// preceding the fragment.
 #[derive(Clone, Eq, PartialEq, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "T: serde::Serialize, A: serde::Serialize",
+        deserialize = "T: serde::Deserialize<'de>, A: serde::Deserialize<'de>"
+    ))
+)]
 pub struct CallRequest<T = CallScope, A = AuthToken> {
     pub scope: T,
     pub api: Option<TypeName>,
@@ -138,6 +146,15 @@ impl<Q: Display + FromStr, A> CallRequest<CallScope<Q>, A> {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Display)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(
+        try_from = "String",
+        into = "String",
+        bound(serialize = "Q: Display + FromStr + Clone", deserialize = "Q: Display + FromStr"),
+    )
+)]
 pub enum CallScope<Q: Display + FromStr = String> {
     #[display(inner)]
     ContractId(ContractId),
@@ -151,19 +168,37 @@ impl<Q: Display + FromStr> FromStr for CallScope<Q> {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match ContractId::from_str(s) {
-            Err(err1) => {
-                let s = s.trim_start_matches("contract:");
-                let query = Q::from_str(s).map_err(|_| err1)?;
-                Ok(Self::ContractQuery(query))
+            Err(err_contract_id) => {
+                if let Some(query_str) = s.strip_prefix("contract:") {
+                    Q::from_str(query_str)
+                        .map(CallScope::ContractQuery)
+                        .map_err(|_| err_contract_id)
+                } else {
+                    Err(err_contract_id)
+                }
             }
             Ok(id) => Ok(Self::ContractId(id)),
         }
     }
 }
 
+#[cfg(feature = "serde")]
+impl<Q: Display + FromStr> TryFrom<String> for CallScope<Q> {
+    type Error = Baid64ParseError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> { Self::from_str(&value) }
+}
+
+#[cfg(feature = "serde")]
+impl<Q: Display + FromStr + Clone> From<CallScope<Q>> for String {
+    fn from(value: CallScope<Q>) -> Self { value.to_string() }
+}
+
 #[derive(Clone, Eq, PartialEq, Debug, Display)]
 #[display(inner)]
 #[non_exhaustive]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(try_from = "String", into = "String"))]
 pub enum Endpoint {
     JsonRpc(String),
     RestHttp(String),
@@ -176,18 +211,29 @@ impl FromStr for Endpoint {
     type Err = Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let s = s.to_lowercase();
-        #[allow(clippy::if_same_then_else)] // Some wierd clippy bug
-        if s.starts_with("http://") || s.starts_with("https://") {
-            Ok(Endpoint::RestHttp(s))
-        } else if s.starts_with("http+json-rpc://") || s.starts_with("https+json-rpc://") {
-            Ok(Endpoint::RestHttp(s))
-        } else if s.starts_with("ws://") || s.starts_with("wss://") {
-            Ok(Endpoint::WebSockets(s))
-        } else if s.starts_with("storm://") {
-            Ok(Endpoint::Storm(s))
+        let lower = s.to_lowercase();
+        if lower.contains("+json-rpc://") {
+            Ok(Endpoint::JsonRpc(s.to_string()))
+        } else if lower.starts_with("http://") || lower.starts_with("https://") {
+            Ok(Endpoint::RestHttp(s.to_string()))
+        } else if lower.starts_with("ws://") || lower.starts_with("wss://") {
+            Ok(Endpoint::WebSockets(s.to_string()))
+        } else if lower.starts_with("storm://") {
+            Ok(Endpoint::Storm(s.to_string()))
         } else {
             Ok(Endpoint::UnspecifiedMeans(s.to_string()))
         }
     }
+}
+
+#[cfg(feature = "serde")]
+impl TryFrom<String> for Endpoint {
+    type Error = Infallible;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> { Self::from_str(&value) }
+}
+
+#[cfg(feature = "serde")]
+impl From<Endpoint> for String {
+    fn from(value: Endpoint) -> Self { value.to_string() }
 }
