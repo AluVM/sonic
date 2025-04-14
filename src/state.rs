@@ -56,7 +56,7 @@ pub struct EffectiveState {
 
 impl EffectiveState {
     /// NB: Do not forget to call `recompute state` after.
-    pub fn with<'a>(raw: RawState, schema: &Schema) -> Self {
+    pub fn with(raw: RawState, schema: &Schema) -> Self {
         let mut me = Self { raw, main: none!(), aux: none!() };
         me.main = AdaptedState::with(&me.raw, &schema.default_api, &schema.types);
         me.aux.clear();

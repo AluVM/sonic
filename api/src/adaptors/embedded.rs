@@ -311,7 +311,7 @@ impl StateCalc for EmbeddedCalc {
 
     fn is_satisfied(&self, target: &StrictVal) -> bool {
         match self {
-            EmbeddedCalc::NonFungible(items) => items.iter().any(|item| *item == *target),
+            EmbeddedCalc::NonFungible(items) => items.contains(target),
             EmbeddedCalc::Fungible(value) => {
                 if value == target {
                     true

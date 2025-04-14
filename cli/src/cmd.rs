@@ -117,7 +117,7 @@ fn process(articles: &Path, stock: Option<&Path>) -> anyhow::Result<()> {
     let path = stock.unwrap_or(articles);
 
     let articles = Articles::load(articles)?;
-    Stock::new(articles, path);
+    Stock::new(articles, path)?;
 
     Ok(())
 }
