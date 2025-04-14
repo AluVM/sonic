@@ -212,16 +212,14 @@ impl FromStr for Endpoint {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let lower = s.to_lowercase();
-        if lower.contains("+json-rpc://") {
-            Ok(Endpoint::JsonRpc(s.to_string()))
-        } else if lower.starts_with("http://") || lower.starts_with("https://") {
-            Ok(Endpoint::RestHttp(s.to_string()))
-        } else if lower.starts_with("ws://") || lower.starts_with("wss://") {
-            Ok(Endpoint::WebSockets(s.to_string()))
-        } else if lower.starts_with("storm://") {
-            Ok(Endpoint::Storm(s.to_string()))
-        } else {
-            Ok(Endpoint::UnspecifiedMeans(s.to_string()))
+        match () {
+            _ if lower.starts_with("http+json-rpc://") || lower.starts_with("https+json-rpc://") => {
+                Ok(Endpoint::JsonRpc(s.to_string()))
+            }
+            _ if lower.starts_with("http://") || lower.starts_with("https://") => Ok(Endpoint::RestHttp(s.to_string())),
+            _ if lower.starts_with("ws://") || lower.starts_with("wss://") => Ok(Endpoint::WebSockets(s.to_string())),
+            _ if lower.starts_with("storm://") => Ok(Endpoint::Storm(s.to_string())),
+            _ => Ok(Endpoint::UnspecifiedMeans(s.to_string())),
         }
     }
 }
