@@ -141,7 +141,7 @@ checksum = "e16d2d3311acee920a9eb8d33b8cbc1787ce4a264e85f964c2404b969bdcd487"
 [[package]]
 name = "aora"
 version = "0.2.0"
-source = "git+https://github.com/rust-amplify/aora?branch=refactor#66b76476826a37e3ff744bb5e72776221d11ddb3"
+source = "git+https://github.com/rust-amplify/aora?branch=refactor#aa44bd22aed1a17640f5d3430312165cb320aa15"
 dependencies = [
  "indexmap",
  "strict_encoding",

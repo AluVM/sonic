@@ -21,12 +21,10 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::collections::{BTreeMap, BTreeSet, VecDeque};
 use core::borrow::Borrow;
-use std::collections::VecDeque;
 // Used in strict encoding; once solved there, remove here
-use std::io;
-use std::io::ErrorKind;
+use std::io::{self, ErrorKind};
 
 use aluvm::LibSite;
 use aora::AoraMap;
@@ -240,9 +238,25 @@ impl<S: Supply> Stock<S> {
     }
 
     pub fn forward(&mut self, opids: impl IntoIterator<Item = Opid>) -> Result<(), AcceptError> {
-        // TODO: Ensure operations are come in the right order
-        for opid in opids {
+        let mut all = opids.into_iter().collect::<VecDeque<_>>();
+        let mut queue = VecDeque::with_capacity(all.len());
+
+        while let Some(opid) = all.pop_front() {
             let op = self.supply.stash_mut().get_expect(opid);
+            queue.push_front(op);
+            let op = &queue[0];
+            for prev in &op.reading {
+                if all.contains(&prev.opid) {
+                    all.push_front(prev.opid);
+                }
+            }
+            for prev in &op.destroying {
+                if all.contains(&prev.addr.opid) {
+                    all.push_front(prev.addr.opid);
+                }
+            }
+        }
+        for op in queue {
             self.apply_verify(op)?;
         }
         Ok(())
