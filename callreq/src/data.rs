@@ -209,15 +209,18 @@ impl FromStr for Endpoint {
     type Err = Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let lower = s.to_lowercase();
-        match () {
-            _ if lower.starts_with("http+json-rpc://") || lower.starts_with("https+json-rpc://") => {
-                Ok(Endpoint::JsonRpc(s.to_string()))
-            }
-            _ if lower.starts_with("http://") || lower.starts_with("https://") => Ok(Endpoint::RestHttp(s.to_string())),
-            _ if lower.starts_with("ws://") || lower.starts_with("wss://") => Ok(Endpoint::WebSockets(s.to_string())),
-            _ if lower.starts_with("storm://") => Ok(Endpoint::Storm(s.to_string())),
-            _ => Ok(Endpoint::UnspecifiedMeans(s.to_string())),
+        let s = s.to_lowercase();
+        #[allow(clippy::if_same_then_else)] // Some wierd clippy bug
+        if s.starts_with("http://") || s.starts_with("https://") {
+            Ok(Endpoint::RestHttp(s))
+        } else if s.starts_with("http+json-rpc://") || s.starts_with("https+json-rpc://") {
+            Ok(Endpoint::RestHttp(s))
+        } else if s.starts_with("ws://") || s.starts_with("wss://") {
+            Ok(Endpoint::WebSockets(s))
+        } else if s.starts_with("storm://") {
+            Ok(Endpoint::Storm(s))
+        } else {
+            Ok(Endpoint::UnspecifiedMeans(s.to_string()))
         }
     }
 }
