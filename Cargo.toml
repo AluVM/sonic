@@ -24,7 +24,7 @@ ultrasonic = "=0.12.0-beta.5"
 sonic-api = { version = "=0.12.0-beta.5", path = "api" }
 sonic-callreq = { version = "=0.12.0-beta.5", path = "callreq" }
 hypersonic = { version = "=0.12.0-beta.5", path = "." }
-aora = "0.2.0"
+aora = "0.3.0"
 baid64 = "0.4.1"
 indexmap = "2.9.0"
 chrono = "0.4.38"
@@ -95,7 +95,6 @@ wasm-bindgen-test = "0.3"
 features = ["all"]
 
 [patch.crates-io]
-aora = { git = "https://github.com/rust-amplify/aora", branch = "refactor" }
 aluvm = { git = "https://github.com/AluVM/aluvm", branch = "master" }
 zk-aluvm = { git = "https://github.com/AluVM/zk-aluvm", branch = "master" }
 ultrasonic = { git = "https://github.com/AluVM/ultrasonic", branch = "master" }
