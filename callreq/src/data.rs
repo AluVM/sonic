@@ -146,9 +146,9 @@ impl<Q: Display + FromStr, A> CallRequest<CallScope<Q>, A> {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Display)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "serde",
+    derive(Serialize, Deserialize),
     serde(
         try_from = "String",
         into = "String",
