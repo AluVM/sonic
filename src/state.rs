@@ -22,6 +22,7 @@
 // the License.
 
 use alloc::collections::BTreeMap;
+use std::mem;
 
 use amplify::confinement::{LargeOrdMap, SmallOrdMap};
 use sonicapi::{Api, Schema, StateAtom, StateName};
@@ -55,7 +56,7 @@ pub struct EffectiveState {
 
 impl EffectiveState {
     /// NB: Do not forget to call `recompute state` after.
-    pub fn with<'a>(raw: RawState, schema: &Schema) -> Self {
+    pub fn with(raw: RawState, schema: &Schema) -> Self {
         let mut me = Self { raw, main: none!(), aux: none!() };
         me.main = AdaptedState::with(&me.raw, &schema.default_api, &schema.types);
         me.aux.clear();
@@ -104,6 +105,7 @@ impl EffectiveState {
         self.main.apply(&op, default_api, sys);
         for api in custom_apis {
             // TODO: Remove name from API itself.
+            // Skip default API (it is already processed as `main` above)
             let Some(name) = api.name() else {
                 continue;
             };
@@ -111,6 +113,28 @@ impl EffectiveState {
             state.apply(&op, api, sys);
         }
         self.raw.apply(op)
+    }
+
+    pub(crate) fn rollback<'a>(
+        &mut self,
+        transition: Transition,
+        default_api: &Api,
+        custom_apis: impl IntoIterator<Item = &'a Api>,
+        sys: &TypeSystem,
+    ) {
+        self.main.rollback(&transition, default_api, sys);
+        let mut count = 0usize;
+        for api in custom_apis {
+            // Skip default API (it is already processed as `main` above)
+            let Some(name) = api.name() else {
+                continue;
+            };
+            let state = self.aux.get_mut(name).expect("unknown aux API");
+            state.rollback(&transition, api, sys);
+            count += 1;
+        }
+        debug_assert_eq!(count, self.aux.len());
+        self.raw.rollback(transition);
     }
 }
 
@@ -181,6 +205,27 @@ impl RawState {
 
         transition
     }
+
+    pub(self) fn rollback(&mut self, transition: Transition) {
+        let opid = transition.opid;
+
+        let mut immutable = mem::take(&mut self.immutable);
+        let mut owned = mem::take(&mut self.owned);
+        immutable = LargeOrdMap::from_iter_checked(immutable.into_iter().filter(|(addr, _)| addr.opid != opid));
+        owned = LargeOrdMap::from_iter_checked(owned.into_iter().filter(|(addr, _)| addr.opid != opid));
+        self.immutable = immutable;
+        self.owned = owned;
+
+        // TODO: Use `retain` instead of the above workaround once supported by amplify
+        // self.immutable.retain(|addr, _| addr.opid != opid);
+        // self.owned.retain(|addr, _| addr.opid != opid);
+
+        for (addr, cell) in transition.destroyed {
+            self.owned
+                .insert(addr, cell)
+                .expect("exceed state size limit");
+        }
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
@@ -247,6 +292,24 @@ impl AdaptedState {
                     .or_default()
                     .insert(CellAddr::new(opid, no as u16), atom);
             }
+        }
+    }
+
+    pub(self) fn rollback(&mut self, transition: &Transition, api: &Api, sys: &TypeSystem) {
+        let opid = transition.opid;
+
+        self.immutable
+            .values_mut()
+            .for_each(|state| state.retain(|addr, _| addr.opid != opid));
+        self.owned
+            .values_mut()
+            .for_each(|state| state.retain(|addr, _| addr.opid != opid));
+
+        for (addr, cell) in &transition.destroyed {
+            if let Some((name, value)) = api.convert_destructible(cell.data, sys) {
+                self.owned.entry(name).or_default().insert(*addr, value);
+            }
+            // TODO: Warn if no state is present
         }
     }
 }

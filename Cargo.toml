@@ -24,9 +24,9 @@ ultrasonic = "=0.12.0-beta.5"
 sonic-api = { version = "=0.12.0-beta.5", path = "api" }
 sonic-callreq = { version = "=0.12.0-beta.5", path = "callreq" }
 hypersonic = { version = "=0.12.0-beta.5", path = "." }
-aora = "0.2.0"
+aora = "0.3.0"
 baid64 = "0.4.1"
-indexmap = "2.6.0"
+indexmap = "2.9.0"
 chrono = "0.4.38"
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9.34"

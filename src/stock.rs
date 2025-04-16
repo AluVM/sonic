@@ -21,14 +21,13 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::collections::{BTreeMap, BTreeSet, VecDeque};
 use core::borrow::Borrow;
 // Used in strict encoding; once solved there, remove here
-use std::io;
-use std::io::ErrorKind;
+use std::io::{self, ErrorKind};
 
 use aluvm::LibSite;
-use aora::Aora;
+use aora::AoraMap;
 use sonic_callreq::{MethodName, StateName};
 use sonicapi::{CoreParams, MergeError, NamedState, OpBuilder};
 use strict_encoding::{DecodeError, ReadRaw, StrictDecode, StrictEncode, StrictReader, StrictWriter, WriteRaw};
@@ -43,14 +42,18 @@ use crate::{Articles, EffectiveState, RawState, Transition};
 /// for instance in a separate thread or using channels; and in case of error the error must be
 /// reported elsewhere (via logging, or using a dedicated error reporting microservice).
 pub trait Supply {
-    type Stash: Aora<Id = Opid, Item = Operation>;
-    type Trace: Aora<Id = Opid, Item = Transition>;
+    type Stash: AoraMap<Opid, Operation>;
+    type Trace: AoraMap<Opid, Transition>;
+    // Map of operations which spent a given output
+    type Spent: AoraMap<CellAddr, Opid, 34>;
 
     fn stash(&self) -> &Self::Stash;
     fn trace(&self) -> &Self::Trace;
+    fn spent(&self) -> &Self::Spent;
 
     fn stash_mut(&mut self) -> &mut Self::Stash;
     fn trace_mut(&mut self) -> &mut Self::Trace;
+    fn spent_mut(&mut self) -> &mut Self::Spent;
 
     fn save_articles(&self, obj: &Articles);
     fn load_articles(&self) -> Articles;
@@ -139,7 +142,7 @@ impl<S: Supply> Stock<S> {
         queue.remove(&genesis_opid);
         let mut opids = queue.clone();
         while let Some(opid) = queue.pop_first() {
-            let st = self.supply.trace_mut().read(opid);
+            let st = self.supply.trace_mut().get_expect(opid);
             for prev in st.destroyed.into_keys().map(|a| a.opid) {
                 if !opids.contains(&prev) && prev != genesis_opid {
                     opids.insert(prev);
@@ -191,23 +194,81 @@ impl<S: Supply> Stock<S> {
                 Err(DecodeError::Io(e)) if e.kind() == ErrorKind::UnexpectedEof => break,
                 Err(e) => return Err(e.into()),
             };
-            self.check_apply(op)?;
+            self.apply_verify(op)?;
         }
         self.recompute_state();
         self.save_state();
         Ok(())
     }
 
-    pub fn rollback(&self, ops: impl IntoIterator<Item = Opid>) { todo!() }
-    pub fn forward(&self, ops: impl IntoIterator<Item = Opid>) { todo!() }
+    pub fn rollback(&mut self, opids: impl IntoIterator<Item = Opid>) {
+        let mut chain = opids.into_iter().collect::<VecDeque<_>>();
+        // Get all subsequent operations
+        loop {
+            let mut count = 0usize;
+            for mut index in 0..chain.len() {
+                let opid = chain[index];
+                let op = self.supply.stash_mut().get_expect(opid);
+                for no in 0..op.destructible.len_u16() {
+                    let addr = CellAddr::new(opid, no);
+                    if !self.supply.spent().contains_key(addr) {
+                        continue;
+                    }
+                    let spent = self.supply.spent_mut().get_expect(addr);
+                    chain.push_front(spent);
+                    count += 1;
+                    index += 1;
+                }
+            }
+            if count == 0 {
+                break;
+            }
+        }
 
-    pub fn has_operation(&self, opid: Opid) -> bool { self.supply.stash().has(&opid) }
+        let articles = self.supply.load_articles();
+        for opid in chain {
+            let transition = self.supply.trace_mut().get_expect(opid);
+            self.state.rollback(
+                transition,
+                &articles.schema.default_api,
+                articles.schema.custom_apis.keys(),
+                &articles.schema.types,
+            );
+        }
+    }
+
+    pub fn forward(&mut self, opids: impl IntoIterator<Item = Opid>) -> Result<(), AcceptError> {
+        let mut all = opids.into_iter().collect::<VecDeque<_>>();
+        let mut queue = VecDeque::with_capacity(all.len());
+
+        while let Some(opid) = all.pop_front() {
+            let op = self.supply.stash_mut().get_expect(opid);
+            queue.push_front(op);
+            let op = &queue[0];
+            for prev in &op.reading {
+                if all.contains(&prev.opid) {
+                    all.push_front(prev.opid);
+                }
+            }
+            for prev in &op.destroying {
+                if all.contains(&prev.addr.opid) {
+                    all.push_front(prev.addr.opid);
+                }
+            }
+        }
+        for op in queue {
+            self.apply_verify(op)?;
+        }
+        Ok(())
+    }
+
+    pub fn has_operation(&self, opid: Opid) -> bool { self.supply.stash().contains_key(opid) }
 
     pub fn operations(&mut self) -> impl Iterator<Item = (Opid, Operation)> + use<'_, S> {
         self.supply.stash_mut().iter()
     }
 
-    pub fn operation(&mut self, opid: Opid) -> Operation { self.supply.stash_mut().read(opid) }
+    pub fn operation(&mut self, opid: Opid) -> Operation { self.supply.stash_mut().get_expect(opid) }
 
     pub fn trace(&mut self) -> impl Iterator<Item = (Opid, Transition)> + use<'_, S> { self.supply.trace_mut().iter() }
 
@@ -239,14 +300,14 @@ impl<S: Supply> Stock<S> {
     ///
     /// Whether operation was already successfully included (`true`), or was already present in the
     /// stash.
-    fn check_apply(&mut self, operation: Operation) -> Result<bool, AcceptError> {
+    fn apply_verify(&mut self, operation: Operation) -> Result<bool, AcceptError> {
         if operation.contract_id != self.contract_id() {
             return Err(AcceptError::ContractMismatch);
         }
 
         let opid = operation.opid();
 
-        let present = self.supply.stash().has(&opid);
+        let present = self.supply.stash().contains_key(opid);
         if !present {
             let verified = self.articles.schema.codex.verify(
                 self.articles.contract.contract_id(),
@@ -271,7 +332,7 @@ impl<S: Supply> Stock<S> {
     // TODO: Introduce type [`ValidOperation`] and use it here.
     pub fn apply(&mut self, operation: VerifiedOperation) -> Transition {
         let opid = operation.opid();
-        let present = self.supply.stash().has(&opid);
+        let present = self.supply.stash().contains_key(opid);
         self.apply_internal(opid, operation, present)
     }
 
@@ -279,7 +340,7 @@ impl<S: Supply> Stock<S> {
         if !present {
             self.supply
                 .stash_mut()
-                .append(opid, operation.as_operation());
+                .insert(opid, operation.as_operation());
         }
 
         let transition = self.state.apply(
@@ -288,7 +349,7 @@ impl<S: Supply> Stock<S> {
             self.articles.schema.custom_apis.keys(),
             &self.articles.schema.types,
         );
-        self.supply.trace_mut().append(opid, &transition);
+        self.supply.trace_mut().insert(opid, &transition);
         transition
     }
 
@@ -361,7 +422,7 @@ impl<S: Supply> DeedBuilder<'_, S> {
     pub fn commit(self) -> Opid {
         let deed = self.builder.finalize();
         let opid = deed.opid();
-        if let Err(err) = self.stock.check_apply(deed) {
+        if let Err(err) = self.stock.apply_verify(deed) {
             panic!("Invalid operation data: {err}");
         }
         self.stock.recompute_state();
@@ -393,7 +454,7 @@ pub mod fs {
     use std::path::{Path, PathBuf};
 
     use amplify::confinement::U64 as U64MAX;
-    use aora::file::FileAora;
+    use aora::file::FileAoraMap;
     use strict_encoding::{StreamReader, StreamWriter, StrictDeserialize, StrictSerialize};
     use ultrasonic::ContractName;
 
@@ -401,8 +462,9 @@ pub mod fs {
 
     pub struct FileSupply {
         path: PathBuf,
-        stash: FileAora<Opid, Operation>,
-        trace: FileAora<Opid, Transition>,
+        stash: FileAoraMap<Opid, Operation>,
+        trace: FileAoraMap<Opid, Transition>,
+        spent: FileAoraMap<CellAddr, Opid, 34>,
     }
 
     impl FileSupply {
@@ -415,33 +477,40 @@ pub mod fs {
             path.set_extension("contract");
             fs::create_dir_all(&path).expect("Unable to create directory to store Stock");
 
-            let stash = FileAora::new(&path, "stash");
-            let trace = FileAora::new(&path, "trace");
+            let stash = FileAoraMap::new(&path, "stash");
+            let trace = FileAoraMap::new(&path, "trace");
+            let spent = FileAoraMap::new(&path, "spent");
 
-            Self { path, stash, trace }
+            Self { path, stash, trace, spent }
         }
 
         pub fn path(&self) -> &Path { &self.path }
 
         pub fn open(path: impl AsRef<Path>) -> Self {
             let path = path.as_ref().to_path_buf();
-            let stash = FileAora::open(&path, "stash");
-            let trace = FileAora::open(&path, "trace");
-            Self { path, stash, trace }
+            let stash = FileAoraMap::open(&path, "stash");
+            let trace = FileAoraMap::open(&path, "trace");
+            let spent = FileAoraMap::open(&path, "spent");
+            Self { path, stash, trace, spent }
         }
     }
 
     impl Supply for FileSupply {
-        type Stash = FileAora<Opid, Operation>;
-        type Trace = FileAora<Opid, Transition>;
+        type Stash = FileAoraMap<Opid, Operation>;
+        type Trace = FileAoraMap<Opid, Transition>;
+        type Spent = FileAoraMap<CellAddr, Opid, 34>;
 
         fn stash(&self) -> &Self::Stash { &self.stash }
 
         fn trace(&self) -> &Self::Trace { &self.trace }
 
+        fn spent(&self) -> &Self::Spent { &self.spent }
+
         fn stash_mut(&mut self) -> &mut Self::Stash { &mut self.stash }
 
         fn trace_mut(&mut self) -> &mut Self::Trace { &mut self.trace }
+
+        fn spent_mut(&mut self) -> &mut Self::Spent { &mut self.spent }
 
         fn save_articles(&self, obj: &Articles) {
             let path = self.path.clone().join(Self::FILENAME_ARTICLES);
