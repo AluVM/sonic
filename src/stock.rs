@@ -460,11 +460,15 @@ pub mod fs {
 
     use super::*;
 
+    const STASH_MAGIC: u64 = u64::from_be_bytes(*b"RGBSTASH");
+    const TRACE_MAGIC: u64 = u64::from_be_bytes(*b"RGBTRACE");
+    const SPENT_MAGIC: u64 = u64::from_be_bytes(*b"RGBSPENT");
+
     pub struct FileSupply {
         path: PathBuf,
-        stash: FileAoraMap<Opid, Operation>,
-        trace: FileAoraMap<Opid, Transition>,
-        spent: FileAoraMap<CellAddr, Opid, 34>,
+        stash: FileAoraMap<Opid, Operation, STASH_MAGIC, 1>,
+        trace: FileAoraMap<Opid, Transition, TRACE_MAGIC, 1>,
+        spent: FileAoraMap<CellAddr, Opid, SPENT_MAGIC, 1, 34>,
     }
 
     impl FileSupply {
@@ -496,9 +500,9 @@ pub mod fs {
     }
 
     impl Supply for FileSupply {
-        type Stash = FileAoraMap<Opid, Operation>;
-        type Trace = FileAoraMap<Opid, Transition>;
-        type Spent = FileAoraMap<CellAddr, Opid, 34>;
+        type Stash = FileAoraMap<Opid, Operation, STASH_MAGIC, 1>;
+        type Trace = FileAoraMap<Opid, Transition, TRACE_MAGIC, 1>;
+        type Spent = FileAoraMap<CellAddr, Opid, SPENT_MAGIC, 1, 34>;
 
         fn stash(&self) -> &Self::Stash { &self.stash }
 
