@@ -168,13 +168,13 @@ impl<Q: Display + FromStr> FromStr for CallScope<Q> {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match ContractId::from_str(s) {
-            Err(err_contract_id) => {
-                let query_str = s.strip_prefix("contract:").ok_or(err_contract_id)?;
-                Q::from_str(query_str)
-                    .map(CallScope::ContractQuery)
-                    .map_err(|_| err_contract_id)
-            }
             Ok(id) => Ok(Self::ContractId(id)),
+            Err(err_contract_id) => match s.strip_prefix("contract:") {
+                Some(query_str) => Q::from_str(query_str)
+                    .map(Self::ContractQuery)
+                    .map_err(|_| err_contract_id),
+                None => Err(err_contract_id),
+            },
         }
     }
 }
