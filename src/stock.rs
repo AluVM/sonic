@@ -29,7 +29,7 @@ use ultrasonic::{CellAddr, Operation, Opid};
 
 use crate::{Articles, EffectiveState, Transition};
 
-/// Persistence API for keeping and accessing the contract data.
+/// Stock is a persistence API for keeping and accessing a contract data.
 ///
 /// Contract data include:
 /// - contract [`Articles`];
@@ -45,14 +45,14 @@ use crate::{Articles, EffectiveState, Transition};
 pub trait Stock {
     /// Provides contract [`Articles`].
     ///
-    /// # I/O
+    /// # Blocking I/O
     ///
     /// This call MUST NOT perform any I/O operations and MUST BE a non-blocking.
     fn articles(&self) -> &Articles;
 
     /// Provides contract [`EffectiveState`].
     ///
-    /// # I/O
+    /// # Blocking I/O
     ///
     /// This call MUST NOT perform any I/O operations and MUST BE a non-blocking.
     fn state(&self) -> &EffectiveState;
@@ -68,7 +68,7 @@ pub trait Stock {
     /// as well as re-included later with forwards (see [`Contract::forward`]). In both cases
     /// they are kept in the contract storage ("stash") and remain accessible to this method.
     ///
-    /// # I/O
+    /// # Blocking I/O
     ///
     /// This call MAY BE blocking.
     fn has_operation(&self, opid: Opid) -> bool;
@@ -91,7 +91,7 @@ pub trait Stock {
     ///
     /// In order to avoid panics always call the method after calling `has_operation`.
     ///
-    /// # I/O
+    /// # Blocking I/O
     ///
     /// This call MAY BE blocking.
     ///
@@ -118,7 +118,7 @@ pub trait Stock {
     ///
     /// The method MUST NOT panic
     ///
-    /// # I/O
+    /// # Blocking I/O
     ///
     /// The iterator provided in return may be a blocking iterator.
     ///
@@ -148,7 +148,7 @@ pub trait Stock {
     ///
     /// In order to avoid panics always call the method after calling `has_operation`.
     ///
-    /// # I/O
+    /// # Blocking I/O
     ///
     /// This call MAY BE blocking.
     ///
@@ -176,7 +176,7 @@ pub trait Stock {
     ///
     /// The method MUST NOT panic
     ///
-    /// # I/O
+    /// # Blocking I/O
     ///
     /// The iterator provided in return may be a blocking iterator.
     ///
@@ -193,7 +193,7 @@ pub trait Stock {
     ///
     /// This method is internally used in rollback procedure, and must not be accessed from outside.
     ///
-    /// # I/O
+    /// # Blocking I/O
     ///
     /// This call MAY BE blocking.
     ///
@@ -206,7 +206,7 @@ pub trait Stock {
 
     /// Updates articles with a newer version inside a callback method.
     ///
-    /// # I/O
+    /// # Blocking I/O
     ///
     /// This call MAY BE blocking.
     ///
@@ -221,7 +221,7 @@ pub trait Stock {
 
     /// Updates contract effective state inside a callback method.
     ///
-    /// # I/O
+    /// # Blocking I/O
     ///
     /// This call MAY BE blocking.
     ///
@@ -233,7 +233,7 @@ pub trait Stock {
 
     /// Adds operation to the contract data.
     ///
-    /// # I/O
+    /// # Blocking I/O
     ///
     /// This call MAY BE blocking.
     ///
@@ -253,7 +253,7 @@ pub trait Stock {
 
     /// Adds state transition caused by an operation with `opid` to the contract data.
     ///
-    /// # I/O
+    /// # Blocking I/O
     ///
     /// This call MAY BE blocking.
     ///
@@ -272,7 +272,7 @@ pub trait Stock {
     /// Registers given operation output (`spent`) to be spent (used as an input) in operation
     /// `spender`.
     ///
-    /// # I/O
+    /// # Blocking I/O
     ///
     /// This call MAY BE blocking.
     ///

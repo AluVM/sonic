@@ -35,16 +35,87 @@ use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Operation, Opid, Ve
 use crate::deed::{CallParams, DeedBuilder};
 use crate::{Articles, EffectiveState, Stock, StockError, Transition};
 
-/// Stock is a contract with all its state and operations, supporting updates and rollbacks.
+/// Contract with all its state and operations, supporting updates and rollbacks.
 // We need this structure to hide internal persistence methods and not to expose them.
 // We need the persistence trait (`Stock`) in order to allow different persistence storage
 // implementations.
 pub struct Contract<S: Stock>(pub(crate) S);
 
 impl<S: Stock> Contract<S> {
+    /// Provides [`Schema`] object, which includes codex, under which the contract was issued, and
+    /// interfaces for the contract under that codex.
+    ///
+    /// # Blocking I/O
+    ///
+    /// This call MUST NOT perform any I/O operations and MUST BE a non-blocking.
+    #[inline]
     pub fn schema(&self) -> &Schema { &self.0.articles().schema }
+
+    /// Provides contract id.
+    ///
+    /// # Blocking I/O
+    ///
+    /// This call MUST NOT perform any I/O operations and MUST BE a non-blocking.
+    // TODO: Cache the id
+    #[inline]
     pub fn contract_id(&self) -> ContractId { self.0.articles().contract_id() }
+
+    /// Provides contract [`Articles`], which include contract genesis.
+    ///
+    /// # Blocking I/O
+    ///
+    /// This call MUST NOT perform any I/O operations and MUST BE a non-blocking.
+    #[inline]
+    pub fn articles(&self) -> &Articles { self.0.articles() }
+
+    /// Provides contract [`EffectiveState`].
+    ///
+    /// # Blocking I/O
+    ///
+    /// This call MUST NOT perform any I/O operations and MUST BE a non-blocking.
+    #[inline]
     pub fn state(&self) -> &EffectiveState { self.0.state() }
+
+    /// Detects whether an operation with a given `opid` is known to the contract.
+    ///
+    /// # Nota bene
+    ///
+    /// Positive response doesn't indicate that the operation participates in the current contract
+    /// state or in a current valid contract history, which may be exported.
+    ///
+    /// Operations may be excluded from the history due to rollbacks (see [`Contract::rollback`]),
+    /// as well as re-included later with forwards (see [`Contract::forward`]). In both cases
+    /// they are kept in the contract storage ("stash") and remain accessible to this method.
+    ///
+    /// # Blocking I/O
+    ///
+    /// This call MAY BE blocking.
+    #[inline]
+    pub fn has_operation(&self, opid: Opid) -> bool { self.0.has_operation(opid) }
+
+    /// Returns an operation ([`Operation`]) with a given `opid` from the set of known contract
+    /// operations ("stash").
+    ///
+    /// # Nota bene
+    ///
+    /// If the method returns an operation, this doesn't indicate that the operation participates in
+    /// the current contract state or in a current valid contract history, which/ may be exported.
+    ///
+    /// Operations may be excluded from the history due to rollbacks (see [`Contract::rollback`]),
+    /// as well as re-included later with forwards (see [`Contract::forward`]). In both cases
+    /// they are kept in the contract storage ("stash") and remain accessible to this method.
+    ///
+    /// # Panics
+    ///
+    /// If an `opid` is not present in the contract stash.
+    ///
+    /// In order to avoid panics always call the method after calling `has_operation`.
+    ///
+    /// # Blocking I/O
+    ///
+    /// This call MAY BE blocking.
+    #[inline]
+    pub fn operation(&self, opid: Opid) -> Operation { self.0.operation(opid) }
 
     pub fn export_all(&self, mut writer: StrictWriter<impl WriteRaw>) -> io::Result<()> {
         // Write articles
