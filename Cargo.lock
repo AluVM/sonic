@@ -141,7 +141,7 @@ checksum = "e16d2d3311acee920a9eb8d33b8cbc1787ce4a264e85f964c2404b969bdcd487"
 [[package]]
 name = "aora"
 version = "0.4.0"
-source = "git+https://github.com/rust-amplify/aora?branch=master#a1f456e8caa574754b3f0053bcc83cee9938d71e"
+source = "git+https://github.com/rust-amplify/aora?branch=master#1217885510d7f882d949d8832152684a0d70a744"
 dependencies = [
  "amplify",
  "binfile",
@@ -949,7 +949,7 @@ checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 [[package]]
 name = "ultrasonic"
 version = "0.12.0-beta.5"
-source = "git+https://github.com/AluVM/ultrasonic?branch=master#bf3a155acf9804b21a3178e5602927f892e3b38c"
+source = "git+https://github.com/AluVM/ultrasonic?branch=master#f08a6749bb6c97837130dce07ae04c73e92a36c9"
 dependencies = [
  "amplify",
  "baid64",

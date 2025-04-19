@@ -56,10 +56,9 @@ impl FileSupply {
 
     pub fn issue(articles: Articles, path: impl AsRef<Path>) -> Result<Self, IssueError> {
         let state = EffectiveState::from_genesis(&articles)
-            .map_err(|e| IssueError::Genesis(articles.contract.meta.name.clone(), e))?;
+            .map_err(|e| IssueError::Genesis(articles.issue.meta.name.clone(), e))?;
 
-        let name =
-            format!("{}.{}.{}", articles.contract.meta.name, articles.contract_id(), Self::CONTRACT_DIR_EXTENSION);
+        let name = format!("{}.{}.{}", articles.issue.meta.name, articles.contract_id(), Self::CONTRACT_DIR_EXTENSION);
         let path = path.as_ref().join(name);
         fs::create_dir_all(&path)?;
 

@@ -22,7 +22,7 @@
 // the License.
 
 use strict_encoding::{StrictDeserialize, StrictSerialize, TypeName};
-use ultrasonic::{Contract, ContractId};
+use ultrasonic::{ContractId, Issue};
 
 use crate::sigs::ContentSigs;
 use crate::{Api, Schema, LIB_NAME_SONIC};
@@ -36,14 +36,14 @@ pub struct Articles {
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub schema: Schema,
     pub contract_sigs: ContentSigs,
-    pub contract: Contract,
+    pub issue: Issue,
 }
 
 impl StrictSerialize for Articles {}
 impl StrictDeserialize for Articles {}
 
 impl Articles {
-    pub fn contract_id(&self) -> ContractId { self.contract.contract_id() }
+    pub fn contract_id(&self) -> ContractId { self.issue.contract_id() }
 
     pub fn api(&self, name: &TypeName) -> &Api { self.schema.api(name) }
 

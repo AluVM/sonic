@@ -59,15 +59,15 @@ impl EffectiveState {
         let mut state = EffectiveState::default();
 
         let genesis = articles
-            .contract
+            .issue
             .genesis
-            .to_operation(articles.contract.contract_id());
+            .to_operation(articles.issue.contract_id());
 
         let verified =
             articles
                 .schema
                 .codex
-                .verify(articles.contract.contract_id(), genesis, &state.raw, &articles.schema)?;
+                .verify(articles.issue.contract_id(), genesis, &state.raw, &articles.schema)?;
 
         // We do not need state transition for genesis.
         let _ = state.apply(

@@ -332,7 +332,7 @@ impl<S: Supply> Stock<S> {
             .into_iter()
             .map(|terminal| self.0.state().addr(*terminal.borrow()).opid)
             .collect::<BTreeSet<_>>();
-        let genesis_opid = self.0.articles().contract.genesis_opid();
+        let genesis_opid = self.0.articles().issue.genesis_opid();
         queue.remove(&genesis_opid);
         let mut opids = queue.clone();
         while let Some(opid) = queue.pop_first() {
