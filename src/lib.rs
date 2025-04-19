@@ -49,4 +49,4 @@ mod deed;
 
 pub use deed::{CallParams, DeedBuilder};
 pub use state::{AdaptedState, EffectiveState, RawState, Transition};
-pub use stock::{AcceptError, Stock, StockError, Supply};
+pub use stock::{AcceptError, Contract, StockError, Supply};

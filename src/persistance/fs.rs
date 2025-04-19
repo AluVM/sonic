@@ -32,9 +32,9 @@ use sonicapi::{Articles, MergeError, Schema};
 use strict_encoding::{DeserializeError, SerializeError, StreamReader, StreamWriter, StrictReader, StrictWriter};
 use ultrasonic::{AuthToken, CallError, CellAddr, ContractName, Operation, Opid};
 
-use crate::{AcceptError, EffectiveState, RawState, Stock, StockError, Supply, Transition};
+use crate::{AcceptError, Contract, EffectiveState, RawState, StockError, Supply, Transition};
 
-pub type FileStock = Stock<FileSupply>;
+pub type ContractDir = Contract<FileSupply>;
 
 const STASH_MAGIC: u64 = u64::from_be_bytes(*b"RGBSTASH");
 const TRACE_MAGIC: u64 = u64::from_be_bytes(*b"RGBTRACE");
@@ -138,7 +138,7 @@ impl Supply for FileSupply {
     fn add_spending(&mut self, spent: CellAddr, spender: Opid) { self.spent.insert_or_update(spent, spender) }
 }
 
-impl FileStock {
+impl ContractDir {
     pub fn issue(articles: Articles, path: impl AsRef<Path>) -> Result<Self, IssueError> {
         FileSupply::issue(articles, path).map(Self)
     }

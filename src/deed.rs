@@ -29,7 +29,7 @@ use sonicapi::{CoreParams, OpBuilder};
 use strict_types::StrictVal;
 use ultrasonic::{AuthToken, CellAddr, Opid};
 
-use crate::{AcceptError, Stock, Supply};
+use crate::{AcceptError, Contract, Supply};
 
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -42,7 +42,7 @@ pub struct CallParams {
 
 pub struct DeedBuilder<'c, S: Supply> {
     pub(super) builder: OpBuilder,
-    pub(super) stock: &'c mut Stock<S>,
+    pub(super) stock: &'c mut Contract<S>,
 }
 
 impl<S: Supply> DeedBuilder<'_, S> {

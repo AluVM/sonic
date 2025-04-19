@@ -71,9 +71,9 @@ pub trait Supply {
     /// Positive response doesn't indicate that the operation participates in the current contract
     /// state or in a current valid contract history, which may be exported.
     ///
-    /// Operations may be excluded from the history due to rollbacks (see [`Stock::rollback`]), as
-    /// well as re-included later with forwards (see [`Stock::forward`]). In both cases they are
-    /// kept in the contract storage ("stash") and remain accessible to this method.
+    /// Operations may be excluded from the history due to rollbacks (see [`Contract::rollback`]),
+    /// as well as re-included later with forwards (see [`Contract::forward`]). In both cases
+    /// they are kept in the contract storage ("stash") and remain accessible to this method.
     ///
     /// # I/O
     ///
@@ -88,9 +88,9 @@ pub trait Supply {
     /// If the method returns an operation, this doesn't indicate that the operation participates in
     /// the current contract state or in a current valid contract history, which/ may be exported.
     ///
-    /// Operations may be excluded from the history due to rollbacks (see [`Stock::rollback`]), as
-    /// well as re-included later with forwards (see [`Stock::forward`]). In both cases they are
-    /// kept in the contract storage ("stash") and remain accessible to this method.
+    /// Operations may be excluded from the history due to rollbacks (see [`Contract::rollback`]),
+    /// as well as re-included later with forwards (see [`Contract::forward`]). In both cases
+    /// they are kept in the contract storage ("stash") and remain accessible to this method.
     ///
     /// # Panics
     ///
@@ -117,9 +117,9 @@ pub trait Supply {
     /// not contribute to the current contract state or participate in the contract history, which
     /// may be exported.
     ///
-    /// Operations may be excluded from the history due to rollbacks (see [`Stock::rollback`]), as
-    /// well as re-included later with forwards (see [`Stock::forward`]). In both cases they are
-    /// kept in the contract storage ("stash") and remain accessible to this method.
+    /// Operations may be excluded from the history due to rollbacks (see [`Contract::rollback`]),
+    /// as well as re-included later with forwards (see [`Contract::forward`]). In both cases
+    /// they are kept in the contract storage ("stash") and remain accessible to this method.
     ///
     /// # Panics
     ///
@@ -145,9 +145,9 @@ pub trait Supply {
     /// history, which may be exported.
     ///
     /// State transitions may be excluded from the history due to rollbacks (see
-    /// [`Stock::rollback`]), as well as re-included later with forwards (see [`Stock::forward`]).
-    /// In both cases corresponding state transitions are kept in the contract storage ("stash")
-    /// and remain accessible to this method.
+    /// [`Contract::rollback`]), as well as re-included later with forwards (see
+    /// [`Contract::forward`]). In both cases corresponding state transitions are kept in the
+    /// contract storage ("stash") and remain accessible to this method.
     ///
     /// # Panics
     ///
@@ -175,9 +175,9 @@ pub trait Supply {
     /// history, which may be exported.
     ///
     /// State transitions may be excluded from the history due to rollbacks (see
-    /// [`Stock::rollback`]), as well as re-included later with forwards (see [`Stock::forward`]).
-    /// In both cases corresponding state transitions are kept in the contract storage ("stash")
-    /// and remain accessible to this method.
+    /// [`Contract::rollback`]), as well as re-included later with forwards (see
+    /// [`Contract::forward`]). In both cases corresponding state transitions are kept in the
+    /// contract storage ("stash") and remain accessible to this method.
     ///
     /// # Panics
     ///
@@ -296,9 +296,9 @@ pub trait Supply {
 // We need this structure to hide internal persistence methods and not to expose them.
 // We need the persistence trait (`Supply`) in order to allow different persistence storage
 // implementations.
-pub struct Stock<S: Supply>(pub(crate) S);
+pub struct Contract<S: Supply>(pub(crate) S);
 
-impl<S: Supply> Stock<S> {
+impl<S: Supply> Contract<S> {
     pub fn schema(&self) -> &Schema { &self.0.articles().schema }
     pub fn contract_id(&self) -> ContractId { self.0.articles().contract_id() }
     pub fn state(&self) -> &EffectiveState { self.0.state() }

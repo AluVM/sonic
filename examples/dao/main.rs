@@ -35,7 +35,7 @@ use aluvm::{CoreConfig, LibSite};
 use amplify::num::u256;
 use commit_verify::{Digest, Sha256};
 use hypersonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc, EmbeddedReaders};
-use hypersonic::persistance::FileStock;
+use hypersonic::persistance::ContractDir;
 use hypersonic::{Api, ApiInner, AppendApi, DestructibleApi, Schema};
 use strict_types::{SemId, StrictVal};
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
@@ -161,7 +161,7 @@ fn main() {
         fs::remove_dir_all(contract_path).expect("unable to remove contract file");
     }
 
-    let mut stock = FileStock::issue(articles, "examples/dao/data").expect("invalid articles");
+    let mut stock = ContractDir::issue(articles, "examples/dao/data").expect("invalid articles");
 
     // Proposing vote
     let votings = stock

@@ -24,7 +24,7 @@
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
-use hypersonic::persistance::FileStock;
+use hypersonic::persistance::ContractDir;
 use hypersonic::{Articles, AuthToken, CallParams, IssueParams, Schema};
 
 #[derive(Parser)]
@@ -118,20 +118,20 @@ fn process(articles: &Path, stock: Option<&Path>) -> anyhow::Result<()> {
     let path = stock.unwrap_or(articles);
 
     let articles = Articles::load(articles)?;
-    FileStock::issue(articles, path)?;
+    ContractDir::issue(articles, path)?;
 
     Ok(())
 }
 
 fn state(path: &Path) -> anyhow::Result<()> {
-    let stock = FileStock::load(path)?;
+    let stock = ContractDir::load(path)?;
     let val = serde_yaml::to_string(&stock.state().main)?;
     println!("{val}");
     Ok(())
 }
 
 fn call(stock: &Path, form: &Path) -> anyhow::Result<()> {
-    let mut stock = FileStock::load(stock)?;
+    let mut stock = ContractDir::load(stock)?;
     let file = File::open(form)?;
     let call = serde_yaml::from_reader::<_, CallParams>(file)?;
     let opid = stock.call(call)?;
@@ -140,13 +140,13 @@ fn call(stock: &Path, form: &Path) -> anyhow::Result<()> {
 }
 
 fn export<'a>(stock: &Path, terminals: impl IntoIterator<Item = &'a AuthToken>, output: &Path) -> anyhow::Result<()> {
-    let mut stock = FileStock::load(stock)?;
+    let mut stock = ContractDir::load(stock)?;
     stock.export_to_file(terminals, output)?;
     Ok(())
 }
 
 fn accept(stock: &Path, input: &Path) -> anyhow::Result<()> {
-    let mut stock = FileStock::load(stock)?;
+    let mut stock = ContractDir::load(stock)?;
     stock.accept_from_file(input)?;
     Ok(())
 }
