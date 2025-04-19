@@ -25,4 +25,4 @@
 mod fs;
 
 #[cfg(feature = "persist-file")]
-pub use fs::{ContractDir, FileSupply, IssueError, LoadError};
+pub use fs::{ContractDir, IssueError, LoadError, StockFs};

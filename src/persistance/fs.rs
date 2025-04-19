@@ -32,15 +32,15 @@ use sonicapi::{Articles, MergeError, Schema};
 use strict_encoding::{DeserializeError, SerializeError, StreamReader, StreamWriter, StrictReader, StrictWriter};
 use ultrasonic::{AuthToken, CallError, CellAddr, ContractName, Operation, Opid};
 
-use crate::{AcceptError, Contract, EffectiveState, RawState, StockError, Supply, Transition};
+use crate::{AcceptError, Contract, EffectiveState, RawState, Stock, StockError, Transition};
 
-pub type ContractDir = Contract<FileSupply>;
+pub type ContractDir = Contract<StockFs>;
 
 const STASH_MAGIC: u64 = u64::from_be_bytes(*b"RGBSTASH");
 const TRACE_MAGIC: u64 = u64::from_be_bytes(*b"RGBTRACE");
 const SPENT_MAGIC: u64 = u64::from_be_bytes(*b"RGBSPENT");
 
-pub struct FileSupply {
+pub struct StockFs {
     path: PathBuf,
     stash: FileAoraMap<Opid, Operation, STASH_MAGIC, 1>,
     trace: FileAoraMap<Opid, Transition, TRACE_MAGIC, 1>,
@@ -49,7 +49,7 @@ pub struct FileSupply {
     state: EffectiveState,
 }
 
-impl FileSupply {
+impl StockFs {
     const FILENAME_ARTICLES: &'static str = "contract.articles";
     const FILENAME_STATE_RAW: &'static str = "state.dat";
     const CONTRACT_DIR_EXTENSION: &'static str = "contract";
@@ -92,7 +92,7 @@ impl FileSupply {
     }
 }
 
-impl Supply for FileSupply {
+impl Stock for StockFs {
     #[inline]
     fn articles(&self) -> &Articles { &self.articles }
     #[inline]
@@ -140,10 +140,10 @@ impl Supply for FileSupply {
 
 impl ContractDir {
     pub fn issue(articles: Articles, path: impl AsRef<Path>) -> Result<Self, IssueError> {
-        FileSupply::issue(articles, path).map(Self)
+        StockFs::issue(articles, path).map(Self)
     }
 
-    pub fn load(path: impl AsRef<Path>) -> Result<Self, LoadError> { FileSupply::load(path).map(Self) }
+    pub fn load(path: impl AsRef<Path>) -> Result<Self, LoadError> { StockFs::load(path).map(Self) }
 
     pub fn backup_to_file(&mut self, output: impl AsRef<Path>) -> io::Result<()> {
         let file = File::create_new(output)?;

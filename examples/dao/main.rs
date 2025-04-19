@@ -161,10 +161,10 @@ fn main() {
         fs::remove_dir_all(contract_path).expect("unable to remove contract file");
     }
 
-    let mut stock = ContractDir::issue(articles, "examples/dao/data").expect("invalid articles");
+    let mut contract = ContractDir::issue(articles, "examples/dao/data").expect("invalid articles");
 
     // Proposing vote
-    let votings = stock
+    let votings = contract
         .start_deed("proposal")
         .append(
             "_votings",
@@ -179,7 +179,7 @@ fn main() {
     let carol_auth2 = next_auth();
 
     // Alice vote against her being on duty today
-    stock
+    contract
         .start_deed("castVote")
         .using(CellAddr::new(opid, 0), svnum!(0u64))
         .reading(CellAddr::new(votings, 0))
@@ -189,7 +189,7 @@ fn main() {
         .unwrap();
 
     // Bob and Carol vote for Alice being on duty today
-    stock
+    contract
         .start_deed("castVote")
         .using(CellAddr::new(opid, 1), svnum!(1u64))
         .reading(CellAddr::new(votings, 0))
@@ -197,7 +197,7 @@ fn main() {
         .assign("signers", bob_auth2, svnum!(1u64), None)
         .commit()
         .unwrap();
-    stock
+    contract
         .start_deed("castVote")
         .using(CellAddr::new(opid, 2), svnum!(2u64))
         .reading(CellAddr::new(votings, 0))
@@ -206,13 +206,13 @@ fn main() {
         .commit()
         .unwrap();
 
-    let StrictVal::Map(votings) = stock.state().read("votings") else {
+    let StrictVal::Map(votings) = contract.state().read("votings") else {
         panic!("invalid data")
     };
     let (_, first_voting) = votings.first().unwrap();
     println!("voting: {first_voting}");
     println!("Votes:");
-    let StrictVal::Set(votes) = stock.state().read("votes") else {
+    let StrictVal::Set(votes) = contract.state().read("votes") else {
         panic!("invalid data")
     };
     for vote in votes {
@@ -225,7 +225,7 @@ fn main() {
         fs::remove_file(deeds_path).expect("unable to remove contract file");
     }
 
-    stock
+    contract
         .export_to_file([alice_auth2, bob_auth2, carol_auth2], "examples/dao/data/voting.deeds")
         .expect("unable to save deeds to a file");
 }

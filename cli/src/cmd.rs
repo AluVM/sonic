@@ -41,32 +41,32 @@ pub enum Cmd {
         output: Option<PathBuf>,
     },
 
-    /// Process contract articles into a contract stock directory
+    /// Process contract articles into a contract directory
     Process {
         /// Contract articles to process
         articles: PathBuf,
-        /// Directory to put the contract stock directory inside
-        stock: Option<PathBuf>,
+        /// Directory to put the contract directory inside
+        dir: Option<PathBuf>,
     },
 
     /// Print out a contract state
     State {
-        /// Contract stock directory
-        stock: PathBuf,
+        /// Contract directory
+        dir: PathBuf,
     },
 
     /// Make a contract call
     Call {
-        /// Contract stock directory
-        stock: PathBuf,
+        /// Contract directory
+        dir: PathBuf,
         /// Parameters and data for the call
         call: PathBuf,
     },
 
     /// Export contract deeds to a file
     Export {
-        /// Contract stock directory
-        stock: PathBuf,
+        /// Contract directory
+        dir: PathBuf,
 
         /// List of tokens of authority which should serve as a contract terminals.
         #[clap(short, long)]
@@ -76,10 +76,10 @@ pub enum Cmd {
         output: PathBuf,
     },
 
-    /// Accept deeds into a contract stock
+    /// Accept deeds into a contract
     Accept {
-        /// Contract stock directory
-        stock: PathBuf,
+        /// Contract directory
+        dir: PathBuf,
 
         /// File with deeds to accept
         input: PathBuf,
@@ -90,11 +90,11 @@ impl Cmd {
     pub fn exec(&self) -> anyhow::Result<()> {
         match self {
             Cmd::Issue { schema, params, output } => issue(schema, params, output.as_deref())?,
-            Cmd::Process { articles, stock } => process(articles, stock.as_deref())?,
-            Cmd::State { stock } => state(stock)?,
-            Cmd::Call { stock, call: path } => call(stock, path)?,
-            Cmd::Export { stock, terminals, output } => export(stock, terminals, output)?,
-            Cmd::Accept { stock, input } => accept(stock, input)?,
+            Cmd::Process { articles, dir } => process(articles, dir.as_deref())?,
+            Cmd::State { dir } => state(dir)?,
+            Cmd::Call { dir, call: path } => call(dir, path)?,
+            Cmd::Export { dir, terminals, output } => export(dir, terminals, output)?,
+            Cmd::Accept { dir, input } => accept(dir, input)?,
         }
         Ok(())
     }
@@ -114,8 +114,8 @@ fn issue(schema: &Path, form: &Path, output: Option<&Path>) -> anyhow::Result<()
     Ok(())
 }
 
-fn process(articles: &Path, stock: Option<&Path>) -> anyhow::Result<()> {
-    let path = stock.unwrap_or(articles);
+fn process(articles: &Path, dir: Option<&Path>) -> anyhow::Result<()> {
+    let path = dir.unwrap_or(articles);
 
     let articles = Articles::load(articles)?;
     ContractDir::issue(articles, path)?;
@@ -124,29 +124,29 @@ fn process(articles: &Path, stock: Option<&Path>) -> anyhow::Result<()> {
 }
 
 fn state(path: &Path) -> anyhow::Result<()> {
-    let stock = ContractDir::load(path)?;
-    let val = serde_yaml::to_string(&stock.state().main)?;
+    let contract = ContractDir::load(path)?;
+    let val = serde_yaml::to_string(&contract.state().main)?;
     println!("{val}");
     Ok(())
 }
 
-fn call(stock: &Path, form: &Path) -> anyhow::Result<()> {
-    let mut stock = ContractDir::load(stock)?;
+fn call(dir: &Path, form: &Path) -> anyhow::Result<()> {
+    let mut contract = ContractDir::load(dir)?;
     let file = File::open(form)?;
     let call = serde_yaml::from_reader::<_, CallParams>(file)?;
-    let opid = stock.call(call)?;
+    let opid = contract.call(call)?;
     println!("Operation ID: {opid}");
     Ok(())
 }
 
-fn export<'a>(stock: &Path, terminals: impl IntoIterator<Item = &'a AuthToken>, output: &Path) -> anyhow::Result<()> {
-    let mut stock = ContractDir::load(stock)?;
-    stock.export_to_file(terminals, output)?;
+fn export<'a>(dir: &Path, terminals: impl IntoIterator<Item = &'a AuthToken>, output: &Path) -> anyhow::Result<()> {
+    let mut contract = ContractDir::load(dir)?;
+    contract.export_to_file(terminals, output)?;
     Ok(())
 }
 
-fn accept(stock: &Path, input: &Path) -> anyhow::Result<()> {
-    let mut stock = ContractDir::load(stock)?;
-    stock.accept_from_file(input)?;
+fn accept(dir: &Path, input: &Path) -> anyhow::Result<()> {
+    let mut contract = ContractDir::load(dir)?;
+    contract.accept_from_file(input)?;
     Ok(())
 }

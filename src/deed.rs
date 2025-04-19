@@ -29,7 +29,7 @@ use sonicapi::{CoreParams, OpBuilder};
 use strict_types::StrictVal;
 use ultrasonic::{AuthToken, CellAddr, Opid};
 
-use crate::{AcceptError, Contract, Supply};
+use crate::{AcceptError, Contract, Stock};
 
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -40,12 +40,12 @@ pub struct CallParams {
     pub reading: Vec<CellAddr>,
 }
 
-pub struct DeedBuilder<'c, S: Supply> {
+pub struct DeedBuilder<'c, S: Stock> {
     pub(super) builder: OpBuilder,
-    pub(super) stock: &'c mut Contract<S>,
+    pub(super) contract: &'c mut Contract<S>,
 }
 
-impl<S: Supply> DeedBuilder<'_, S> {
+impl<S: Stock> DeedBuilder<'_, S> {
     pub fn reading(mut self, addr: CellAddr) -> Self {
         self.builder = self.builder.access(addr);
         self
@@ -57,8 +57,8 @@ impl<S: Supply> DeedBuilder<'_, S> {
     }
 
     pub fn append(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
-        let api = &self.stock.schema().default_api;
-        let types = &self.stock.schema().types;
+        let api = &self.contract.schema().default_api;
+        let types = &self.contract.schema().types;
         self.builder = self.builder.add_immutable(name, data, raw, api, types);
         self
     }
@@ -70,8 +70,8 @@ impl<S: Supply> DeedBuilder<'_, S> {
         data: StrictVal,
         lock: Option<LibSite>,
     ) -> Self {
-        let api = &self.stock.schema().default_api;
-        let types = &self.stock.schema().types;
+        let api = &self.contract.schema().default_api;
+        let types = &self.contract.schema().types;
         self.builder = self
             .builder
             .add_destructible(name, auth, data, lock, api, types);
@@ -82,7 +82,7 @@ impl<S: Supply> DeedBuilder<'_, S> {
     where Self: 'a {
         let deed = self.builder.finalize();
         let opid = deed.opid();
-        self.stock.apply_verify(deed)?;
+        self.contract.apply_verify(deed)?;
         Ok(opid)
     }
 }
