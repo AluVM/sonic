@@ -35,6 +35,7 @@ use aluvm::{CoreConfig, LibSite};
 use amplify::num::u256;
 use commit_verify::{Digest, Sha256};
 use hypersonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc, EmbeddedReaders};
+use hypersonic::persistance::FileStock;
 use hypersonic::{Api, ApiInner, AppendApi, DestructibleApi, Schema, Stock};
 use strict_types::{SemId, StrictVal};
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
@@ -160,7 +161,7 @@ fn main() {
         fs::remove_dir_all(contract_path).expect("unable to remove contract file");
     }
 
-    let mut stock = Stock::new(articles, "examples/dao/data").expect("invalid articles");
+    let mut stock = FileStock::issue(articles, "examples/dao/data").expect("invalid articles");
 
     // Proposing vote
     let votings = stock
@@ -170,7 +171,8 @@ fn main() {
             svnum!(100u64),
             Some(ston!(title "Is Alice on duty today?", text "Vote 'pro' if Alice should be on duty today")),
         )
-        .commit();
+        .commit()
+        .unwrap();
 
     let alice_auth2 = next_auth();
     let bob_auth2 = next_auth();
@@ -183,7 +185,8 @@ fn main() {
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(0u8), partyId 0u64), None)
         .assign("signers", alice_auth2, svnum!(0u64), None)
-        .commit();
+        .commit()
+        .unwrap();
 
     // Bob and Carol vote for Alice being on duty today
     stock
@@ -192,16 +195,16 @@ fn main() {
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 1u64), None)
         .assign("signers", bob_auth2, svnum!(1u64), None)
-        .commit();
+        .commit()
+        .unwrap();
     stock
         .start_deed("castVote")
         .using(CellAddr::new(opid, 2), svnum!(2u64))
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 2u64), None)
         .assign("signers", carol_auth2, svnum!(2u64), None)
-        .commit();
-
-    stock.save();
+        .commit()
+        .unwrap();
 
     let StrictVal::Map(votings) = stock.state().read("votings") else {
         panic!("invalid data")

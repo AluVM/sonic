@@ -21,32 +21,8 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#[cfg(feature = "persist-file")]
+mod fs;
 
-// TODO: Activate once StrictEncoding will be no_std
-// #![cfg_attr(not(feature = "std"), no_std)]
-
-#[macro_use]
-extern crate core;
-extern crate alloc;
-
-#[macro_use]
-extern crate amplify;
-#[macro_use]
-extern crate strict_types;
-
-#[cfg(feature = "serde")]
-#[macro_use]
-extern crate serde;
-
-pub use sonicapi::*;
-pub use ultrasonic::*;
-
-mod state;
-mod stock;
-pub mod persistance;
-mod deed;
-
-pub use deed::{CallParams, DeedBuilder};
-pub use state::{AdaptedState, EffectiveState, RawState, Transition};
-pub use stock::{AcceptError, Stock, StockError, Supply};
+#[cfg(feature = "persist-file")]
+pub use fs::{FileStock, FileSupply, IssueError, LoadError};

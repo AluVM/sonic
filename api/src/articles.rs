@@ -73,17 +73,19 @@ pub enum MergeError {
 mod _fs {
     use std::path::Path;
 
+    use amplify::confinement::U24 as U24MAX;
     use strict_encoding::{DeserializeError, SerializeError, StrictDeserialize, StrictSerialize};
 
     use super::Articles;
 
+    // TODO: Use BinFile
     impl Articles {
         pub fn load(path: impl AsRef<Path>) -> Result<Self, DeserializeError> {
-            Self::strict_deserialize_from_file::<{ usize::MAX }>(path)
+            Self::strict_deserialize_from_file::<U24MAX>(path)
         }
 
         pub fn save(&self, path: impl AsRef<Path>) -> Result<(), SerializeError> {
-            self.strict_serialize_to_file::<{ usize::MAX }>(path)
+            self.strict_serialize_to_file::<U24MAX>(path)
         }
     }
 }

@@ -21,106 +21,300 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use alloc::collections::{BTreeMap, BTreeSet, VecDeque};
+use alloc::collections::{BTreeSet, VecDeque};
 use core::borrow::Borrow;
-// Used in strict encoding; once solved there, remove here
-use std::io::{self, ErrorKind};
+use core::error::Error as StdError;
+use std::io;
 
-use aluvm::LibSite;
-use aora::AoraMap;
-use sonic_callreq::{MethodName, StateName};
-use sonicapi::{CoreParams, MergeError, NamedState, OpBuilder};
-use strict_encoding::{DecodeError, ReadRaw, StrictDecode, StrictEncode, StrictReader, StrictWriter, WriteRaw};
-use strict_types::StrictVal;
+use sonic_callreq::MethodName;
+use sonicapi::{MergeError, NamedState, OpBuilder, Schema};
+use strict_encoding::{
+    DecodeError, ReadRaw, SerializeError, StrictDecode, StrictEncode, StrictReader, StrictWriter, WriteRaw,
+};
 use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Operation, Opid, VerifiedOperation};
 
-use crate::{Articles, EffectiveState, RawState, Transition};
+use crate::deed::{CallParams, DeedBuilder};
+use crate::{Articles, EffectiveState, Transition};
 
-/// Persistence API for keeping and accessing the contract.
+/// Persistence API for keeping and accessing the contract data.
 ///
-/// NB: Methods in the trait do not error; instead, they must perform all operations asynchronously,
-/// for instance in a separate thread or using channels; and in case of error the error must be
-/// reported elsewhere (via logging, or using a dedicated error reporting microservice).
+/// Contract data include:
+/// - contract [`Articles`];
+/// - contract [`EffectiveState`], dynamically computed;
+/// - all known contract [`Operations`] ("stash"), including the ones which may not be included into
+///   a state or be a part of a contract history;
+/// - a trace of the most recent execution of each of the [`Operations`] in the stash ("trace");
+/// - an information which operations reference (use as input, "spend") other operation outputs.
+///
+/// Trace and spending information is used in contract rollback and forward operations, which lead
+/// to a re-computation of a contract state (but leave stash and trace data unaffected).
+// TODO: Consider returning large objects by reference
 pub trait Supply {
-    type Stash: AoraMap<Opid, Operation>;
-    type Trace: AoraMap<Opid, Transition>;
-    // Map of operations which spent a given output
-    type Spent: AoraMap<CellAddr, Opid, 34>;
+    /// Provides contract [`Articles`].
+    ///
+    /// # I/O
+    ///
+    /// This call MUST NOT perform any I/O operations and MUST BE a non-blocking.
+    fn articles(&self) -> &Articles;
 
-    fn stash(&self) -> &Self::Stash;
-    fn trace(&self) -> &Self::Trace;
-    fn spent(&self) -> &Self::Spent;
+    /// Provides contract [`EffectiveState`].
+    ///
+    /// # I/O
+    ///
+    /// This call MUST NOT perform any I/O operations and MUST BE a non-blocking.
+    fn state(&self) -> &EffectiveState;
 
-    fn stash_mut(&mut self) -> &mut Self::Stash;
-    fn trace_mut(&mut self) -> &mut Self::Trace;
-    fn spent_mut(&mut self) -> &mut Self::Spent;
+    /// Detects whether an operation with a given `opid` is known to the contract.
+    ///
+    /// # Nota bene
+    ///
+    /// Positive response doesn't indicate that the operation participates in the current contract
+    /// state or in a current valid contract history, which may be exported.
+    ///
+    /// Operations may be excluded from the history due to rollbacks (see [`Stock::rollback`]), as
+    /// well as re-included later with forwards (see [`Stock::forward`]). In both cases they are
+    /// kept in the contract storage ("stash") and remain accessible to this method.
+    ///
+    /// # I/O
+    ///
+    /// This call MAY BE blocking.
+    fn has_operation(&self, opid: Opid) -> bool;
 
-    fn save_articles(&self, obj: &Articles);
-    fn load_articles(&self) -> Articles;
+    /// Returns an operation ([`Operation`]) with a given `opid` from the set of known contract
+    /// operations ("stash").
+    ///
+    /// # Nota bene
+    ///
+    /// If the method returns an operation, this doesn't indicate that the operation participates in
+    /// the current contract state or in a current valid contract history, which/ may be exported.
+    ///
+    /// Operations may be excluded from the history due to rollbacks (see [`Stock::rollback`]), as
+    /// well as re-included later with forwards (see [`Stock::forward`]). In both cases they are
+    /// kept in the contract storage ("stash") and remain accessible to this method.
+    ///
+    /// # Panics
+    ///
+    /// If an `opid` is not present in the contract stash.
+    ///
+    /// In order to avoid panics always call the method after calling `has_operation`.
+    ///
+    /// # I/O
+    ///
+    /// This call MAY BE blocking.
+    ///
+    /// # Implementation instructions
+    ///
+    /// Specific persistence providers implementing this method MUST panic if there is no operation
+    /// matching the provided `opid`.
+    fn operation(&self, opid: Opid) -> Operation;
 
-    fn save_state(&self, state: &RawState);
-    fn load_state(&self) -> RawState;
+    /// Returns an iterator over all operations known to the contract (i.e. the complete contract
+    /// stash).
+    ///
+    /// # Nota bene
+    ///
+    /// Contract stash is a broader concept than contract history. It includes operations which may
+    /// not contribute to the current contract state or participate in the contract history, which
+    /// may be exported.
+    ///
+    /// Operations may be excluded from the history due to rollbacks (see [`Stock::rollback`]), as
+    /// well as re-included later with forwards (see [`Stock::forward`]). In both cases they are
+    /// kept in the contract storage ("stash") and remain accessible to this method.
+    ///
+    /// # Panics
+    ///
+    /// The method MUST NOT panic
+    ///
+    /// # I/O
+    ///
+    /// The iterator provided in return may be a blocking iterator.
+    ///
+    /// # Implementation instructions
+    ///
+    /// Specific persistence providers implementing this method MUST iterate over all operations
+    /// which were ever provided via [`Self::add_operation`].
+    fn operations(&self) -> impl Iterator<Item = (Opid, Operation)>;
+
+    /// Returns a state transition ([`Transition`]) with a given `opid` from the set of known
+    /// contract state transition ("trace").
+    ///
+    /// # Nota bene
+    ///
+    /// If the method returns a state transition, this doesn't indicate that the corresponding
+    /// operation participates in the current contract state or in a current valid contract
+    /// history, which may be exported.
+    ///
+    /// State transitions may be excluded from the history due to rollbacks (see
+    /// [`Stock::rollback`]), as well as re-included later with forwards (see [`Stock::forward`]).
+    /// In both cases corresponding state transitions are kept in the contract storage ("stash")
+    /// and remain accessible to this method.
+    ///
+    /// # Panics
+    ///
+    /// If an `opid` is not present in the contract trace.
+    ///
+    /// In order to avoid panics always call the method after calling `has_operation`.
+    ///
+    /// # I/O
+    ///
+    /// This call MAY BE blocking.
+    ///
+    /// # Implementation instructions
+    ///
+    /// Specific persistence providers implementing this method MUST panic if there is no operation
+    /// matching the provided `opid`.
+    fn transition(&self, opid: Opid) -> Transition;
+
+    /// Returns an iterator over all state transitions known to the contract (i.e. the complete
+    /// contract trace).
+    ///
+    /// # Nota bene
+    ///
+    /// Contract trace is a broader concept than contract history. It includes state transition
+    /// which may not contribute to the current contract state or participate in the contract
+    /// history, which may be exported.
+    ///
+    /// State transitions may be excluded from the history due to rollbacks (see
+    /// [`Stock::rollback`]), as well as re-included later with forwards (see [`Stock::forward`]).
+    /// In both cases corresponding state transitions are kept in the contract storage ("stash")
+    /// and remain accessible to this method.
+    ///
+    /// # Panics
+    ///
+    /// The method MUST NOT panic
+    ///
+    /// # I/O
+    ///
+    /// The iterator provided in return may be a blocking iterator.
+    ///
+    /// # Implementation instructions
+    ///
+    /// Specific persistence providers implementing this method MUST iterate over all state
+    /// transitions which were ever provided via [`Self::add_transition`].
+    fn trace(&self) -> impl Iterator<Item = (Opid, Transition)>;
+
+    /// Returns an id of an operation spending a provided address (operation destructible state
+    /// output).
+    ///
+    /// # Nota bene
+    ///
+    /// This method is internally used in rollback procedure, and must not be accessed from outside.
+    ///
+    /// # I/O
+    ///
+    /// This call MAY BE blocking.
+    ///
+    /// # Implementation instructions
+    ///
+    /// Specific persistence providers implementing this method MUST guarantee to always return a
+    /// non-`None` for all `addr` which were at least once provided via [`Self::add_spending`]
+    /// as a `spent` argument.
+    fn spent_by(&self, addr: CellAddr) -> Option<Opid>;
+
+    /// Updates articles with a newer version inside a callback method.
+    ///
+    /// # I/O
+    ///
+    /// This call MAY BE blocking.
+    ///
+    /// # Implementation instructions
+    ///
+    /// Specific persistence providers implementing this method MUST guarantee to always persist an
+    /// updated state after calling the callback `f` method.
+    fn update_articles(
+        &mut self,
+        f: impl FnOnce(&mut Articles) -> Result<(), MergeError>,
+    ) -> Result<(), StockError<MergeError>>;
+
+    /// Updates contract effective state inside a callback method.
+    ///
+    /// # I/O
+    ///
+    /// This call MAY BE blocking.
+    ///
+    /// # Implementation instructions
+    ///
+    /// Specific persistence providers implementing this method MUST guarantee to always persist an
+    /// updated state after calling the callback `f` method.
+    fn update_state<R>(&mut self, f: impl FnOnce(&mut EffectiveState, &Schema) -> R) -> Result<R, SerializeError>;
+
+    /// Adds operation to the contract data.
+    ///
+    /// # I/O
+    ///
+    /// This call MAY BE blocking.
+    ///
+    /// # Implementation instructions
+    ///
+    /// Specific persistence providers implementing this method MUST:
+    /// - immediately store the operation data;
+    /// - panic, if the operation with the same `opid` is already known, but differs from the
+    ///   provided operation.
+    ///
+    /// They SHOULD:
+    /// - perform a no-operation if the provided operation with the same `opid` is already known and
+    ///   the `operation` itself matches the known data for it;
+    /// - NOT verify that the `operation` is matching the provided `opid` since this MUST BE
+    ///   guaranteed by a caller.
+    fn add_operation(&mut self, opid: Opid, operation: &Operation);
+
+    /// Adds state transition caused by an operation with `opid` to the contract data.
+    ///
+    /// # I/O
+    ///
+    /// This call MAY BE blocking.
+    ///
+    /// # Implementation instructions
+    ///
+    /// Specific persistence providers implementing this method MUST:
+    /// - immediately store the transition data;
+    /// - panic, if a transition for the same `opid` is already known, but differs from the provided
+    ///   transition.
+    ///
+    /// They SHOULD:
+    /// - perform a no-operation if the provided transition for the same `opid` is already known and
+    ///   the `transition` itself matches the known data for it.
+    fn add_transition(&mut self, opid: Opid, transition: &Transition);
+
+    /// Registers given operation output (`spent`) to be spent (used as an input) in operation
+    /// `spender`.
+    ///
+    /// # I/O
+    ///
+    /// This call MAY BE blocking.
+    ///
+    /// # Implementation instructions
+    ///
+    /// Specific persistence providers implementing this method MUST:
+    /// - immediately store the new spending information;
+    /// - silently update `spender` if the provided `spent` cell address were previously spent by a
+    ///   different operation.
+    fn add_spending(&mut self, spent: CellAddr, spender: Opid);
 }
 
-/// Append-only, random-accessed deeds & trace; updatable and rollback-enabled state.
-#[derive(Getters)]
-pub struct Stock<S: Supply> {
-    articles: Articles,
-    state: EffectiveState,
-
-    #[getter(skip)]
-    supply: S,
-}
+/// Stock is a contract with all its state and operations, supporting updates and rollbacks.
+// We need this structure to hide internal persistence methods and not to expose them.
+// We need the persistence trait (`Supply`) in order to allow different persistence storage
+// implementations.
+pub struct Stock<S: Supply>(pub(crate) S);
 
 impl<S: Supply> Stock<S> {
-    pub fn create(articles: Articles, persistence: S) -> Result<Self, CallError> {
-        let mut state = EffectiveState::default();
+    pub fn schema(&self) -> &Schema { &self.0.articles().schema }
+    pub fn contract_id(&self) -> ContractId { self.0.articles().contract_id() }
+    pub fn state(&self) -> &EffectiveState { self.0.state() }
 
-        let genesis = articles
-            .contract
-            .genesis
-            .to_operation(articles.contract.contract_id());
-
-        let verified =
-            articles
-                .schema
-                .codex
-                .verify(articles.contract.contract_id(), genesis, &state.raw, &articles.schema)?;
-
-        // We do not need state transition for geneis.
-        let _ = state.apply(
-            verified,
-            &articles.schema.default_api,
-            articles.schema.custom_apis.keys(),
-            &articles.schema.types,
-        );
-
-        let mut me = Self { articles, state, supply: persistence };
-        me.recompute_state();
-        me.save();
-        Ok(me)
-    }
-
-    pub fn open(articles: Articles, persistence: S) -> Self {
-        let raw = persistence.load_state();
-        let state = EffectiveState::with(raw, &articles.schema);
-        Self { articles, state, supply: persistence }
-    }
-
-    pub fn contract_id(&self) -> ContractId { self.articles.contract_id() }
-
-    pub fn export_all(&mut self, mut writer: StrictWriter<impl WriteRaw>) -> io::Result<()> {
+    pub fn export_all(&self, mut writer: StrictWriter<impl WriteRaw>) -> io::Result<()> {
         // Write articles
-        writer = self.articles.strict_encode(writer)?;
+        writer = self.0.articles().strict_encode(writer)?;
         // Stream operations
-        for (_, op) in self.operations() {
+        for (_, op) in self.0.operations() {
             writer = op.strict_encode(writer)?;
         }
         Ok(())
     }
 
     pub fn export(
-        &mut self,
+        &self,
         terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
         writer: StrictWriter<impl WriteRaw>,
     ) -> io::Result<()> {
@@ -129,20 +323,20 @@ impl<S: Supply> Stock<S> {
 
     // TODO: Return statistics
     pub fn export_aux<W: WriteRaw>(
-        &mut self,
+        &self,
         terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
         mut writer: StrictWriter<W>,
         mut aux: impl FnMut(Opid, StrictWriter<W>) -> io::Result<StrictWriter<W>>,
     ) -> io::Result<()> {
         let mut queue = terminals
             .into_iter()
-            .map(|terminal| self.state.addr(*terminal.borrow()).opid)
+            .map(|terminal| self.0.state().addr(*terminal.borrow()).opid)
             .collect::<BTreeSet<_>>();
-        let genesis_opid = self.articles.contract.genesis_opid();
+        let genesis_opid = self.0.articles().contract.genesis_opid();
         queue.remove(&genesis_opid);
         let mut opids = queue.clone();
         while let Some(opid) = queue.pop_first() {
-            let st = self.supply.trace_mut().get_expect(opid);
+            let st = self.0.transition(opid);
             for prev in st.destroyed.into_keys().map(|a| a.opid) {
                 if !opids.contains(&prev) && prev != genesis_opid {
                     opids.insert(prev);
@@ -154,10 +348,10 @@ impl<S: Supply> Stock<S> {
         // TODO: Include all operations defining published state
 
         // Write articles
-        writer = self.articles.strict_encode(writer)?;
+        writer = self.0.articles().strict_encode(writer)?;
         writer = aux(genesis_opid, writer)?;
         // Stream operations
-        for (opid, op) in self.operations() {
+        for (opid, op) in self.0.operations() {
             if !opids.remove(&opid) {
                 continue;
             }
@@ -178,43 +372,42 @@ impl<S: Supply> Stock<S> {
         Ok(())
     }
 
-    pub fn merge_articles(&mut self, articles: Articles) -> Result<(), MergeError> {
-        self.articles.merge(articles)?;
-        self.supply.save_articles(&self.articles);
-        Ok(())
+    pub fn merge_articles(&mut self, new_articles: Articles) -> Result<(), StockError<MergeError>> {
+        self.0.update_articles(|articles| {
+            articles.merge(new_articles)?;
+            Ok(())
+        })
     }
 
     pub fn import(&mut self, reader: &mut StrictReader<impl ReadRaw>) -> Result<(), AcceptError> {
         let articles = Articles::strict_decode(reader)?;
-        self.articles.merge(articles)?;
+        self.merge_articles(articles).map_err(|e| match e {
+            StockError::Inner(e) => AcceptError::Articles(e),
+            StockError::Serialize(e) => AcceptError::Serialize(e),
+        })?;
 
         loop {
             let op = match Operation::strict_decode(reader) {
                 Ok(operation) => operation,
-                Err(DecodeError::Io(e)) if e.kind() == ErrorKind::UnexpectedEof => break,
+                Err(DecodeError::Io(e)) if e.kind() == io::ErrorKind::UnexpectedEof => break,
                 Err(e) => return Err(e.into()),
             };
             self.apply_verify(op)?;
         }
-        self.recompute_state();
-        self.save_state();
         Ok(())
     }
 
-    pub fn rollback(&mut self, opids: impl IntoIterator<Item = Opid>) {
+    pub fn rollback(&mut self, opids: impl IntoIterator<Item = Opid>) -> Result<(), SerializeError> {
         let mut chain = opids.into_iter().collect::<VecDeque<_>>();
         // Get all subsequent operations
         loop {
             let mut count = 0usize;
             for mut index in 0..chain.len() {
                 let opid = chain[index];
-                let op = self.supply.stash_mut().get_expect(opid);
+                let op = self.0.operation(opid);
                 for no in 0..op.destructible.len_u16() {
                     let addr = CellAddr::new(opid, no);
-                    if !self.supply.spent().contains_key(addr) {
-                        continue;
-                    }
-                    let spent = self.supply.spent_mut().get_expect(addr);
+                    let Some(spent) = self.0.spent_by(addr) else { continue };
                     chain.push_front(spent);
                     count += 1;
                     index += 1;
@@ -225,16 +418,13 @@ impl<S: Supply> Stock<S> {
             }
         }
 
-        let articles = self.supply.load_articles();
         for opid in chain {
-            let transition = self.supply.trace_mut().get_expect(opid);
-            self.state.rollback(
-                transition,
-                &articles.schema.default_api,
-                articles.schema.custom_apis.keys(),
-                &articles.schema.types,
-            );
+            let transition = self.0.transition(opid);
+            self.0.update_state(|state, schema| {
+                state.rollback(transition, &schema.default_api, schema.custom_apis.keys(), &schema.types);
+            })?;
         }
+        Ok(())
     }
 
     pub fn forward(&mut self, opids: impl IntoIterator<Item = Opid>) -> Result<(), AcceptError> {
@@ -242,7 +432,7 @@ impl<S: Supply> Stock<S> {
         let mut queue = VecDeque::with_capacity(all.len());
 
         while let Some(opid) = all.pop_front() {
-            let op = self.supply.stash_mut().get_expect(opid);
+            let op = self.0.operation(opid);
             queue.push_front(op);
             let op = &queue[0];
             for prev in &op.reading {
@@ -262,22 +452,12 @@ impl<S: Supply> Stock<S> {
         Ok(())
     }
 
-    pub fn has_operation(&self, opid: Opid) -> bool { self.supply.stash().contains_key(opid) }
-
-    pub fn operations(&mut self) -> impl Iterator<Item = (Opid, Operation)> + use<'_, S> {
-        self.supply.stash_mut().iter()
-    }
-
-    pub fn operation(&mut self, opid: Opid) -> Operation { self.supply.stash_mut().get_expect(opid) }
-
-    pub fn trace(&mut self) -> impl Iterator<Item = (Opid, Transition)> + use<'_, S> { self.supply.trace_mut().iter() }
-
     pub fn start_deed(&mut self, method: impl Into<MethodName>) -> DeedBuilder<'_, S> {
-        let builder = OpBuilder::new(self.articles.contract.contract_id(), self.articles.schema.call_id(method));
+        let builder = OpBuilder::new(self.contract_id(), self.0.articles().schema.call_id(method));
         DeedBuilder { builder, stock: self }
     }
 
-    pub fn call(&mut self, params: CallParams) -> Opid {
+    pub fn call(&mut self, params: CallParams) -> Result<Opid, AcceptError> {
         let mut builder = self.start_deed(params.core.method);
 
         for NamedState { name, state } in params.core.global {
@@ -300,22 +480,20 @@ impl<S: Supply> Stock<S> {
     ///
     /// Whether operation was already successfully included (`true`), or was already present in the
     /// stash.
-    fn apply_verify(&mut self, operation: Operation) -> Result<bool, AcceptError> {
+    pub fn apply_verify(&mut self, operation: Operation) -> Result<bool, AcceptError> {
         if operation.contract_id != self.contract_id() {
-            return Err(AcceptError::ContractMismatch);
+            return Err(AcceptError::Articles(MergeError::ContractMismatch));
         }
 
         let opid = operation.opid();
 
-        let present = self.supply.stash().contains_key(opid);
+        let present = self.0.has_operation(opid);
+        let schema = &self.0.articles().schema;
         if !present {
-            let verified = self.articles.schema.codex.verify(
-                self.articles.contract.contract_id(),
-                operation,
-                &self.state.raw,
-                &self.articles.schema,
-            )?;
-            self.apply_internal(opid, verified, present);
+            let verified = schema
+                .codex
+                .verify(self.contract_id(), operation, &self.0.state().raw, schema)?;
+            self.apply_internal(opid, verified, present)?;
         }
 
         Ok(present)
@@ -329,113 +507,50 @@ impl<S: Supply> Stock<S> {
     /// # Returns
     ///
     /// State invalidated by the operation in form of a [`Transition`].
-    // TODO: Introduce type [`ValidOperation`] and use it here.
-    pub fn apply(&mut self, operation: VerifiedOperation) -> Transition {
+    pub fn apply(&mut self, operation: VerifiedOperation) -> Result<Transition, SerializeError> {
         let opid = operation.opid();
-        let present = self.supply.stash().contains_key(opid);
+        let present = self.0.has_operation(opid);
         self.apply_internal(opid, operation, present)
     }
 
-    fn apply_internal(&mut self, opid: Opid, operation: VerifiedOperation, present: bool) -> Transition {
+    fn apply_internal(
+        &mut self,
+        opid: Opid,
+        operation: VerifiedOperation,
+        present: bool,
+    ) -> Result<Transition, SerializeError> {
         if !present {
-            self.supply
-                .stash_mut()
-                .insert(opid, operation.as_operation());
+            self.0.add_operation(opid, operation.as_operation());
         }
 
-        let transition = self.state.apply(
-            operation,
-            &self.articles.schema.default_api,
-            self.articles.schema.custom_apis.keys(),
-            &self.articles.schema.types,
-        );
-        self.supply.trace_mut().insert(opid, &transition);
-        transition
-    }
-
-    pub fn complete_update(&mut self) {
-        self.recompute_state();
-        self.save_state();
-    }
-
-    /// Recalculates computable part of the state
-    fn recompute_state(&mut self) {
-        self.state
-            .recompute(&self.articles.schema.default_api, self.articles.schema.custom_apis.keys());
-    }
-
-    fn save_state(&self) { self.supply.save_state(&self.state.raw); }
-
-    pub fn save(&self) {
-        self.supply.save_articles(&self.articles);
-        self.save_state();
-    }
-}
-
-#[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct CallParams {
-    #[cfg_attr(feature = "serde", serde(flatten))]
-    pub core: CoreParams,
-    pub using: BTreeMap<CellAddr, StrictVal>,
-    pub reading: Vec<CellAddr>,
-}
-
-pub struct DeedBuilder<'c, S: Supply> {
-    pub(super) builder: OpBuilder,
-    pub(super) stock: &'c mut Stock<S>,
-}
-
-impl<S: Supply> DeedBuilder<'_, S> {
-    pub fn reading(mut self, addr: CellAddr) -> Self {
-        self.builder = self.builder.access(addr);
-        self
-    }
-
-    pub fn using(mut self, addr: CellAddr, witness: StrictVal) -> Self {
-        self.builder = self.builder.destroy(addr, witness);
-        self
-    }
-
-    pub fn append(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
-        let api = &self.stock.articles.schema.default_api;
-        let types = &self.stock.articles.schema.types;
-        self.builder = self.builder.add_immutable(name, data, raw, api, types);
-        self
-    }
-
-    pub fn assign(
-        mut self,
-        name: impl Into<StateName>,
-        auth: AuthToken,
-        data: StrictVal,
-        lock: Option<LibSite>,
-    ) -> Self {
-        let api = &self.stock.articles.schema.default_api;
-        let types = &self.stock.articles.schema.types;
-        self.builder = self
-            .builder
-            .add_destructible(name, auth, data, lock, api, types);
-        self
-    }
-
-    pub fn commit(self) -> Opid {
-        let deed = self.builder.finalize();
-        let opid = deed.opid();
-        if let Err(err) = self.stock.apply_verify(deed) {
-            panic!("Invalid operation data: {err}");
+        let op = operation.as_operation();
+        for prevout in &op.destroying {
+            self.0.add_spending(prevout.addr, opid);
         }
-        self.stock.recompute_state();
-        self.stock.save_state();
-        opid
+
+        let transition = self.0.update_state(|state, schema| {
+            state.apply(operation, &schema.default_api, schema.custom_apis.keys(), &schema.types)
+        })?;
+
+        self.0.add_transition(opid, &transition);
+        Ok(transition)
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Debug, Display, Error, From)]
+#[derive(Debug, Display, Error, From)]
+#[display(inner)]
+pub enum StockError<E: StdError> {
+    Inner(E),
+
+    #[from]
+    Serialize(SerializeError),
+}
+
+#[derive(Debug, Display, Error, From)]
 #[display(inner)]
 pub enum AcceptError {
-    #[display("contract id doesn't match")]
-    ContractMismatch,
+    #[from]
+    Io(io::Error),
 
     #[from]
     Articles(MergeError),
@@ -444,137 +559,8 @@ pub enum AcceptError {
     Verify(CallError),
 
     #[from]
-    #[cfg_attr(feature = "std", from(std::io::Error))]
     Decode(DecodeError),
-}
 
-#[cfg(feature = "persist-file")]
-pub mod fs {
-    use std::fs::{self, File};
-    use std::path::{Path, PathBuf};
-
-    use amplify::confinement::U64 as U64MAX;
-    use aora::file::FileAoraMap;
-    use strict_encoding::{StreamReader, StreamWriter, StrictDeserialize, StrictSerialize};
-    use ultrasonic::ContractName;
-
-    use super::*;
-
-    const STASH_MAGIC: u64 = u64::from_be_bytes(*b"RGBSTASH");
-    const TRACE_MAGIC: u64 = u64::from_be_bytes(*b"RGBTRACE");
-    const SPENT_MAGIC: u64 = u64::from_be_bytes(*b"RGBSPENT");
-
-    pub struct FileSupply {
-        path: PathBuf,
-        stash: FileAoraMap<Opid, Operation, STASH_MAGIC, 1>,
-        trace: FileAoraMap<Opid, Transition, TRACE_MAGIC, 1>,
-        spent: FileAoraMap<CellAddr, Opid, SPENT_MAGIC, 1, 34>,
-    }
-
-    impl FileSupply {
-        const FILENAME_ARTICLES: &'static str = "contract.articles";
-        const FILENAME_STATE_RAW: &'static str = "state.dat";
-
-        pub fn new(name: &str, path: impl AsRef<Path>) -> Self {
-            let mut path = path.as_ref().to_path_buf();
-            path.push(name);
-            path.set_extension("contract");
-            fs::create_dir_all(&path).expect("Unable to create directory to store Stock");
-
-            let stash = FileAoraMap::new(&path, "stash");
-            let trace = FileAoraMap::new(&path, "trace");
-            let spent = FileAoraMap::new(&path, "spent");
-
-            Self { path, stash, trace, spent }
-        }
-
-        pub fn path(&self) -> &Path { &self.path }
-
-        pub fn open(path: impl AsRef<Path>) -> Self {
-            let path = path.as_ref().to_path_buf();
-            let stash = FileAoraMap::open(&path, "stash");
-            let trace = FileAoraMap::open(&path, "trace");
-            let spent = FileAoraMap::open(&path, "spent");
-            Self { path, stash, trace, spent }
-        }
-    }
-
-    impl Supply for FileSupply {
-        type Stash = FileAoraMap<Opid, Operation, STASH_MAGIC, 1>;
-        type Trace = FileAoraMap<Opid, Transition, TRACE_MAGIC, 1>;
-        type Spent = FileAoraMap<CellAddr, Opid, SPENT_MAGIC, 1, 34>;
-
-        fn stash(&self) -> &Self::Stash { &self.stash }
-
-        fn trace(&self) -> &Self::Trace { &self.trace }
-
-        fn spent(&self) -> &Self::Spent { &self.spent }
-
-        fn stash_mut(&mut self) -> &mut Self::Stash { &mut self.stash }
-
-        fn trace_mut(&mut self) -> &mut Self::Trace { &mut self.trace }
-
-        fn spent_mut(&mut self) -> &mut Self::Spent { &mut self.spent }
-
-        fn save_articles(&self, obj: &Articles) {
-            let path = self.path.clone().join(Self::FILENAME_ARTICLES);
-            obj.save(path).expect("unable to save articles");
-        }
-
-        fn load_articles(&self) -> Articles {
-            let path = self.path.clone().join(Self::FILENAME_ARTICLES);
-            Articles::load(path).expect("unable to load articles")
-        }
-
-        fn save_state(&self, state: &RawState) {
-            let path = self.path.clone().join(Self::FILENAME_STATE_RAW);
-            state
-                .strict_serialize_to_file::<U64MAX>(path)
-                .expect("unable to serialize state");
-        }
-
-        fn load_state(&self) -> RawState {
-            let path = self.path.clone().join(Self::FILENAME_STATE_RAW);
-            RawState::strict_deserialize_from_file::<U64MAX>(path).expect("unable to load state")
-        }
-    }
-
-    impl Stock<FileSupply> {
-        pub fn new(articles: Articles, path: impl AsRef<Path>) -> Result<Self, CallError> {
-            let name = match &articles.contract.meta.name {
-                ContractName::Unnamed => articles.contract_id().to_string(),
-                ContractName::Named(name) => name.to_string(),
-            };
-            let persistence = FileSupply::new(&name, path);
-            Self::create(articles, persistence)
-        }
-
-        pub fn load(path: impl AsRef<Path>) -> Self {
-            let path = path.as_ref();
-            let persistence = FileSupply::open(path);
-            Self::open(persistence.load_articles(), persistence)
-        }
-
-        pub fn backup_to_file(&mut self, output: impl AsRef<Path>) -> io::Result<()> {
-            let file = File::create_new(output)?;
-            let writer = StrictWriter::with(StreamWriter::new::<{ usize::MAX }>(file));
-            self.export_all(writer)
-        }
-
-        pub fn export_to_file(
-            &mut self,
-            terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
-            output: impl AsRef<Path>,
-        ) -> io::Result<()> {
-            let file = File::create_new(output)?;
-            let writer = StrictWriter::with(StreamWriter::new::<{ usize::MAX }>(file));
-            self.export(terminals, writer)
-        }
-
-        pub fn accept_from_file(&mut self, input: impl AsRef<Path>) -> Result<(), AcceptError> {
-            let file = File::open(input)?;
-            let mut reader = StrictReader::with(StreamReader::new::<{ usize::MAX }>(file));
-            self.import(&mut reader)
-        }
-    }
+    #[from]
+    Serialize(SerializeError),
 }

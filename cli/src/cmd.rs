@@ -24,7 +24,8 @@
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
-use hypersonic::{Articles, AuthToken, CallParams, IssueParams, Schema, Stock};
+use hypersonic::persistance::FileStock;
+use hypersonic::{Articles, AuthToken, CallParams, IssueParams, Schema};
 
 #[derive(Parser)]
 pub enum Cmd {
@@ -90,7 +91,7 @@ impl Cmd {
         match self {
             Cmd::Issue { schema, params, output } => issue(schema, params, output.as_deref())?,
             Cmd::Process { articles, stock } => process(articles, stock.as_deref())?,
-            Cmd::State { stock } => state(stock),
+            Cmd::State { stock } => state(stock)?,
             Cmd::Call { stock, call: path } => call(stock, path)?,
             Cmd::Export { stock, terminals, output } => export(stock, terminals, output)?,
             Cmd::Accept { stock, input } => accept(stock, input)?,
@@ -117,34 +118,35 @@ fn process(articles: &Path, stock: Option<&Path>) -> anyhow::Result<()> {
     let path = stock.unwrap_or(articles);
 
     let articles = Articles::load(articles)?;
-    Stock::new(articles, path)?;
+    FileStock::issue(articles, path)?;
 
     Ok(())
 }
 
-fn state(path: &Path) {
-    let stock = Stock::load(path);
-    let val = serde_yaml::to_string(&stock.state().main).expect("unable to generate YAML");
+fn state(path: &Path) -> anyhow::Result<()> {
+    let stock = FileStock::load(path)?;
+    let val = serde_yaml::to_string(&stock.state().main)?;
     println!("{val}");
+    Ok(())
 }
 
 fn call(stock: &Path, form: &Path) -> anyhow::Result<()> {
-    let mut stock = Stock::load(stock);
+    let mut stock = FileStock::load(stock)?;
     let file = File::open(form)?;
     let call = serde_yaml::from_reader::<_, CallParams>(file)?;
-    let opid = stock.call(call);
+    let opid = stock.call(call)?;
     println!("Operation ID: {opid}");
     Ok(())
 }
 
 fn export<'a>(stock: &Path, terminals: impl IntoIterator<Item = &'a AuthToken>, output: &Path) -> anyhow::Result<()> {
-    let mut stock = Stock::load(stock);
+    let mut stock = FileStock::load(stock)?;
     stock.export_to_file(terminals, output)?;
     Ok(())
 }
 
 fn accept(stock: &Path, input: &Path) -> anyhow::Result<()> {
-    let mut stock = Stock::load(stock);
+    let mut stock = FileStock::load(stock)?;
     stock.accept_from_file(input)?;
     Ok(())
 }
