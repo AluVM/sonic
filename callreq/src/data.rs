@@ -102,6 +102,14 @@ impl CallState {
 /// Optional fragment may be present and should represent a checksum value for the URI string
 /// preceding the fragment.
 #[derive(Clone, Eq, PartialEq, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "T: serde::Serialize, A: serde::Serialize",
+        deserialize = "T: serde::Deserialize<'de>, A: serde::Deserialize<'de>"
+    ))
+)]
 pub struct CallRequest<T = CallScope, A = AuthToken> {
     pub scope: T,
     pub api: Option<TypeName>,
@@ -138,6 +146,15 @@ impl<Q: Display + FromStr, A> CallRequest<CallScope<Q>, A> {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Display)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(
+        try_from = "String",
+        into = "String",
+        bound(serialize = "Q: Display + FromStr + Clone", deserialize = "Q: Display + FromStr"),
+    )
+)]
 pub enum CallScope<Q: Display + FromStr = String> {
     #[display(inner)]
     ContractId(ContractId),
@@ -151,19 +168,32 @@ impl<Q: Display + FromStr> FromStr for CallScope<Q> {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match ContractId::from_str(s) {
-            Err(err1) => {
-                let s = s.trim_start_matches("contract:");
-                let query = Q::from_str(s).map_err(|_| err1)?;
-                Ok(Self::ContractQuery(query))
-            }
             Ok(id) => Ok(Self::ContractId(id)),
+            Err(err_contract_id) => match s.strip_prefix("contract:") {
+                Some(query_str) => Q::from_str(query_str)
+                    .map(Self::ContractQuery)
+                    .map_err(|_| err_contract_id),
+                None => Err(err_contract_id),
+            },
         }
     }
+}
+
+impl<Q: Display + FromStr> TryFrom<String> for CallScope<Q> {
+    type Error = Baid64ParseError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> { Self::from_str(&value) }
+}
+
+impl<Q: Display + FromStr + Clone> From<CallScope<Q>> for String {
+    fn from(value: CallScope<Q>) -> Self { value.to_string() }
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Display)]
 #[display(inner)]
 #[non_exhaustive]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(try_from = "String", into = "String"))]
 pub enum Endpoint {
     JsonRpc(String),
     RestHttp(String),
@@ -190,4 +220,14 @@ impl FromStr for Endpoint {
             Ok(Endpoint::UnspecifiedMeans(s.to_string()))
         }
     }
+}
+
+impl TryFrom<String> for Endpoint {
+    type Error = Infallible;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> { Self::from_str(&value) }
+}
+
+impl From<Endpoint> for String {
+    fn from(value: Endpoint) -> Self { value.to_string() }
 }
