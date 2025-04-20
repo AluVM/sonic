@@ -46,9 +46,9 @@ mod state;
 mod stock;
 pub mod persistance;
 mod deed;
-mod contract;
+mod ledger;
 
-pub use contract::{AcceptError, Contract};
 pub use deed::{CallParams, DeedBuilder};
+pub use ledger::{AcceptError, Ledger};
 pub use state::{AdaptedState, EffectiveState, RawState, Transition};
 pub use stock::{IssueError, LoadError, Stock, StockError};

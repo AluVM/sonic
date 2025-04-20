@@ -25,4 +25,4 @@
 mod fs;
 
 #[cfg(feature = "persist-file")]
-pub use fs::{ContractDir, StockFs};
+pub use fs::{LedgerDir, StockFs};

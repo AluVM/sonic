@@ -24,7 +24,7 @@
 use std::fs::File;
 use std::path::PathBuf;
 
-use hypersonic::persistance::ContractDir;
+use hypersonic::persistance::LedgerDir;
 use hypersonic::{Articles, AuthToken, CallParams, IssueParams, Schema};
 
 #[derive(Parser)]
@@ -121,35 +121,35 @@ fn process(articles_path: PathBuf, dir: Option<PathBuf>) -> anyhow::Result<()> {
     let path = dir
         .or_else(|| Some(articles_path.parent()?.to_path_buf()))
         .ok_or(anyhow::anyhow!("invalid path for creating the contract"))?;
-    ContractDir::issue(articles, path)?;
+    LedgerDir::issue(articles, path)?;
 
     Ok(())
 }
 
 fn state(path: PathBuf) -> anyhow::Result<()> {
-    let contract = ContractDir::load(path)?;
-    let val = serde_yaml::to_string(&contract.state().main)?;
+    let ledger = LedgerDir::load(path)?;
+    let val = serde_yaml::to_string(&ledger.state().main)?;
     println!("{val}");
     Ok(())
 }
 
 fn call(dir: PathBuf, form: PathBuf) -> anyhow::Result<()> {
-    let mut contract = ContractDir::load(dir)?;
+    let mut ledger = LedgerDir::load(dir)?;
     let file = File::open(form)?;
     let call = serde_yaml::from_reader::<_, CallParams>(file)?;
-    let opid = contract.call(call)?;
+    let opid = ledger.call(call)?;
     println!("Operation ID: {opid}");
     Ok(())
 }
 
 fn export(dir: PathBuf, terminals: impl IntoIterator<Item = AuthToken>, output: PathBuf) -> anyhow::Result<()> {
-    let mut contract = ContractDir::load(dir)?;
-    contract.export_to_file(terminals, output)?;
+    let mut ledger = LedgerDir::load(dir)?;
+    ledger.export_to_file(terminals, output)?;
     Ok(())
 }
 
 fn accept(dir: PathBuf, input: PathBuf) -> anyhow::Result<()> {
-    let mut contract = ContractDir::load(dir)?;
-    contract.accept_from_file(input)?;
+    let mut ledger = LedgerDir::load(dir)?;
+    ledger.accept_from_file(input)?;
     Ok(())
 }

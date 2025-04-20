@@ -39,9 +39,9 @@ use crate::{Articles, EffectiveState, IssueError, LoadError, Stock, StockError, 
 // We need this structure to hide internal persistence methods and not to expose them.
 // We need the persistence trait (`Stock`) in order to allow different persistence storage
 // implementations.
-pub struct Contract<S: Stock>(pub(crate) S);
+pub struct Ledger<S: Stock>(pub(crate) S);
 
-impl<S: Stock> Contract<S> {
+impl<S: Stock> Ledger<S> {
     /// Issues a new contract from the provided articles, creating its persistence using given
     /// implementation-specific configuration.
     ///
@@ -108,8 +108,8 @@ impl<S: Stock> Contract<S> {
     /// Positive response doesn't indicate that the operation participates in the current contract
     /// state or in a current valid contract history, which may be exported.
     ///
-    /// Operations may be excluded from the history due to rollbacks (see [`Contract::rollback`]),
-    /// as well as re-included later with forwards (see [`Contract::forward`]). In both cases
+    /// Operations may be excluded from the history due to rollbacks (see [`Ledger::rollback`]),
+    /// as well as re-included later with forwards (see [`Ledger::forward`]). In both cases
     /// they are kept in the contract storage ("stash") and remain accessible to this method.
     ///
     /// # Blocking I/O
@@ -126,8 +126,8 @@ impl<S: Stock> Contract<S> {
     /// If the method returns an operation, this doesn't indicate that the operation participates in
     /// the current contract state or in a current valid contract history, which/ may be exported.
     ///
-    /// Operations may be excluded from the history due to rollbacks (see [`Contract::rollback`]),
-    /// as well as re-included later with forwards (see [`Contract::forward`]). In both cases
+    /// Operations may be excluded from the history due to rollbacks (see [`Ledger::rollback`]),
+    /// as well as re-included later with forwards (see [`Ledger::forward`]). In both cases
     /// they are kept in the contract storage ("stash") and remain accessible to this method.
     ///
     /// # Panics
@@ -151,8 +151,8 @@ impl<S: Stock> Contract<S> {
     /// not contribute to the current contract state or participate in the contract history, which
     /// may be exported.
     ///
-    /// Operations may be excluded from the history due to rollbacks (see [`Contract::rollback`]),
-    /// as well as re-included later with forwards (see [`Contract::forward`]). In both cases
+    /// Operations may be excluded from the history due to rollbacks (see [`Ledger::rollback`]),
+    /// as well as re-included later with forwards (see [`Ledger::forward`]). In both cases
     /// they are kept in the contract storage ("stash") and remain accessible to this method.
     ///
     /// # Panics
@@ -175,8 +175,8 @@ impl<S: Stock> Contract<S> {
     /// history, which may be exported.
     ///
     /// State transitions may be excluded from the history due to rollbacks (see
-    /// [`Contract::rollback`]), as well as re-included later with forwards (see
-    /// [`Contract::forward`]). In both cases corresponding state transitions are kept in the
+    /// [`Ledger::rollback`]), as well as re-included later with forwards (see
+    /// [`Ledger::forward`]). In both cases corresponding state transitions are kept in the
     /// contract storage ("stash") and remain accessible to this method.
     ///
     /// # Panics
@@ -340,7 +340,7 @@ impl<S: Stock> Contract<S> {
 
     pub fn start_deed(&mut self, method: impl Into<MethodName>) -> DeedBuilder<'_, S> {
         let builder = OpBuilder::new(self.contract_id(), self.0.articles().schema.call_id(method));
-        DeedBuilder { builder, contract: self }
+        DeedBuilder { builder, ledger: self }
     }
 
     pub fn call(&mut self, params: CallParams) -> Result<Opid, AcceptError> {

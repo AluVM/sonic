@@ -32,9 +32,9 @@ use sonicapi::{Articles, MergeError, Schema};
 use strict_encoding::{SerializeError, StreamReader, StreamWriter, StrictReader, StrictWriter};
 use ultrasonic::{AuthToken, CellAddr, Operation, Opid};
 
-use crate::{AcceptError, Contract, EffectiveState, IssueError, LoadError, RawState, Stock, StockError, Transition};
+use crate::{AcceptError, EffectiveState, IssueError, Ledger, LoadError, RawState, Stock, StockError, Transition};
 
-pub type ContractDir = Contract<StockFs>;
+pub type LedgerDir = Ledger<StockFs>;
 
 const STASH_MAGIC: u64 = u64::from_be_bytes(*b"RGBSTASH");
 const TRACE_MAGIC: u64 = u64::from_be_bytes(*b"RGBTRACE");
@@ -141,7 +141,7 @@ impl Stock for StockFs {
     fn add_spending(&mut self, spent: CellAddr, spender: Opid) { self.spent.insert_or_update(spent, spender) }
 }
 
-impl ContractDir {
+impl LedgerDir {
     pub fn backup_to_file(&mut self, output: impl AsRef<Path>) -> io::Result<()> {
         let file = File::create_new(output)?;
         let writer = StrictWriter::with(StreamWriter::new::<{ usize::MAX }>(file));
