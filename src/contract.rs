@@ -142,6 +142,53 @@ impl<S: Stock> Contract<S> {
     #[inline]
     pub fn operation(&self, opid: Opid) -> Operation { self.0.operation(opid) }
 
+    /// Returns an iterator over all operations known to the contract (i.e. the complete contract
+    /// stash).
+    ///
+    /// # Nota bene
+    ///
+    /// Contract stash is a broader concept than contract history. It includes operations which may
+    /// not contribute to the current contract state or participate in the contract history, which
+    /// may be exported.
+    ///
+    /// Operations may be excluded from the history due to rollbacks (see [`Contract::rollback`]),
+    /// as well as re-included later with forwards (see [`Contract::forward`]). In both cases
+    /// they are kept in the contract storage ("stash") and remain accessible to this method.
+    ///
+    /// # Panics
+    ///
+    /// The method MUST NOT panic
+    ///
+    /// # Blocking I/O
+    ///
+    /// The iterator provided in return may be a blocking iterator.
+    #[inline]
+    pub fn operations(&self) -> impl Iterator<Item = (Opid, Operation)> + use<'_, S> { self.0.operations() }
+
+    /// Returns an iterator over all state transitions known to the contract (i.e. the complete
+    /// contract trace).
+    ///
+    /// # Nota bene
+    ///
+    /// Contract trace is a broader concept than contract history. It includes state transition
+    /// which may not contribute to the current contract state or participate in the contract
+    /// history, which may be exported.
+    ///
+    /// State transitions may be excluded from the history due to rollbacks (see
+    /// [`Contract::rollback`]), as well as re-included later with forwards (see
+    /// [`Contract::forward`]). In both cases corresponding state transitions are kept in the
+    /// contract storage ("stash") and remain accessible to this method.
+    ///
+    /// # Panics
+    ///
+    /// The method MUST NOT panic
+    ///
+    /// # Blocking I/O
+    ///
+    /// The iterator provided in return may be a blocking iterator.
+    #[inline]
+    pub fn trace(&self) -> impl Iterator<Item = (Opid, Transition)> + use<'_, S> { self.0.trace() }
+
     pub fn export_all(&self, mut writer: StrictWriter<impl WriteRaw>) -> io::Result<()> {
         // Write articles
         writer = self.0.articles().strict_encode(writer)?;
