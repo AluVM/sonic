@@ -161,7 +161,7 @@ fn main() {
         fs::remove_dir_all(contract_path).expect("unable to remove contract file");
     }
 
-    let mut contract = ContractDir::issue(articles, "examples/dao/data").expect("invalid articles");
+    let mut contract = ContractDir::issue(articles, "examples/dao/data".into()).expect("invalid articles");
 
     // Proposing vote
     let votings = contract

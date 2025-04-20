@@ -51,4 +51,4 @@ mod contract;
 pub use contract::{AcceptError, Contract};
 pub use deed::{CallParams, DeedBuilder};
 pub use state::{AdaptedState, EffectiveState, RawState, Transition};
-pub use stock::{Stock, StockError};
+pub use stock::{IssueError, LoadError, Stock, StockError};

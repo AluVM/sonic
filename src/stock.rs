@@ -24,8 +24,8 @@
 use core::error::Error as StdError;
 
 use sonicapi::{MergeError, Schema};
-use strict_encoding::SerializeError;
-use ultrasonic::{CellAddr, Operation, Opid};
+use strict_encoding::{DeserializeError, SerializeError};
+use ultrasonic::{CallError, CellAddr, ContractName, Operation, Opid};
 
 use crate::{Articles, EffectiveState, Transition};
 
@@ -43,6 +43,38 @@ use crate::{Articles, EffectiveState, Transition};
 /// to a re-computation of a contract state (but leave stash and trace data unaffected).
 // TODO: Consider returning large objects by reference
 pub trait Stock {
+    /// Persistence configuration type.
+    type Conf;
+
+    /// Error type specific to a persistence implementation, which may happen during the
+    /// construction.
+    type Error: StdError;
+
+    /// Issues a new contract from the provided articles, creating its persistence using given
+    /// implementation-specific configuration.
+    ///
+    /// # Panics
+    ///
+    /// This call must not panic, and instead must return an error.
+    ///
+    /// # Blocking I/O
+    ///
+    /// This call MAY perform any I/O operations.
+    fn issue(articles: Articles, conf: Self::Conf) -> Result<Self, IssueError<Self::Error>>
+    where Self: Sized;
+
+    /// Loads a contract from a persistence using the provided configuration.
+    ///
+    /// # Panics
+    ///
+    /// This call must not panic, and instead must return an error.
+    ///
+    /// # Blocking I/O
+    ///
+    /// This call MAY perform any I/O operations.
+    fn load(conf: Self::Conf) -> Result<Self, LoadError<Self::Error>>
+    where Self: Sized;
+
     /// Provides contract [`Articles`].
     ///
     /// # Blocking I/O
@@ -292,4 +324,33 @@ pub enum StockError<E: StdError> {
 
     #[from]
     Serialize(SerializeError),
+}
+
+#[derive(Debug, Display, Error, From)]
+#[display(doc_comments)]
+pub enum IssueError<E: StdError> {
+    /// unable to issue a new contract '{0}' due to invalid genesis data. Specifically, {1}
+    Genesis(ContractName, CallError),
+
+    /// unable to save contract articles - {0}
+    ArticlesPersistence(SerializeError),
+
+    /// unable to save contract state data - {0}
+    StatePersistence(SerializeError),
+
+    #[display(inner)]
+    OtherPersistence(E),
+}
+
+#[derive(Debug, Display, Error, From)]
+#[display(doc_comments)]
+pub enum LoadError<E: StdError> {
+    /// unable to load contract articles - {0}
+    ArticlesPersistence(DeserializeError),
+
+    /// unable to load contract state data - {0}
+    StatePersistence(DeserializeError),
+
+    #[display(inner)]
+    OtherPersistence(E),
 }

@@ -22,7 +22,7 @@
 // the License.
 
 use std::fs::File;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use hypersonic::persistance::ContractDir;
 use hypersonic::{Articles, AuthToken, CallParams, IssueParams, Schema};
@@ -87,10 +87,10 @@ pub enum Cmd {
 }
 
 impl Cmd {
-    pub fn exec(&self) -> anyhow::Result<()> {
+    pub fn exec(self) -> anyhow::Result<()> {
         match self {
-            Cmd::Issue { schema, params, output } => issue(schema, params, output.as_deref())?,
-            Cmd::Process { articles, dir } => process(articles, dir.as_deref())?,
+            Cmd::Issue { schema, params, output } => issue(schema, params, output)?,
+            Cmd::Process { articles, dir } => process(articles, dir)?,
             Cmd::State { dir } => state(dir)?,
             Cmd::Call { dir, call: path } => call(dir, path)?,
             Cmd::Export { dir, terminals, output } => export(dir, terminals, output)?,
@@ -100,13 +100,15 @@ impl Cmd {
     }
 }
 
-fn issue(schema: &Path, form: &Path, output: Option<&Path>) -> anyhow::Result<()> {
+fn issue(schema: PathBuf, form: PathBuf, output: Option<PathBuf>) -> anyhow::Result<()> {
     let schema = Schema::load(schema)?;
-    let file = File::open(form)?;
+    let file = File::open(&form)?;
     let params = serde_yaml::from_reader::<_, IssueParams>(file)?;
 
     let path = output.unwrap_or(form);
-    let output = path.with_file_name(format!("{}.articles", params.name));
+    let output = path
+        .with_file_name(params.name.as_str())
+        .with_extension("articles");
 
     let articles = schema.issue(params);
     articles.save(output)?;
@@ -114,23 +116,24 @@ fn issue(schema: &Path, form: &Path, output: Option<&Path>) -> anyhow::Result<()
     Ok(())
 }
 
-fn process(articles: &Path, dir: Option<&Path>) -> anyhow::Result<()> {
-    let path = dir.unwrap_or(articles);
-
-    let articles = Articles::load(articles)?;
+fn process(articles_path: PathBuf, dir: Option<PathBuf>) -> anyhow::Result<()> {
+    let articles = Articles::load(&articles_path)?;
+    let path = dir
+        .or_else(|| Some(articles_path.parent()?.to_path_buf()))
+        .ok_or(anyhow::anyhow!("invalid path for creating the contract"))?;
     ContractDir::issue(articles, path)?;
 
     Ok(())
 }
 
-fn state(path: &Path) -> anyhow::Result<()> {
+fn state(path: PathBuf) -> anyhow::Result<()> {
     let contract = ContractDir::load(path)?;
     let val = serde_yaml::to_string(&contract.state().main)?;
     println!("{val}");
     Ok(())
 }
 
-fn call(dir: &Path, form: &Path) -> anyhow::Result<()> {
+fn call(dir: PathBuf, form: PathBuf) -> anyhow::Result<()> {
     let mut contract = ContractDir::load(dir)?;
     let file = File::open(form)?;
     let call = serde_yaml::from_reader::<_, CallParams>(file)?;
@@ -139,13 +142,13 @@ fn call(dir: &Path, form: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn export<'a>(dir: &Path, terminals: impl IntoIterator<Item = &'a AuthToken>, output: &Path) -> anyhow::Result<()> {
+fn export(dir: PathBuf, terminals: impl IntoIterator<Item = AuthToken>, output: PathBuf) -> anyhow::Result<()> {
     let mut contract = ContractDir::load(dir)?;
     contract.export_to_file(terminals, output)?;
     Ok(())
 }
 
-fn accept(dir: &Path, input: &Path) -> anyhow::Result<()> {
+fn accept(dir: PathBuf, input: PathBuf) -> anyhow::Result<()> {
     let mut contract = ContractDir::load(dir)?;
     contract.accept_from_file(input)?;
     Ok(())

@@ -29,10 +29,10 @@ use std::path::{Path, PathBuf};
 use aora::file::{FileAoraMap, FileAuraMap};
 use aora::{AoraMap, AuraMap};
 use sonicapi::{Articles, MergeError, Schema};
-use strict_encoding::{DeserializeError, SerializeError, StreamReader, StreamWriter, StrictReader, StrictWriter};
-use ultrasonic::{AuthToken, CallError, CellAddr, ContractName, Operation, Opid};
+use strict_encoding::{SerializeError, StreamReader, StreamWriter, StrictReader, StrictWriter};
+use ultrasonic::{AuthToken, CellAddr, Operation, Opid};
 
-use crate::{AcceptError, Contract, EffectiveState, RawState, Stock, StockError, Transition};
+use crate::{AcceptError, Contract, EffectiveState, IssueError, LoadError, RawState, Stock, StockError, Transition};
 
 pub type ContractDir = Contract<StockFs>;
 
@@ -53,18 +53,23 @@ impl StockFs {
     const FILENAME_ARTICLES: &'static str = "contract.articles";
     const FILENAME_STATE_RAW: &'static str = "state.dat";
     const CONTRACT_DIR_EXTENSION: &'static str = "contract";
+}
 
-    pub fn issue(articles: Articles, path: impl AsRef<Path>) -> Result<Self, IssueError> {
+impl Stock for StockFs {
+    type Conf = PathBuf;
+    type Error = io::Error;
+
+    fn issue(articles: Articles, path: PathBuf) -> Result<Self, IssueError<io::Error>> {
         let state = EffectiveState::from_genesis(&articles)
             .map_err(|e| IssueError::Genesis(articles.issue.meta.name.clone(), e))?;
 
         let name = format!("{}.{}.{}", articles.issue.meta.name, articles.contract_id(), Self::CONTRACT_DIR_EXTENSION);
-        let path = path.as_ref().join(name);
-        fs::create_dir_all(&path)?;
+        let path = path.join(name);
+        fs::create_dir_all(&path).map_err(IssueError::OtherPersistence)?;
 
-        let stash = FileAoraMap::create_new(&path, "stash")?;
-        let trace = FileAoraMap::create_new(&path, "trace")?;
-        let spent = FileAuraMap::create_new(&path, "spent")?;
+        let stash = FileAoraMap::create_new(&path, "stash").map_err(IssueError::OtherPersistence)?;
+        let trace = FileAoraMap::create_new(&path, "trace").map_err(IssueError::OtherPersistence)?;
+        let spent = FileAuraMap::create_new(&path, "spent").map_err(IssueError::OtherPersistence)?;
 
         articles
             .save(path.join(Self::FILENAME_ARTICLES))
@@ -77,12 +82,12 @@ impl StockFs {
         Ok(Self { path, stash, trace, spent, articles, state })
     }
 
-    pub fn load(path: impl AsRef<Path>) -> Result<Self, LoadError> {
-        let path = path.as_ref().to_path_buf();
+    fn load(path: PathBuf) -> Result<Self, LoadError<io::Error>> {
+        let path = path.to_path_buf();
 
-        let stash = FileAoraMap::open(&path, "stash")?;
-        let trace = FileAoraMap::open(&path, "trace")?;
-        let spent = FileAuraMap::open(&path, "spent")?;
+        let stash = FileAoraMap::open(&path, "stash").map_err(LoadError::OtherPersistence)?;
+        let trace = FileAoraMap::open(&path, "trace").map_err(LoadError::OtherPersistence)?;
+        let spent = FileAuraMap::open(&path, "spent").map_err(LoadError::OtherPersistence)?;
 
         let articles = Articles::load(path.join(Self::FILENAME_ARTICLES)).map_err(LoadError::ArticlesPersistence)?;
         let raw = RawState::load(path.join(Self::FILENAME_STATE_RAW)).map_err(LoadError::StatePersistence)?;
@@ -90,9 +95,7 @@ impl StockFs {
 
         Ok(Self { path, stash, trace, spent, articles, state })
     }
-}
 
-impl Stock for StockFs {
     #[inline]
     fn articles(&self) -> &Articles { &self.articles }
     #[inline]
@@ -139,12 +142,6 @@ impl Stock for StockFs {
 }
 
 impl ContractDir {
-    pub fn issue(articles: Articles, path: impl AsRef<Path>) -> Result<Self, IssueError> {
-        StockFs::issue(articles, path).map(Self)
-    }
-
-    pub fn load(path: impl AsRef<Path>) -> Result<Self, LoadError> { StockFs::load(path).map(Self) }
-
     pub fn backup_to_file(&mut self, output: impl AsRef<Path>) -> io::Result<()> {
         let file = File::create_new(output)?;
         let writer = StrictWriter::with(StreamWriter::new::<{ usize::MAX }>(file));
@@ -168,35 +165,4 @@ impl ContractDir {
     }
 
     pub fn path(&self) -> &Path { &self.0.path }
-}
-
-#[derive(Debug, Display, Error, From)]
-#[display(doc_comments)]
-pub enum IssueError {
-    #[from]
-    #[display(inner)]
-    Io(io::Error),
-
-    /// unable to issue a new contract '{0}' due to invalid genesis data. Specifically, {1}
-    Genesis(ContractName, CallError),
-
-    /// unable to save contract articles - {0}
-    ArticlesPersistence(SerializeError),
-
-    /// unable to save contract state data - {0}
-    StatePersistence(SerializeError),
-}
-
-#[derive(Debug, Display, Error, From)]
-#[display(doc_comments)]
-pub enum LoadError {
-    #[from]
-    #[display(inner)]
-    Io(io::Error),
-
-    /// unable to load contract articles - {0}
-    ArticlesPersistence(DeserializeError),
-
-    /// unable to load contract state data - {0}
-    StatePersistence(DeserializeError),
 }

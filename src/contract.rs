@@ -33,7 +33,7 @@ use strict_encoding::{
 use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Operation, Opid, VerifiedOperation};
 
 use crate::deed::{CallParams, DeedBuilder};
-use crate::{Articles, EffectiveState, Stock, StockError, Transition};
+use crate::{Articles, EffectiveState, IssueError, LoadError, Stock, StockError, Transition};
 
 /// Contract with all its state and operations, supporting updates and rollbacks.
 // We need this structure to hide internal persistence methods and not to expose them.
@@ -42,6 +42,31 @@ use crate::{Articles, EffectiveState, Stock, StockError, Transition};
 pub struct Contract<S: Stock>(pub(crate) S);
 
 impl<S: Stock> Contract<S> {
+    /// Issues a new contract from the provided articles, creating its persistence using given
+    /// implementation-specific configuration.
+    ///
+    /// # Panics
+    ///
+    /// This call must not panic, and instead must return an error.
+    ///
+    /// # Blocking I/O
+    ///
+    /// This call MAY perform any I/O operations.
+    pub fn issue(articles: Articles, conf: S::Conf) -> Result<Self, IssueError<S::Error>> {
+        S::issue(articles, conf).map(Self)
+    }
+
+    /// Loads a contract using the provided configuration for persistence.
+    ///
+    /// # Panics
+    ///
+    /// This call must not panic, and instead must return an error.
+    ///
+    /// # Blocking I/O
+    ///
+    /// This call MAY perform any I/O operations.
+    pub fn load(conf: S::Conf) -> Result<Self, LoadError<S::Error>> { S::load(conf).map(Self) }
+
     /// Provides [`Schema`] object, which includes codex, under which the contract was issued, and
     /// interfaces for the contract under that codex.
     ///
