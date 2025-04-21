@@ -140,8 +140,9 @@ checksum = "e16d2d3311acee920a9eb8d33b8cbc1787ce4a264e85f964c2404b969bdcd487"
 
 [[package]]
 name = "aora"
-version = "0.4.0"
-source = "git+https://github.com/rust-amplify/aora?branch=master#1217885510d7f882d949d8832152684a0d70a744"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f417b4ec737fc4fccd74537f2b55c4acd0f6e7209d14e96615a35170c32dfe4"
 dependencies = [
  "amplify",
  "binfile",
