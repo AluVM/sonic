@@ -62,7 +62,7 @@ aluvm.workspace = true
 ultrasonic.workspace = true
 sonic-api.workspace = true
 sonic-callreq.workspace = true
-aora.workspace = true
+aora = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 
 [features]
@@ -72,7 +72,7 @@ all = ["stl", "std", "serde", "persist-file"]
 std = ["sonic-api/std", "sonic-callreq/std"]
 stl = ["commit_verify/stl", "ultrasonic/stl", "strict_types/armor"]
 
-persist-file = ["std"]
+persist-file = ["std", "aora"]
 serde = [
     "dep:serde",
     "amplify/serde",
@@ -95,6 +95,7 @@ wasm-bindgen-test = "0.3"
 features = ["all"]
 
 [patch.crates-io]
+aora = { git = "https://github.com/rust-amplify/aora", branch = "master" }
 aluvm = { git = "https://github.com/AluVM/aluvm", branch = "master" }
 zk-aluvm = { git = "https://github.com/AluVM/zk-aluvm", branch = "master" }
 ultrasonic = { git = "https://github.com/AluVM/ultrasonic", branch = "master" }

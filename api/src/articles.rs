@@ -22,7 +22,7 @@
 // the License.
 
 use strict_encoding::{StrictDeserialize, StrictSerialize, TypeName};
-use ultrasonic::{Contract, ContractId};
+use ultrasonic::{ContractId, Issue};
 
 use crate::sigs::ContentSigs;
 use crate::{Api, Schema, LIB_NAME_SONIC};
@@ -36,14 +36,14 @@ pub struct Articles {
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub schema: Schema,
     pub contract_sigs: ContentSigs,
-    pub contract: Contract,
+    pub issue: Issue,
 }
 
 impl StrictSerialize for Articles {}
 impl StrictDeserialize for Articles {}
 
 impl Articles {
-    pub fn contract_id(&self) -> ContractId { self.contract.contract_id() }
+    pub fn contract_id(&self) -> ContractId { self.issue.contract_id() }
 
     pub fn api(&self, name: &TypeName) -> &Api { self.schema.api(name) }
 
@@ -73,17 +73,19 @@ pub enum MergeError {
 mod _fs {
     use std::path::Path;
 
+    use amplify::confinement::U24 as U24MAX;
     use strict_encoding::{DeserializeError, SerializeError, StrictDeserialize, StrictSerialize};
 
     use super::Articles;
 
+    // TODO: Use BinFile
     impl Articles {
         pub fn load(path: impl AsRef<Path>) -> Result<Self, DeserializeError> {
-            Self::strict_deserialize_from_file::<{ usize::MAX }>(path)
+            Self::strict_deserialize_from_file::<U24MAX>(path)
         }
 
         pub fn save(&self, path: impl AsRef<Path>) -> Result<(), SerializeError> {
-            self.strict_serialize_to_file::<{ usize::MAX }>(path)
+            self.strict_serialize_to_file::<U24MAX>(path)
         }
     }
 }

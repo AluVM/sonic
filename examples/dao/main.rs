@@ -35,7 +35,8 @@ use aluvm::{CoreConfig, LibSite};
 use amplify::num::u256;
 use commit_verify::{Digest, Sha256};
 use hypersonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc, EmbeddedReaders};
-use hypersonic::{Api, ApiInner, AppendApi, DestructibleApi, Schema, Stock};
+use hypersonic::persistance::LedgerDir;
+use hypersonic::{Api, ApiInner, AppendApi, DestructibleApi, Schema};
 use strict_types::{SemId, StrictVal};
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
 use ultrasonic::{AuthToken, CellAddr, Codex, Consensus, Identity};
@@ -153,63 +154,65 @@ fn main() {
         .assign("signers", carol_auth, svnum!(2u64), None)
 
         .finish("WonderlandDAO", 1732529307);
-    let opid = articles.contract.genesis_opid();
+    let opid = articles.issue.genesis_opid();
 
     let contract_path = Path::new("examples/dao/data/WonderlandDAO.contract");
     if contract_path.exists() {
         fs::remove_dir_all(contract_path).expect("unable to remove contract file");
     }
 
-    let mut stock = Stock::new(articles, "examples/dao/data").expect("invalid articles");
+    let mut ledger = LedgerDir::issue(articles, "examples/dao/data".into()).expect("invalid articles");
 
     // Proposing vote
-    let votings = stock
+    let votings = ledger
         .start_deed("proposal")
         .append(
             "_votings",
             svnum!(100u64),
             Some(ston!(title "Is Alice on duty today?", text "Vote 'pro' if Alice should be on duty today")),
         )
-        .commit();
+        .commit()
+        .unwrap();
 
     let alice_auth2 = next_auth();
     let bob_auth2 = next_auth();
     let carol_auth2 = next_auth();
 
     // Alice vote against her being on duty today
-    stock
+    ledger
         .start_deed("castVote")
         .using(CellAddr::new(opid, 0), svnum!(0u64))
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(0u8), partyId 0u64), None)
         .assign("signers", alice_auth2, svnum!(0u64), None)
-        .commit();
+        .commit()
+        .unwrap();
 
     // Bob and Carol vote for Alice being on duty today
-    stock
+    ledger
         .start_deed("castVote")
         .using(CellAddr::new(opid, 1), svnum!(1u64))
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 1u64), None)
         .assign("signers", bob_auth2, svnum!(1u64), None)
-        .commit();
-    stock
+        .commit()
+        .unwrap();
+    ledger
         .start_deed("castVote")
         .using(CellAddr::new(opid, 2), svnum!(2u64))
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 2u64), None)
         .assign("signers", carol_auth2, svnum!(2u64), None)
-        .commit();
+        .commit()
+        .unwrap();
 
-    stock.save();
-
-    let StrictVal::Map(votings) = stock.state().read("votings") else {
+    let StrictVal::Map(votings) = ledger.state().read("votings") else {
         panic!("invalid data")
     };
     let (_, first_voting) = votings.first().unwrap();
     println!("voting: {first_voting}");
     println!("Votes:");
-    let StrictVal::Set(votes) = stock.state().read("votes") else {
+    let StrictVal::Set(votes) = ledger.state().read("votes") else {
         panic!("invalid data")
     };
     for vote in votes {
@@ -222,7 +225,7 @@ fn main() {
         fs::remove_file(deeds_path).expect("unable to remove contract file");
     }
 
-    stock
+    ledger
         .export_to_file([alice_auth2, bob_auth2, carol_auth2], "examples/dao/data/voting.deeds")
         .expect("unable to save deeds to a file");
 }

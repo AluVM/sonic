@@ -28,8 +28,8 @@ use chrono::{DateTime, Utc};
 use strict_encoding::TypeName;
 use strict_types::{StrictVal, TypeSystem};
 use ultrasonic::{
-    fe256, AuthToken, CallId, CellAddr, CodexId, Consensus, Contract, ContractId, ContractMeta, ContractName, Genesis,
-    Identity, Input, Operation, StateCell, StateData, StateValue,
+    fe256, AuthToken, CallId, CellAddr, CodexId, Consensus, ContractId, ContractMeta, ContractName, Genesis, Identity,
+    Input, Issue, Operation, StateCell, StateData, StateValue,
 };
 
 use crate::{Api, Articles, DataCell, MethodName, Schema, StateAtom, StateName};
@@ -128,13 +128,13 @@ impl IssueBuilder {
             issuer: Identity::default(),
         };
         let genesis = self.builder.issue_genesis(self.schema.codex.codex_id());
-        let contract = Contract {
+        let issue = Issue {
             version: default!(),
             meta,
             codex: self.schema.codex.clone(),
             genesis,
         };
-        Articles { contract, contract_sigs: none!(), schema: self.schema }
+        Articles { issue, contract_sigs: none!(), schema: self.schema }
     }
 }
 

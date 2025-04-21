@@ -25,10 +25,10 @@ use alloc::collections::BTreeMap;
 use std::mem;
 
 use amplify::confinement::{LargeOrdMap, SmallOrdMap};
-use sonicapi::{Api, Schema, StateAtom, StateName};
+use sonicapi::{Api, Articles, Schema, StateAtom, StateName};
 use strict_encoding::{StrictDeserialize, StrictSerialize, TypeName};
 use strict_types::{StrictVal, TypeSystem};
-use ultrasonic::{AuthToken, CellAddr, Memory, Opid, StateCell, StateData, StateValue, VerifiedOperation};
+use ultrasonic::{AuthToken, CallError, CellAddr, Memory, Opid, StateCell, StateData, StateValue, VerifiedOperation};
 
 use crate::LIB_NAME_SONIC;
 
@@ -55,6 +55,31 @@ pub struct EffectiveState {
 }
 
 impl EffectiveState {
+    pub fn from_genesis(articles: &Articles) -> Result<Self, CallError> {
+        let mut state = EffectiveState::default();
+
+        let genesis = articles
+            .issue
+            .genesis
+            .to_operation(articles.issue.contract_id());
+
+        let verified =
+            articles
+                .schema
+                .codex
+                .verify(articles.issue.contract_id(), genesis, &state.raw, &articles.schema)?;
+
+        // We do not need state transition for genesis.
+        let _ = state.apply(
+            verified,
+            &articles.schema.default_api,
+            articles.schema.custom_apis.keys(),
+            &articles.schema.types,
+        );
+
+        Ok(state)
+    }
+
     /// NB: Do not forget to call `recompute state` after.
     pub fn with(raw: RawState, schema: &Schema) -> Self {
         let mut me = Self { raw, main: none!(), aux: none!() };
@@ -310,6 +335,27 @@ impl AdaptedState {
                 self.owned.entry(name).or_default().insert(*addr, value);
             }
             // TODO: Warn if no state is present
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+mod _fs {
+    use std::path::Path;
+
+    use amplify::confinement::U24 as U24MAX;
+    use strict_encoding::{DeserializeError, SerializeError, StrictDeserialize, StrictSerialize};
+
+    use super::RawState;
+
+    // TODO: Use BinFile
+    impl RawState {
+        pub fn load(path: impl AsRef<Path>) -> Result<Self, DeserializeError> {
+            Self::strict_deserialize_from_file::<U24MAX>(path)
+        }
+
+        pub fn save(&self, path: impl AsRef<Path>) -> Result<(), SerializeError> {
+            self.strict_serialize_to_file::<U24MAX>(path)
         }
     }
 }
