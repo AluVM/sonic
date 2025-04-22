@@ -118,6 +118,13 @@ impl Api {
         }
     }
 
+    pub fn conforms(&self) -> Option<&TypeName> {
+        match self {
+            Api::Embedded(api) => api.conforms.as_ref(),
+            Api::Alu(api) => api.conforms.as_ref(),
+        }
+    }
+
     pub fn developer(&self) -> &Identity {
         match self {
             Api::Embedded(api) => &api.developer,
