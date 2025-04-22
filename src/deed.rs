@@ -83,6 +83,7 @@ impl<S: Stock> DeedBuilder<'_, S> {
         let deed = self.builder.finalize();
         let opid = deed.opid();
         self.ledger.apply_verify(deed)?;
+        self.ledger.commit_transaction();
         Ok(opid)
     }
 }

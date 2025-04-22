@@ -27,7 +27,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use aora::file::{FileAoraMap, FileAuraMap};
-use aora::{AoraMap, AuraMap};
+use aora::{AoraMap, AuraMap, TransactionalMap};
 use sonicapi::{Articles, MergeError, Schema};
 use strict_encoding::{SerializeError, StreamReader, StreamWriter, StrictReader, StrictWriter};
 use ultrasonic::{AuthToken, CellAddr, Operation, Opid};
@@ -142,6 +142,8 @@ impl Stock for StockFs {
     fn add_transition(&mut self, opid: Opid, transition: &Transition) { self.trace.insert(opid, transition) }
     #[inline]
     fn add_spending(&mut self, spent: CellAddr, spender: Opid) { self.spent.insert_or_update(spent, spender) }
+    #[inline]
+    fn commit_transaction(&mut self) { self.spent.commit_transaction(); }
 }
 
 impl LedgerDir {

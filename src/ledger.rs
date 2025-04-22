@@ -313,6 +313,7 @@ impl<S: Stock> Ledger<S> {
             };
             self.apply_verify(op)?;
         }
+        self.commit_transaction();
         Ok(())
     }
 
@@ -368,6 +369,7 @@ impl<S: Stock> Ledger<S> {
         for op in queue {
             self.apply_verify(op)?;
         }
+        self.commit_transaction();
         Ok(())
     }
 
@@ -395,10 +397,19 @@ impl<S: Stock> Ledger<S> {
         builder.commit()
     }
 
+    /// Adds operation which was already checked to the stock. This does the following:
+    /// - includes raw operation to stash;
+    /// - computes state modification and applies it to the state;
+    /// - saves removed state as a [`Transition`] and adds it to the execution trace.
+    ///
     /// # Returns
     ///
-    /// Whether operation was already successfully included (`true`), or was already present in the
-    /// stash.
+    /// Whether the operation was already successfully included (`true`), or was already present in
+    /// the stash.
+    ///
+    /// # Nota bene
+    ///
+    /// It is required to call [`Self::commit_transaction`] after all calls to this method.
     pub fn apply_verify(&mut self, operation: Operation) -> Result<bool, AcceptError> {
         if operation.contract_id != self.contract_id() {
             return Err(AcceptError::Articles(MergeError::ContractMismatch));
@@ -426,6 +437,10 @@ impl<S: Stock> Ledger<S> {
     /// # Returns
     ///
     /// State invalidated by the operation in form of a [`Transition`].
+    ///
+    /// # Nota bene
+    ///
+    /// It is required to call [`Self::commit_transaction`] after all calls to this method.
     pub fn apply(&mut self, operation: VerifiedOperation) -> Result<Transition, SerializeError> {
         let opid = operation.opid();
         let present = self.0.has_operation(opid);
@@ -454,6 +469,8 @@ impl<S: Stock> Ledger<S> {
         self.0.add_transition(opid, &transition);
         Ok(transition)
     }
+
+    pub fn commit_transaction(&mut self) { self.0.commit_transaction(); }
 }
 
 #[derive(Debug, Display, Error, From)]

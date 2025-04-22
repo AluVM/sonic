@@ -323,6 +323,13 @@ pub trait Stock {
     /// - silently update `spender` if the provided `spent` cell address were previously spent by a
     ///   different operation.
     fn add_spending(&mut self, spent: CellAddr, spender: Opid);
+
+    /// Commits newly added spending info.
+    ///
+    /// # Blocking I/O
+    ///
+    /// This call MAY BE blocking.
+    fn commit_transaction(&mut self);
 }
 
 #[derive(Debug, Display, Error, From)]
