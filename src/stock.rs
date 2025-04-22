@@ -22,6 +22,7 @@
 // the License.
 
 use core::error::Error as StdError;
+use std::io;
 
 use sonicapi::{MergeError, Schema};
 use strict_encoding::{DeserializeError, SerializeError};
@@ -330,7 +331,7 @@ pub enum StockError<E: StdError> {
     Inner(E),
 
     #[from]
-    Serialize(SerializeError),
+    Serialize(io::Error),
 }
 
 #[derive(Debug, Display, Error, From)]
@@ -340,7 +341,7 @@ pub enum IssueError<E: StdError> {
     Genesis(ContractName, CallError),
 
     /// unable to save contract articles - {0}
-    ArticlesPersistence(SerializeError),
+    ArticlesPersistence(io::Error),
 
     /// unable to save contract state data - {0}
     StatePersistence(SerializeError),

@@ -54,9 +54,9 @@ pub use api::{
     Api, ApiId, ApiInner, ApiVm, AppendApi, DestructibleApi, StateAdaptor, StateArithm, StateCalc, StateCalcError,
     StateReader,
 };
-pub use articles::{Articles, MergeError};
+pub use articles::{Articles, MergeError, ARTICLES_MAGIC_NUMBER, ARTICLES_VERSION};
 pub use builders::{Builder, BuilderRef, CoreParams, IssueParams, NamedState, OpBuilder, OpBuilderRef};
-pub use schema::Schema;
+pub use schema::{Schema, SCHEMA_MAGIC_NUMBER, SCHEMA_VERSION};
 pub use sonic_callreq::*;
 pub use state::{DataCell, StateAtom, StateTy, StructData};
 pub use util::{sigs, AnnotationName, Annotations};

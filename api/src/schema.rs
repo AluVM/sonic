@@ -39,7 +39,7 @@ use crate::{Annotations, Api, MergeError, MethodName, LIB_NAME_SONIC};
 pub const SCHEMA_MAGIC_NUMBER: [u8; 8] = *b"COISSUER";
 pub const SCHEMA_VERSION: [u8; 2] = [0x00, 0x01];
 
-/// Schema contains information required for creation of a contract.
+/// A schema contains information required for the creation of a contract.
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_SONIC)]
@@ -157,8 +157,7 @@ impl Schema {
 #[cfg(feature = "std")]
 mod _fs {
     use std::fs::File;
-    use std::io;
-    use std::io::Read;
+    use std::io::{self, Read};
     use std::path::Path;
 
     use amplify::confinement::U24 as U24MAX;

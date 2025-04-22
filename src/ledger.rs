@@ -271,7 +271,7 @@ impl<S: Stock> Ledger<S> {
         let articles = Articles::strict_decode(reader)?;
         self.merge_articles(articles).map_err(|e| match e {
             StockError::Inner(e) => AcceptError::Articles(e),
-            StockError::Serialize(e) => AcceptError::Serialize(e),
+            StockError::Serialize(e) => AcceptError::Io(e),
         })?;
 
         loop {

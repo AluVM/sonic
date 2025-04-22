@@ -21,11 +21,19 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use strict_encoding::{StrictDeserialize, StrictSerialize, TypeName};
+use std::io;
+
+use amplify::hex::ToHex;
+use strict_encoding::{
+    DecodeError, ReadRaw, StrictDecode, StrictEncode, StrictReader, StrictWriter, TypeName, WriteRaw,
+};
 use ultrasonic::{ContractId, Issue};
 
 use crate::sigs::ContentSigs;
 use crate::{Api, Schema, LIB_NAME_SONIC};
+
+pub const ARTICLES_MAGIC_NUMBER: [u8; 8] = *b"ARTICLES";
+pub const ARTICLES_VERSION: [u8; 2] = [0x00, 0x01];
 
 /// Articles contain the contract and all related codex and API information for interacting with it.
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -38,9 +46,6 @@ pub struct Articles {
     pub contract_sigs: ContentSigs,
     pub issue: Issue,
 }
-
-impl StrictSerialize for Articles {}
-impl StrictDeserialize for Articles {}
 
 impl Articles {
     pub fn contract_id(&self) -> ContractId { self.issue.contract_id() }
@@ -57,6 +62,33 @@ impl Articles {
 
         Ok(true)
     }
+
+    pub fn decode(reader: &mut StrictReader<impl ReadRaw>) -> Result<Self, DecodeError> {
+        let magic_bytes = <[u8; 8]>::strict_decode(reader)?;
+        if magic_bytes != ARTICLES_MAGIC_NUMBER {
+            return Err(DecodeError::DataIntegrityError(format!(
+                "wrong contract articles magic bytes {}",
+                magic_bytes.to_hex()
+            )));
+        }
+        let version = <[u8; 2]>::strict_decode(reader)?;
+        if version != ARTICLES_VERSION {
+            return Err(DecodeError::DataIntegrityError(format!(
+                "unsupported contract articles version {}",
+                u16::from_be_bytes(version)
+            )));
+        }
+        Self::strict_decode(reader)
+    }
+
+    pub fn encode(&self, mut writer: StrictWriter<impl WriteRaw>) -> io::Result<()> {
+        // This is compatible with BinFile
+        writer = ARTICLES_MAGIC_NUMBER.strict_encode(writer)?;
+        // Version
+        writer = ARTICLES_VERSION.strict_encode(writer)?;
+        self.strict_encode(writer)?;
+        Ok(())
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Display, Error)]
@@ -71,21 +103,32 @@ pub enum MergeError {
 
 #[cfg(feature = "std")]
 mod _fs {
+    use std::fs::File;
+    use std::io::{self, Read};
     use std::path::Path;
 
     use amplify::confinement::U24 as U24MAX;
-    use strict_encoding::{DeserializeError, SerializeError, StrictDeserialize, StrictSerialize};
+    use strict_encoding::{DeserializeError, StreamReader, StreamWriter, StrictReader, StrictWriter};
 
     use super::Articles;
 
     // TODO: Use BinFile
     impl Articles {
         pub fn load(path: impl AsRef<Path>) -> Result<Self, DeserializeError> {
-            Self::strict_deserialize_from_file::<U24MAX>(path)
+            let file = File::open(path)?;
+            let mut reader = StrictReader::with(StreamReader::new::<U24MAX>(file));
+            let me = Self::decode(&mut reader)?;
+            match reader.unbox().unconfine().read_exact(&mut [0u8; 1]) {
+                Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => Ok(me),
+                Err(e) => Err(e.into()),
+                Ok(()) => Err(DeserializeError::DataNotEntirelyConsumed),
+            }
         }
 
-        pub fn save(&self, path: impl AsRef<Path>) -> Result<(), SerializeError> {
-            self.strict_serialize_to_file::<U24MAX>(path)
+        pub fn save(&self, path: impl AsRef<Path>) -> io::Result<()> {
+            let file = File::create_new(path)?;
+            let writer = StrictWriter::with(StreamWriter::new::<U24MAX>(file));
+            self.encode(writer)
         }
     }
 }
