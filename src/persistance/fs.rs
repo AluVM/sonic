@@ -22,7 +22,7 @@
 // the License.
 
 use core::borrow::Borrow;
-use std::fs::{self, File};
+use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -52,7 +52,6 @@ pub struct StockFs {
 impl StockFs {
     const FILENAME_ARTICLES: &'static str = "contract.articles";
     const FILENAME_STATE_RAW: &'static str = "state.dat";
-    const CONTRACT_DIR_EXTENSION: &'static str = "contract";
 }
 
 impl Stock for StockFs {
@@ -62,11 +61,6 @@ impl Stock for StockFs {
     fn issue(articles: Articles, path: PathBuf) -> Result<Self, IssueError<io::Error>> {
         let state = EffectiveState::from_genesis(&articles)
             .map_err(|e| IssueError::Genesis(articles.issue.meta.name.clone(), e))?;
-
-        let name =
-            format!("{}.{:-}.{}", articles.issue.meta.name, articles.contract_id(), Self::CONTRACT_DIR_EXTENSION);
-        let path = path.join(name);
-        fs::create_dir_all(&path).map_err(IssueError::OtherPersistence)?;
 
         let stash = FileAoraMap::create_new(&path, "stash").map_err(IssueError::OtherPersistence)?;
         let trace = FileAoraMap::create_new(&path, "trace").map_err(IssueError::OtherPersistence)?;

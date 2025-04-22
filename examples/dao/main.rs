@@ -160,10 +160,10 @@ fn main() {
 
     let contract_path = Path::new("examples/dao/data/WonderlandDAO.contract");
     if contract_path.exists() {
-        fs::remove_dir_all(contract_path).expect("unable to remove contract file");
+        fs::remove_dir_all(contract_path).expect("Unable to remove a contract file");
     }
-
-    let mut ledger = LedgerDir::issue(articles, "examples/dao/data".into()).expect("invalid articles");
+    fs::create_dir_all(contract_path).expect("Unable to create a contract folder");
+    let mut ledger = LedgerDir::issue(articles, contract_path.to_path_buf()).expect("Can't issue contract");
 
     // Proposing vote
     let votings = ledger
