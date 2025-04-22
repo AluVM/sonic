@@ -25,6 +25,7 @@ use alloc::collections::{BTreeSet, VecDeque};
 use core::borrow::Borrow;
 use std::io;
 
+use amplify::hex::ToHex;
 use sonic_callreq::MethodName;
 use sonicapi::{MergeError, NamedState, OpBuilder, Schema};
 use strict_encoding::{
@@ -34,6 +35,9 @@ use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Operation, Opid, Ve
 
 use crate::deed::{CallParams, DeedBuilder};
 use crate::{Articles, EffectiveState, IssueError, LoadError, Stock, StockError, Transition};
+
+pub const LEDGER_MAGIC_NUMBER: [u8; 8] = *b"SOLEDGER";
+pub const LEDGER_VERSION: [u8; 2] = [0x00, 0x01];
 
 /// Contract with all its state and operations, supporting updates and rollbacks.
 // We need this structure to hide internal persistence methods and not to expose them.
@@ -204,8 +208,13 @@ impl<S: Stock> Ledger<S> {
     pub fn export(
         &self,
         terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
-        writer: StrictWriter<impl WriteRaw>,
+        mut writer: StrictWriter<impl WriteRaw>,
     ) -> io::Result<()> {
+        // This is compatible with BinFile
+        writer = LEDGER_MAGIC_NUMBER.strict_encode(writer)?;
+        // Version
+        writer = LEDGER_VERSION.strict_encode(writer)?;
+        writer = self.contract_id().strict_encode(writer)?;
         self.export_aux(terminals, writer, |_, w| Ok(w))
     }
 
@@ -267,8 +276,30 @@ impl<S: Stock> Ledger<S> {
         })
     }
 
-    pub fn import(&mut self, reader: &mut StrictReader<impl ReadRaw>) -> Result<(), AcceptError> {
+    pub fn accept(&mut self, reader: &mut StrictReader<impl ReadRaw>) -> Result<(), AcceptError> {
+        let magic_bytes = <[u8; 8]>::strict_decode(reader)?;
+        if magic_bytes != LEDGER_MAGIC_NUMBER {
+            return Err(DecodeError::DataIntegrityError(format!(
+                "wrong contract issuer schema magic bytes {}",
+                magic_bytes.to_hex()
+            ))
+            .into());
+        }
+        let version = <[u8; 2]>::strict_decode(reader)?;
+        if version != LEDGER_VERSION {
+            return Err(DecodeError::DataIntegrityError(format!(
+                "unsupported contract issuer schema version {}",
+                u16::from_be_bytes(version)
+            ))
+            .into());
+        }
+        let contract_id = ContractId::strict_decode(reader)?;
+
         let articles = Articles::strict_decode(reader)?;
+        if articles.contract_id() != contract_id {
+            return Err(AcceptError::Articles(MergeError::ContractMismatch));
+        }
+
         self.merge_articles(articles).map_err(|e| match e {
             StockError::Inner(e) => AcceptError::Articles(e),
             StockError::Serialize(e) => AcceptError::Io(e),

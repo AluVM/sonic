@@ -63,7 +63,8 @@ impl Stock for StockFs {
         let state = EffectiveState::from_genesis(&articles)
             .map_err(|e| IssueError::Genesis(articles.issue.meta.name.clone(), e))?;
 
-        let name = format!("{}.{}.{}", articles.issue.meta.name, articles.contract_id(), Self::CONTRACT_DIR_EXTENSION);
+        let name =
+            format!("{}.{:-}.{}", articles.issue.meta.name, articles.contract_id(), Self::CONTRACT_DIR_EXTENSION);
         let path = path.join(name);
         fs::create_dir_all(&path).map_err(IssueError::OtherPersistence)?;
 
@@ -163,7 +164,7 @@ impl LedgerDir {
     pub fn accept_from_file(&mut self, input: impl AsRef<Path>) -> Result<(), AcceptError> {
         let file = File::open(input)?;
         let mut reader = StrictReader::with(StreamReader::new::<{ usize::MAX }>(file));
-        self.import(&mut reader)
+        self.accept(&mut reader)
     }
 
     pub fn path(&self) -> &Path { &self.0.path }
