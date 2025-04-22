@@ -275,7 +275,7 @@ impl OpBuilder {
         self
     }
 
-    pub fn destroy(mut self, addr: CellAddr, witness: StrictVal) -> Self {
+    pub fn destroy(mut self, addr: CellAddr, _witness: StrictVal) -> Self {
         // TODO: Convert witness
         let input = Input { addr, witness: StateValue::None };
         self.destroying

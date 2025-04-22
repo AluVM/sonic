@@ -21,6 +21,9 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+#![allow(unused_variables)]
+// TODO: Implement AluVM-based APIs.
+
 use std::cmp::Ordering;
 
 use aluvm::LibSite;
