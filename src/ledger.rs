@@ -67,6 +67,8 @@ impl<S: Stock> Ledger<S> {
     /// This call MAY perform any I/O operations.
     pub fn load(conf: S::Conf) -> Result<Self, LoadError<S::Error>> { S::load(conf).map(Self) }
 
+    pub fn config(&self) -> S::Conf { self.0.config() }
+
     /// Provides [`Schema`] object, which includes codex, under which the contract was issued, and
     /// interfaces for the contract under that codex.
     ///

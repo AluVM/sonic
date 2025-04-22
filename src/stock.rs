@@ -75,6 +75,13 @@ pub trait Stock {
     fn load(conf: Self::Conf) -> Result<Self, LoadError<Self::Error>>
     where Self: Sized;
 
+    /// Returns a copy of the config object used during the stock construction.
+    ///
+    /// # Blocking I/O
+    ///
+    /// This call MUST NOT perform any I/O operations.
+    fn config(&self) -> Self::Conf;
+
     /// Provides contract [`Articles`].
     ///
     /// # Blocking I/O

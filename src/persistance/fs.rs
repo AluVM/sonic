@@ -96,6 +96,8 @@ impl Stock for StockFs {
         Ok(Self { path, stash, trace, spent, articles, state })
     }
 
+    fn config(&self) -> Self::Conf { self.path.clone() }
+
     #[inline]
     fn articles(&self) -> &Articles { &self.articles }
     #[inline]
