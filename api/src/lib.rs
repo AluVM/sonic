@@ -61,9 +61,11 @@ pub use sonic_callreq::*;
 pub use state::{DataCell, StateAtom, StateTy, StructData};
 pub use util::{sigs, AnnotationName, Annotations};
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
 #[repr(u8)]
 pub enum VmType {
+    #[display("Built-in")]
     Embedded = 1,
+    #[display("AluVM")]
     AluVM = 2,
 }
