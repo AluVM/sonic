@@ -21,15 +21,23 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+use std::io;
+
 use aluvm::{Lib, LibId};
 use amplify::confinement::{SmallOrdMap, SmallOrdSet, TinyOrdMap};
+use amplify::hex::ToHex;
 use commit_verify::ReservedBytes;
-use strict_encoding::{StrictDeserialize, StrictSerialize, TypeName};
+use strict_encoding::{
+    DecodeError, ReadRaw, StrictDecode, StrictEncode, StrictReader, StrictWriter, TypeName, WriteRaw,
+};
 use strict_types::TypeSystem;
 use ultrasonic::{CallId, Codex, LibRepo};
 
 use crate::sigs::ContentSigs;
 use crate::{Annotations, Api, MergeError, MethodName, LIB_NAME_SONIC};
+
+pub const SCHEMA_MAGIC_NUMBER: [u8; 8] = *b"COISSUER";
+pub const SCHEMA_VERSION: [u8; 2] = [0x00, 0x01];
 
 /// Schema contains information required for creation of a contract.
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -47,9 +55,6 @@ pub struct Schema {
     pub annotations: TinyOrdMap<Annotations, ContentSigs>,
     pub reserved: ReservedBytes<8>,
 }
-
-impl StrictSerialize for Schema {}
-impl StrictDeserialize for Schema {}
 
 impl LibRepo for Schema {
     fn get_lib(&self, lib_id: LibId) -> Option<&Lib> { self.libs.iter().find(|lib| lib.lib_id() == lib_id) }
@@ -120,23 +125,63 @@ impl Schema {
 
         Ok(true)
     }
+
+    pub fn decode(reader: &mut StrictReader<impl ReadRaw>) -> Result<Self, DecodeError> {
+        let magic_bytes = <[u8; 8]>::strict_decode(reader)?;
+        if magic_bytes != SCHEMA_MAGIC_NUMBER {
+            return Err(DecodeError::DataIntegrityError(format!(
+                "wrong contract issuer schema magic bytes {}",
+                magic_bytes.to_hex()
+            )));
+        }
+        let version = <[u8; 2]>::strict_decode(reader)?;
+        if version != SCHEMA_VERSION {
+            return Err(DecodeError::DataIntegrityError(format!(
+                "unsupported contract issuer schema version {}",
+                u16::from_be_bytes(version)
+            )));
+        }
+        Self::strict_decode(reader)
+    }
+
+    pub fn encode(&self, mut writer: StrictWriter<impl WriteRaw>) -> io::Result<()> {
+        // This is compatible with BinFile
+        writer = SCHEMA_MAGIC_NUMBER.strict_encode(writer)?;
+        // Version
+        writer = SCHEMA_VERSION.strict_encode(writer)?;
+        self.strict_encode(writer)?;
+        Ok(())
+    }
 }
 
 #[cfg(feature = "std")]
 mod _fs {
+    use std::fs::File;
+    use std::io;
+    use std::io::Read;
     use std::path::Path;
 
-    use strict_encoding::{DeserializeError, SerializeError, StrictDeserialize, StrictSerialize};
+    use amplify::confinement::U24 as U24MAX;
+    use strict_encoding::{DeserializeError, StreamReader, StreamWriter, StrictReader, StrictWriter};
 
     use super::Schema;
 
     impl Schema {
         pub fn load(path: impl AsRef<Path>) -> Result<Self, DeserializeError> {
-            Self::strict_deserialize_from_file::<{ usize::MAX }>(path)
+            let file = File::open(path)?;
+            let mut reader = StrictReader::with(StreamReader::new::<U24MAX>(file));
+            let me = Self::decode(&mut reader)?;
+            match reader.unbox().unconfine().read_exact(&mut [0u8; 1]) {
+                Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => Ok(me),
+                Err(e) => Err(e.into()),
+                Ok(()) => Err(DeserializeError::DataNotEntirelyConsumed),
+            }
         }
 
-        pub fn save(&self, path: impl AsRef<Path>) -> Result<(), SerializeError> {
-            self.strict_serialize_to_file::<{ usize::MAX }>(path)
+        pub fn save(&self, path: impl AsRef<Path>) -> io::Result<()> {
+            let file = File::create_new(path)?;
+            let writer = StrictWriter::with(StreamWriter::new::<U24MAX>(file));
+            self.encode(writer)
         }
     }
 }
