@@ -124,8 +124,10 @@ fn main() {
 
     // Creating DAO with three participants
     let issuer = Schema::new(codex, api, [libs::success()], types.type_system());
+    let filename = "examples/dao/data/SimpleDAO.issuer";
+    fs::remove_file(filename).ok();
     issuer
-        .save("examples/dao/data/SimpleDAO.issuer")
+        .save(filename)
         .expect("unable to save issuer to a file");
 
     let seed = &[0xCA; 30][..];
@@ -240,14 +242,14 @@ mod libs {
         Lib::assemble(&code).unwrap()
     }
 
+    #[allow(dead_code)]
     pub fn cast_vote() -> Lib {
         // 1. Verify that there is just one referenced global state for the party and one for the voting
-        // 2. Verify that referenced global state has a valid voteId matching the one provided in the
-        //    operation
-        // 3. Verify that referenced global state has a valid partyId matching the one provided in the
+        // 2. Verify that the referenced global state has a valid voteId matching the one provided operation
+        // 3. Verify that the referenced global state has a valid partyId matching the one provided
         //    operation
         // 4. Verify there is just one input
-        // 5. Verify that the provided witness argument is a prehash of the input
+        // 5. Verify that the provided witness argument is a preimage of the input
         todo!()
     }
 }

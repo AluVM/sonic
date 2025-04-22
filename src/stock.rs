@@ -165,7 +165,7 @@ pub trait Stock {
     /// # Implementation instructions
     ///
     /// Specific persistence providers implementing this method MUST iterate over all operations
-    /// which were ever provided via [`Self::add_operation`].
+    /// ever provided via [`Self::add_operation`].
     fn operations(&self) -> impl Iterator<Item = (Opid, Operation)>;
 
     /// Returns a state transition ([`Transition`]) with a given `opid` from the set of known
@@ -186,7 +186,7 @@ pub trait Stock {
     ///
     /// If an `opid` is not present in the contract trace.
     ///
-    /// In order to avoid panics always call the method after calling `has_operation`.
+    /// To avoid panics, always call the method after calling `has_operation`.
     ///
     /// # Blocking I/O
     ///
