@@ -28,22 +28,23 @@ use sonicapi::Articles;
 use strict_types::stl::{std_stl, strict_types_stl};
 use strict_types::typelib::LibBuilder;
 use strict_types::{CompileError, TypeLib};
-use ultrasonic::stl::{finite_field_stl, usonic_stl};
+use ultrasonic::stl::finite_field_stl;
+pub use ultrasonic::stl::usonic_stl;
 
 use crate::Transition;
 
 /// Strict types id for the library providing data types for RGB consensus.
-pub const LIB_ID_SONIC: &str = "stl:_HTaEW0d-gtFS43T-unkHkQ6-846Y1~H-nBqRg0T-000TrbI#parent-hawaii-iron";
+pub const LIB_ID_SONIC: &str = "stl:ZZXTNLne-OlEhPFg-CJ~5vJp-GWvAFvO-wesM6i8-p0VDc0w#wolf-byte-zero";
 
 fn _sonic_stl() -> Result<TypeLib, CompileError> {
-    LibBuilder::new(libname!(LIB_NAME_SONIC), tiny_bset! {
-        std_stl().to_dependency(),
-        strict_types_stl().to_dependency(),
-        commit_verify_stl().to_dependency(),
-        aluvm_stl().to_dependency(),
-        finite_field_stl().to_dependency(),
-        usonic_stl().to_dependency(),
-    })
+    LibBuilder::with(libname!(LIB_NAME_SONIC), [
+        std_stl().to_dependency_types(),
+        strict_types_stl().to_dependency_types(),
+        commit_verify_stl().to_dependency_types(),
+        aluvm_stl().to_dependency_types(),
+        finite_field_stl().to_dependency_types(),
+        usonic_stl().to_dependency_types(),
+    ])
     .transpile::<Articles>()
     .transpile::<Transition>()
     .compile()

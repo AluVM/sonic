@@ -163,7 +163,7 @@ fn main() {
         fs::remove_dir_all(contract_path).expect("Unable to remove a contract file");
     }
     fs::create_dir_all(contract_path).expect("Unable to create a contract folder");
-    let mut ledger = LedgerDir::issue(articles, contract_path.to_path_buf()).expect("Can't issue contract");
+    let mut ledger = LedgerDir::new(articles, contract_path.to_path_buf()).expect("Can't issue contract");
 
     // Proposing vote
     let votings = ledger
@@ -323,14 +323,12 @@ mod stl {
     }
 
     pub fn stl() -> TypeLib {
-        LibBuilder::new(libname!(LIB_NAME_DAO), tiny_bset! {
-            std_stl().to_dependency(),
-        })
-        .transpile::<Party>()
-        .transpile::<Voting>()
-        .transpile::<CastVote>()
-        .compile()
-        .expect("invalid DAO type library")
+        LibBuilder::with(libname!(LIB_NAME_DAO), [std_stl().to_dependency_types()])
+            .transpile::<Party>()
+            .transpile::<Voting>()
+            .transpile::<CastVote>()
+            .compile()
+            .expect("invalid DAO type library")
     }
 
     impl DaoTypes {
