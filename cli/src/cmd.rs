@@ -121,7 +121,7 @@ fn process(articles_path: PathBuf, dir: Option<PathBuf>) -> anyhow::Result<()> {
     let path = dir
         .or_else(|| Some(articles_path.parent()?.to_path_buf()))
         .ok_or(anyhow::anyhow!("invalid path for creating the contract"))?;
-    LedgerDir::issue(articles, path)?;
+    LedgerDir::new(articles, path)?;
 
     Ok(())
 }

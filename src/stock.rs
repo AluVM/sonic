@@ -51,7 +51,7 @@ pub trait Stock {
     /// construction.
     type Error: StdError;
 
-    /// Issues a new contract from the provided articles, creating its persistence using given
+    /// Creates a new contract from the provided articles, creating its persistence using a given
     /// implementation-specific configuration.
     ///
     /// # Panics
@@ -61,7 +61,7 @@ pub trait Stock {
     /// # Blocking I/O
     ///
     /// This call MAY perform any I/O operations.
-    fn issue(articles: Articles, conf: Self::Conf) -> Result<Self, IssueError<Self::Error>>
+    fn new(articles: Articles, conf: Self::Conf) -> Result<Self, IssueError<Self::Error>>
     where Self: Sized;
 
     /// Loads a contract from a persistence using the provided configuration.

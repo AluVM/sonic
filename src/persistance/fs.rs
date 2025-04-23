@@ -58,7 +58,7 @@ impl Stock for StockFs {
     type Conf = PathBuf;
     type Error = io::Error;
 
-    fn issue(articles: Articles, path: PathBuf) -> Result<Self, IssueError<io::Error>> {
+    fn new(articles: Articles, path: PathBuf) -> Result<Self, IssueError<io::Error>> {
         let state = EffectiveState::from_genesis(&articles)
             .map_err(|e| IssueError::Genesis(articles.issue.meta.name.clone(), e))?;
 

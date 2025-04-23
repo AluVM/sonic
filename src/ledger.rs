@@ -46,8 +46,8 @@ pub const LEDGER_VERSION: [u8; 2] = [0x00, 0x01];
 pub struct Ledger<S: Stock>(pub(crate) S);
 
 impl<S: Stock> Ledger<S> {
-    /// Issues a new contract from the provided articles, creating its persistence using given
-    /// implementation-specific configuration.
+    /// Instantiates a new contract from the provided articles, creating its persistence with the
+    /// provided configuration.
     ///
     /// # Panics
     ///
@@ -56,8 +56,8 @@ impl<S: Stock> Ledger<S> {
     /// # Blocking I/O
     ///
     /// This call MAY perform any I/O operations.
-    pub fn issue(articles: Articles, conf: S::Conf) -> Result<Self, IssueError<S::Error>> {
-        S::issue(articles, conf).map(Self)
+    pub fn new(articles: Articles, conf: S::Conf) -> Result<Self, IssueError<S::Error>> {
+        S::new(articles, conf).map(Self)
     }
 
     /// Loads a contract using the provided configuration for persistence.
