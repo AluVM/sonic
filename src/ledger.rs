@@ -36,7 +36,7 @@ use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Operation, Opid, Ve
 use crate::deed::{CallParams, DeedBuilder};
 use crate::{Articles, EffectiveState, IssueError, LoadError, Stock, StockError, Transition};
 
-pub const LEDGER_MAGIC_NUMBER: [u8; 8] = *b"SOLEDGER";
+pub const LEDGER_MAGIC_NUMBER: [u8; 8] = *b"DEEDLDGR";
 pub const LEDGER_VERSION: [u8; 2] = [0x00, 0x01];
 
 /// Contract with all its state and operations, supporting updates and rollbacks.
