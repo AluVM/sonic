@@ -43,6 +43,7 @@ pub const LEDGER_VERSION: [u8; 2] = [0x00, 0x01];
 // We need this structure to hide internal persistence methods and not to expose them.
 // We need the persistence trait (`Stock`) in order to allow different persistence storage
 // implementations.
+#[derive(Clone, Debug)]
 pub struct Ledger<S: Stock>(pub(crate) S);
 
 impl<S: Stock> Ledger<S> {

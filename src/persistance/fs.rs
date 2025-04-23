@@ -40,6 +40,7 @@ const STASH_MAGIC: u64 = u64::from_be_bytes(*b"RGBSTASH");
 const TRACE_MAGIC: u64 = u64::from_be_bytes(*b"RGBTRACE");
 const SPENT_MAGIC: u64 = u64::from_be_bytes(*b"RGBSPENT");
 
+#[derive(Debug)]
 pub struct StockFs {
     path: PathBuf,
     stash: FileAoraMap<Opid, Operation, STASH_MAGIC, 1>,
