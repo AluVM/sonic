@@ -46,6 +46,10 @@ edition.workspace = true
 rust-version.workspace = true
 exclude = [".github"]
 
+[[bin]]
+name = "sonic-stl"
+required-features = ["stl"]
+
 [lib]
 name = "hypersonic"
 

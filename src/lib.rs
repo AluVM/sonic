@@ -1,4 +1,4 @@
-// SONIC: Toolchain for formally-verifiable distributed contracts
+// SONIC: Standard library for formally-verifiable distributed contracts
 //
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -47,6 +47,8 @@ mod stock;
 pub mod persistance;
 mod deed;
 mod ledger;
+#[cfg(feature = "stl")]
+pub mod stl;
 
 pub use deed::{CallParams, DeedBuilder};
 pub use ledger::{AcceptError, Ledger, LEDGER_MAGIC_NUMBER, LEDGER_VERSION};

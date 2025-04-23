@@ -1,4 +1,4 @@
-// SONIC: Toolchain for formally-verifiable distributed contracts
+// SONIC: Standard library for formally-verifiable distributed contracts
 //
 // SPDX-License-Identifier: Apache-2.0
 //

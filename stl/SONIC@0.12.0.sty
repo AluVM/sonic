@@ -1,0 +1,191 @@
+{-
+  Id: stl:_HTaEW0d-gtFS43T-unkHkQ6-846Y1~H-nBqRg0T-000TrbI#parent-hawaii-iron
+  Name: SONIC
+  Version: 0.12.0
+  Description: Standard library for formally-verifiable distributed contracts
+  Author: Dr Maxim Orlovsky <orlovsky@ubideco.org>
+  Copyright (C) 2024-2025 Laboratories for Ubiquitous Deterministic Computing (UBIDECO),
+                          Institute for Distributed and Cognitive Systems (InDCS), Switzerland.
+                          All rights reserved.
+  License: Apache-2.0
+-}
+
+@context
+typelib SONIC
+
+import UltraSONIC#nurse-decimal-legal
+  use ContractMeta#elegant-canvas-bazaar
+  use Consensus#nissan-congo-clark
+  use Codex#condor-airport-morph
+  use ContractName#value-reform-lesson
+  use StateData#amigo-igor-panel
+  use Genesis#button-evident-sphere
+  use Opid#storm-dragon-brain
+  use StateValue#bamboo-morgan-edition
+  use AuthToken#western-america-patrol
+  use CodexId#cargo-season-impact
+  use Identity#smart-pioneer-nominal
+  use Issue#brenda-watch-clarion
+  use StateCell#storm-martin-jump
+  use CellAddr#lecture-vincent-carbon
+  use RawData#lima-anvil-karate
+
+import FiniteField#report-canal-convert
+  use Fe256#palace-mixer-visual
+
+import Std#delete-roman-hair
+  use AlphaCaps#picnic-soprano-aurora
+  use AsciiPrintable#ultra-sunset-format
+  use Bool#oxygen-complex-duet
+  use AlphaNumDash#sponsor-snake-nice
+  use AlphaCapsNum#aladdin-zebra-marble
+  use AlphaNumLodash#percent-bingo-caesar
+  use AlphaCapsLodash#duet-hammer-labor
+  use AlphaSmallLodash#pioneer-eagle-spell
+
+import AluVM#reward-accent-swim
+  use Lib#report-gordon-recycle
+  use IsaId#mobile-letter-absorb
+  use LibId#germany-culture-olivia
+  use CoreConfig#ventura-ibiza-special
+  use LibSite#polo-macro-elite
+
+import StrictTypes#henry-heart-survive
+  use VariantName#theory-austin-before
+  use FieldName#present-flute-herman
+  use Primitive#deliver-arrow-boxer
+  use TySemId#popcorn-super-young
+  use FieldSemId#spiral-road-marco
+  use TypeName#edgar-carol-mystery
+  use UnnamedFieldsSemId#freedom-degree-gregory
+  use SemId#logic-absorb-hilton
+  use Variant#humor-regard-promise
+  use Sizing#courage-alien-salon
+  use NamedFieldsSemId#solar-salad-smoke
+  use EnumVariants#dispute-natasha-vega
+  use VariantInfoSemId#museum-edward-mirror
+  use UnionVariantsSemId#santana-address-pepper
+  use TypeSystem#adrian-boris-sponsor
+
+import CommitVerify#uranium-alien-extend
+  use ReservedBytes14#prize-edison-classic
+  use ReservedBytes2#florida-libra-circus
+  use ReservedBytes8#rudolf-tape-adrian
+
+
+@mnemonic(blast-limbo-normal)
+data AluAdaptor        : converter AluVM.LibSite, builder AluVM.LibSite
+
+@mnemonic(compass-today-needle)
+data AluReader         : AluVM.LibSite
+
+@mnemonic(harvest-express-harvest)
+data AluVMArithm       : accumulate AluVM.LibSite
+                       , lessen AluVM.LibSite
+                       , diff AluVM.LibSite
+
+@mnemonic(domino-waiter-orlando)
+data AnnotationName    : Std.AlphaCaps, [Std.AlphaNumDash ^ ..0xfe]
+
+@mnemonic(phantom-habitat-pegasus)
+data Annotations       : {AnnotationName -> ^ ..0xff [Byte]}
+
+@mnemonic(fuji-asia-cadet)
+data Api               : embedded#1 ApiInnerEmbeddedProc
+                       | alu ApiInnerVm
+
+@mnemonic(mars-cello-avalon)
+data ApiInnerEmbeddedProc : version CommitVerify.ReservedBytes2
+                       , codexId UltraSONIC.CodexId
+                       , timestamp I64
+                       , name StrictTypes.TypeName?
+                       , developer UltraSONIC.Identity
+                       , conforms StrictTypes.TypeName?
+                       , defaultCall CallState?
+                       , reserved CommitVerify.ReservedBytes8
+                       , appendOnly {StrictTypes.VariantName -> ^ ..0xff AppendApiEmbeddedProc}
+                       , destructible {StrictTypes.VariantName -> ^ ..0xff DestructibleApiEmbeddedProc}
+                       , readers {StrictTypes.VariantName -> ^ ..0xff EmbeddedReaders}
+                       , verifiers {StrictTypes.VariantName -> ^ ..0xff U16}
+                       , errors {U256 -> ^ ..0xff [Unicode ^ ..0xff]}
+
+@mnemonic(evident-trapeze-comedy)
+data ApiInnerVm        : version CommitVerify.ReservedBytes2
+                       , codexId UltraSONIC.CodexId
+                       , timestamp I64
+                       , name StrictTypes.TypeName?
+                       , developer UltraSONIC.Identity
+                       , conforms StrictTypes.TypeName?
+                       , defaultCall CallState?
+                       , reserved CommitVerify.ReservedBytes8
+                       , appendOnly {StrictTypes.VariantName -> ^ ..0xff AppendApiVm}
+                       , destructible {StrictTypes.VariantName -> ^ ..0xff DestructibleApiVm}
+                       , readers {StrictTypes.VariantName -> ^ ..0xff AluReader}
+                       , verifiers {StrictTypes.VariantName -> ^ ..0xff U16}
+                       , errors {U256 -> ^ ..0xff [Unicode ^ ..0xff]}
+
+@mnemonic(serial-iron-galaxy)
+data AppendApiEmbeddedProc : semId StrictTypes.SemId
+                       , rawSemId StrictTypes.SemId
+                       , published Std.Bool
+                       , adaptor EmbeddedImmutable
+
+@mnemonic(alamo-spoon-mega)
+data AppendApiVm       : semId StrictTypes.SemId
+                       , rawSemId StrictTypes.SemId
+                       , published Std.Bool
+                       , adaptor AluAdaptor
+
+@mnemonic(chaos-orca-exotic)
+data Articles          : schema Schema
+                       , contractSigs ContentSigs
+                       , issue UltraSONIC.Issue
+
+@mnemonic(alpha-balsa-verona)
+data CallState         : method StrictTypes.VariantName, destructible StrictTypes.VariantName?
+
+@mnemonic(tango-helena-helium)
+data ContentSigs       : {UltraSONIC.Identity -> ^ ..0xa SigBlob}
+
+@mnemonic(cliff-mirror-table)
+data DestructibleApiEmbeddedProc : semId StrictTypes.SemId
+                       , arithmetics EmbeddedArithm
+                       , adaptor EmbeddedImmutable
+
+@mnemonic(octopus-input-africa)
+data DestructibleApiVm : semId StrictTypes.SemId
+                       , arithmetics AluVMArithm
+                       , adaptor AluAdaptor
+
+@mnemonic(state-single-random)
+data EmbeddedArithm    : nonFungible | fungible
+
+
+@mnemonic(protect-mailbox-bishop)
+data EmbeddedImmutable : U256
+
+@mnemonic(arrow-aroma-spark)
+data EmbeddedReaders   : count#1 StrictTypes.VariantName
+                       | sumV StrictTypes.VariantName
+                       | listV#32 StrictTypes.VariantName
+                       | setV#34 StrictTypes.VariantName
+                       | mapV2u#48 StrictTypes.VariantName
+
+@mnemonic(frank-memo-eddie)
+data Schema            : codex UltraSONIC.Codex
+                       , defaultApi Api
+                       , defaultApiSigs ContentSigs
+                       , customApis {Api -> ContentSigs}
+                       , libs {AluVM.Lib}
+                       , types StrictTypes.TypeSystem
+                       , codexSigs ContentSigs
+                       , annotations {Annotations -> ^ ..0xff ContentSigs}
+                       , reserved CommitVerify.ReservedBytes8
+
+@mnemonic(insect-cello-avalon)
+data SigBlob           : [Byte ^ 1..0x1000]
+
+@mnemonic(explore-locate-zoom)
+data Transition        : opid UltraSONIC.Opid, destroyed {UltraSONIC.CellAddr -> UltraSONIC.StateCell}
+
+

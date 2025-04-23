@@ -33,7 +33,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        feature: [ stl, serde ]
+        feature:
+          - std
+          - persist-file
+          - stl
+          - serde
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
