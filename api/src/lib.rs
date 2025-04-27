@@ -59,6 +59,7 @@ pub use builders::{Builder, BuilderRef, CoreParams, IssueParams, NamedState, OpB
 pub use schema::{Schema, SCHEMA_MAGIC_NUMBER, SCHEMA_VERSION};
 pub use sonic_callreq::*;
 pub use state::{DataCell, StateAtom, StateTy, StructData};
+pub use ultrasonic::*;
 pub use util::{sigs, AnnotationName, Annotations};
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
