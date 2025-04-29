@@ -126,7 +126,7 @@ mod _fs {
         }
 
         pub fn save(&self, path: impl AsRef<Path>) -> io::Result<()> {
-            let file = File::create_new(path)?;
+            let file = File::create(path)?;
             let writer = StrictWriter::with(StreamWriter::new::<U24MAX>(file));
             self.encode(writer)
         }
