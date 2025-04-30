@@ -312,7 +312,7 @@ impl<S: Stock> Ledger<S> {
                 Err(DecodeError::Io(e)) if e.kind() == io::ErrorKind::UnexpectedEof => break,
                 Err(e) => return Err(e.into()),
             };
-            self.apply_verify(op)?;
+            self.apply_verify(op, false)?;
         }
         self.commit_transaction();
         Ok(())
@@ -368,7 +368,7 @@ impl<S: Stock> Ledger<S> {
             }
         }
         for op in queue {
-            self.apply_verify(op)?;
+            self.apply_verify(op, true)?;
         }
         self.commit_transaction();
         Ok(())
@@ -411,7 +411,7 @@ impl<S: Stock> Ledger<S> {
     /// # Nota bene
     ///
     /// It is required to call [`Self::commit_transaction`] after all calls to this method.
-    pub fn apply_verify(&mut self, operation: Operation) -> Result<bool, AcceptError> {
+    pub fn apply_verify(&mut self, operation: Operation, force: bool) -> Result<bool, AcceptError> {
         if operation.contract_id != self.contract_id() {
             return Err(AcceptError::Articles(MergeError::ContractMismatch));
         }
@@ -420,11 +420,11 @@ impl<S: Stock> Ledger<S> {
 
         let present = self.0.has_operation(opid);
         let schema = &self.0.articles().schema;
-        if !present {
+        if !present || force {
             let verified = schema
                 .codex
                 .verify(self.contract_id(), operation, &self.0.state().raw, schema)?;
-            self.apply_internal(opid, verified, present)?;
+            self.apply_internal(opid, verified, present && !force)?;
         }
 
         Ok(present)
@@ -437,7 +437,7 @@ impl<S: Stock> Ledger<S> {
     ///
     /// # Returns
     ///
-    /// State invalidated by the operation in form of a [`Transition`].
+    /// State invalidated by the operation in the form of a [`Transition`].
     ///
     /// # Nota bene
     ///
