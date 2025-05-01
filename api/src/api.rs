@@ -21,16 +21,16 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-//! API defines how a contract can be interfaced by a software.
+//! API defines how a contract can be interfaced by software.
 //!
-//! SONARE provides four types of actions for working with contract (ROVT):
+//! SONIC provides four types of actions for working with contract (ROVT):
 //! 1. _Read_ the state of the contract;
 //! 2. _Operate_: construct new operations performing contract state transitions;
 //! 3. _Verify_ an existing operation under the contract Codex and generate transaction;
 //! 4. _Transact_: apply or roll-back transactions to the contract state.
 //!
 //! API defines methods for human-based interaction with the contract for read and operate actions.
-//! The verify part is implemented in the consensus layer (UltraSONIC), the transact part is
+//! The "verify" part is implemented in the consensus layer (UltraSONIC), the "transact" part is
 //! performed directly, so these two are not covered by an API.
 
 use core::cmp::Ordering;
@@ -51,6 +51,14 @@ use crate::{StateAtom, VmType, LIB_NAME_SONIC};
 pub(super) const USED_FIEL_BYTES: usize = u256::BYTES as usize - 2;
 pub(super) const TOTAL_BYTES: usize = USED_FIEL_BYTES * 3;
 
+/// API is an interface implementation.
+///
+/// API should work without requiring runtime to have corresponding interfaces; it should provide
+/// all necessary data. Basically, one may think of API as a compiled interface hierarchy applied to
+/// a specific codex.
+///
+/// API doesn't commit to an interface ID, since it can match multiple interfaces in the interface
+/// hierarchy.
 #[derive(Clone, Debug, From)]
 #[derive(CommitEncode)]
 #[commit_encode(strategy = strict, id = ApiId)]
@@ -278,14 +286,6 @@ impl Api {
     }
 }
 
-/// API is an interface implementation.
-///
-/// API should work without requiring runtime to have corresponding interfaces; it should provide
-/// all necessary data. Basically one may think of API as a compiled interface hierarchy applied to
-/// a specific codex.
-///
-/// API doesn't commit to an interface ID, since it can match multiple interfaces in the interface
-/// hierarchy.
 #[derive(Clone, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_SONIC)]
@@ -297,7 +297,7 @@ pub struct ApiInner<Vm: ApiVm> {
     /// Commitment to the codex under which the API is valid.
     pub codex_id: CodexId,
 
-    /// Timestamp which is used for versioning (later APIs have priority over new ones).
+    /// Timestamp, which is used for versioning (later APIs have priority over new ones).
     pub timestamp: i64,
 
     /// API name. Each codex must have a default API with no name.
@@ -312,28 +312,28 @@ pub struct ApiInner<Vm: ApiVm> {
     /// Name for the default API call and destructible state name.
     pub default_call: Option<CallState>,
 
-    /// Reserved for the future use.
+    /// Reserved for future use.
     pub reserved: ReservedBytes<8>,
 
-    /// State API defines how structured contract state is constructed out of (and converted into)
+    /// State API defines how a structured contract state is constructed out of (and converted into)
     /// UltraSONIC immutable memory cells.
     pub append_only: TinyOrdMap<StateName, AppendApi<Vm>>,
 
-    /// State API defines how structured contract state is constructed out of (and converted into)
+    /// State API defines how a structured contract state is constructed out of (and converted into)
     /// UltraSONIC destructible memory cells.
     pub destructible: TinyOrdMap<StateName, DestructibleApi<Vm>>,
 
     /// Readers have access to the converted global `state` and can construct a derived state out of
     /// it.
     ///
-    /// The typical examples when readers are used is to sum individual asset issues and compute the
-    /// number of totally issued assets.
+    /// The typical examples when readers are used are to sum individual asset issues and compute
+    /// the number of totally issued assets.
     pub readers: TinyOrdMap<MethodName, Vm::Reader>,
 
     /// Links between named transaction methods defined in the interface - and corresponding
     /// verifier call ids defined by the contract.
     ///
-    /// NB: Multiple methods from the interface may call to the came verifier.
+    /// NB: Multiple methods from the interface may call the came verifier.
     pub verifiers: TinyOrdMap<MethodName, CallId>,
 
     /// Maps error type reported by a contract verifier via `EA` value to an error description taken
