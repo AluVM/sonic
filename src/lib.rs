@@ -40,6 +40,7 @@ extern crate strict_types;
 extern crate serde;
 
 pub use sonicapi::*;
+#[allow(unused_imports)]
 pub use ultrasonic::*;
 
 mod state;

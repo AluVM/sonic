@@ -31,4 +31,4 @@ all = ["std", "uri"]
 
 std = ["amplify/std", "indexmap/std", "chrono/std", "fluent-uri/std"]
 uri = ["dep:fluent-uri", "dep:percent-encoding", "dep:indexmap"]
-serde = ["dep:serde", "strict_types/serde", "amplify/serde"]
+serde = ["dep:serde", "strict_types/serde", "amplify/serde", "chrono/serde"]
