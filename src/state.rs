@@ -65,7 +65,7 @@ impl EffectiveState {
 
         let verified =
             articles
-                .schema
+                .issue
                 .codex
                 .verify(articles.issue.contract_id(), genesis, &state.raw, &articles.schema)?;
 

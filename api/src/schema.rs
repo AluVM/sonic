@@ -31,13 +31,10 @@ use strict_encoding::{
     DecodeError, ReadRaw, StrictDecode, StrictEncode, StrictReader, StrictWriter, TypeName, WriteRaw,
 };
 use strict_types::TypeSystem;
-use ultrasonic::{CallId, Codex, LibRepo};
+use ultrasonic::{CallId, CodexId, LibRepo};
 
 use crate::sigs::ContentSigs;
 use crate::{Annotations, Api, MergeError, MethodName, LIB_NAME_SONIC};
-
-pub const SCHEMA_MAGIC_NUMBER: [u8; 8] = *b"COISSUER";
-pub const SCHEMA_VERSION: [u8; 2] = [0x00, 0x01];
 
 /// A schema contains information required for the creation of a contract.
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -45,7 +42,7 @@ pub const SCHEMA_VERSION: [u8; 2] = [0x00, 0x01];
 #[strict_type(lib = LIB_NAME_SONIC)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct Schema {
-    pub codex: Codex,
+    pub codex_id: CodexId,
     pub default_api: Api,
     pub default_api_sigs: ContentSigs,
     pub custom_apis: SmallOrdMap<Api, ContentSigs>,
@@ -61,10 +58,10 @@ impl LibRepo for Schema {
 }
 
 impl Schema {
-    pub fn new(codex: Codex, api: Api, libs: impl IntoIterator<Item = Lib>, types: TypeSystem) -> Self {
+    pub fn new(codex_id: CodexId, api: Api, libs: impl IntoIterator<Item = Lib>, types: TypeSystem) -> Self {
         // TODO: Ensure default API is unnamed?
         Schema {
-            codex,
+            codex_id,
             default_api: api,
             default_api_sigs: none!(),
             custom_apis: none!(),
@@ -90,7 +87,7 @@ impl Schema {
     }
 
     pub fn merge(&mut self, other: Self) -> Result<bool, MergeError> {
-        if self.codex.codex_id() != other.codex.codex_id() {
+        if self.codex_id != other.codex_id {
             return Err(MergeError::CodexMismatch);
         }
         self.codex_sigs.merge(other.codex_sigs);

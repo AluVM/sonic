@@ -21,38 +21,23 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+use aluvm::Lib;
+use amplify::confinement::SmallOrdSet;
+use sonicapi::Api;
+use strict_types::TypeSystem;
+use ultrasonic::Codex;
 
-// TODO: Activate once StrictEncoding will be no_std
-// #![cfg_attr(not(feature = "std"), no_std)]
+pub const ISSUER_MAGIC_NUMBER: [u8; 8] = *b"COISSUER";
+pub const ISSUER_VERSION: [u8; 2] = [0x00, 0x01];
 
-#[macro_use]
-extern crate core;
-extern crate alloc;
-
-#[macro_use]
-extern crate amplify;
-#[macro_use]
-extern crate strict_types;
-
-#[cfg(feature = "serde")]
-#[macro_use]
-extern crate serde;
-
-pub use sonicapi::*;
-#[allow(unused_imports)]
-pub use ultrasonic::*;
-
-mod state;
-mod stock;
-pub mod persistance;
-mod deed;
-mod ledger;
-#[cfg(feature = "stl")]
-pub mod stl;
-mod issuer;
-
-pub use deed::{CallParams, DeedBuilder};
-pub use ledger::{AcceptError, Ledger, LEDGER_MAGIC_NUMBER, LEDGER_VERSION};
-pub use state::{AdaptedState, EffectiveState, RawState, Transition};
-pub use stock::{IssueError, LoadError, Stock, StockError};
+/// An issuer contains information required for the creation of a contract.
+#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONIC)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
+pub struct Issuer {
+    pub codex: Codex,
+    pub api: Api,
+    pub libs: SmallOrdSet<Lib>,
+    pub types: TypeSystem,
+}

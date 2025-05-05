@@ -433,11 +433,13 @@ impl<S: Stock> Ledger<S> {
         let opid = operation.opid();
 
         let present = self.0.is_valid(opid);
-        let schema = &self.0.articles().schema;
+        let articles = self.0.articles();
         if !present || force {
-            let verified = schema
-                .codex
-                .verify(self.contract_id(), operation, &self.0.state().raw, schema)?;
+            let verified =
+                articles
+                    .issue
+                    .codex
+                    .verify(self.contract_id(), operation, &self.0.state().raw, &articles.schema)?;
             self.apply_internal(opid, verified, present && !force)?;
         }
 
