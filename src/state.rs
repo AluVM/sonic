@@ -150,7 +150,7 @@ impl EffectiveState {
         self.main.rollback(&transition, default_api, sys);
         let mut count = 0usize;
         for api in custom_apis {
-            // Skip default API (it is already processed as `main` above)
+            // Skip the default API (it is already processed as `main` above)
             let Some(name) = api.name() else {
                 continue;
             };

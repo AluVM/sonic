@@ -39,12 +39,47 @@ pub type LedgerDir = Ledger<StockFs>;
 const STASH_MAGIC: u64 = u64::from_be_bytes(*b"RGBSTASH");
 const TRACE_MAGIC: u64 = u64::from_be_bytes(*b"RGBTRACE");
 const SPENT_MAGIC: u64 = u64::from_be_bytes(*b"RGBSPENT");
+const VALID_MAGIC: u64 = u64::from_be_bytes(*b"RGBVALID");
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+enum OpValidity {
+    Invalid,
+    Valid,
+}
+
+impl From<[u8; 1]> for OpValidity {
+    fn from(bytes: [u8; 1]) -> Self {
+        match bytes[0] {
+            1 => Self::Valid,
+            _ => Self::Invalid,
+        }
+    }
+}
+
+impl From<OpValidity> for [u8; 1] {
+    fn from(v: OpValidity) -> Self {
+        match v {
+            OpValidity::Valid => [1],
+            OpValidity::Invalid => [0],
+        }
+    }
+}
+
+impl From<OpValidity> for bool {
+    fn from(v: OpValidity) -> Self {
+        match v {
+            OpValidity::Valid => true,
+            OpValidity::Invalid => false,
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct StockFs {
     path: PathBuf,
     stash: FileAoraMap<Opid, Operation, STASH_MAGIC, 1>,
     trace: FileAoraMap<Opid, Transition, TRACE_MAGIC, 1>,
+    valid: FileAuraMap<Opid, OpValidity, VALID_MAGIC, 1, 32, 1>,
     spent: FileAuraMap<CellAddr, Opid, SPENT_MAGIC, 1, 34>,
     articles: Articles,
     state: EffectiveState,
@@ -60,12 +95,14 @@ impl Stock for StockFs {
     type Error = io::Error;
 
     fn new(articles: Articles, path: PathBuf) -> Result<Self, IssueError<io::Error>> {
+        // TODO: Move state and validity init into a shared code (i.e. `Ledger` implementation)
         let state = EffectiveState::from_genesis(&articles)
             .map_err(|e| IssueError::Genesis(articles.issue.meta.name.clone(), e))?;
 
         let stash = FileAoraMap::create_new(&path, "stash").map_err(IssueError::OtherPersistence)?;
         let trace = FileAoraMap::create_new(&path, "trace").map_err(IssueError::OtherPersistence)?;
         let spent = FileAuraMap::create_new(&path, "spent").map_err(IssueError::OtherPersistence)?;
+        let mut valid = FileAuraMap::create_new(&path, "valid").map_err(IssueError::OtherPersistence)?;
 
         articles
             .save(path.join(Self::FILENAME_ARTICLES))
@@ -75,7 +112,10 @@ impl Stock for StockFs {
             .save(path.join(Self::FILENAME_STATE_RAW))
             .map_err(IssueError::StatePersistence)?;
 
-        Ok(Self { path, stash, trace, spent, articles, state })
+        valid.insert_only(articles.issue.genesis_opid(), OpValidity::Valid);
+        valid.commit_transaction();
+
+        Ok(Self { path, stash, trace, spent, articles, state, valid })
     }
 
     fn load(path: PathBuf) -> Result<Self, LoadError<io::Error>> {
@@ -84,12 +124,13 @@ impl Stock for StockFs {
         let stash = FileAoraMap::open(&path, "stash").map_err(LoadError::OtherPersistence)?;
         let trace = FileAoraMap::open(&path, "trace").map_err(LoadError::OtherPersistence)?;
         let spent = FileAuraMap::open(&path, "spent").map_err(LoadError::OtherPersistence)?;
+        let valid = FileAuraMap::open(&path, "valid").map_err(LoadError::OtherPersistence)?;
 
         let articles = Articles::load(path.join(Self::FILENAME_ARTICLES)).map_err(LoadError::ArticlesPersistence)?;
         let raw = RawState::load(path.join(Self::FILENAME_STATE_RAW)).map_err(LoadError::StatePersistence)?;
         let state = EffectiveState::with(raw, &articles.schema);
 
-        Ok(Self { path, stash, trace, spent, articles, state })
+        Ok(Self { path, stash, trace, spent, articles, state, valid })
     }
 
     fn config(&self) -> Self::Conf { self.path.clone() }
@@ -98,6 +139,13 @@ impl Stock for StockFs {
     fn articles(&self) -> &Articles { &self.articles }
     #[inline]
     fn state(&self) -> &EffectiveState { &self.state }
+
+    fn is_valid(&self, opid: Opid) -> bool { self.valid.get(opid).map(bool::from).unwrap_or_default() }
+
+    fn mark_valid(&mut self, opid: Opid) { self.valid.insert_or_update(opid, OpValidity::Valid) }
+
+    fn mark_invalid(&mut self, opid: Opid) { self.valid.insert_or_update(opid, OpValidity::Invalid) }
+
     #[inline]
     fn has_operation(&self, opid: Opid) -> bool { self.stash.contains_key(opid) }
     #[inline]
@@ -138,7 +186,10 @@ impl Stock for StockFs {
     #[inline]
     fn add_spending(&mut self, spent: CellAddr, spender: Opid) { self.spent.insert_or_update(spent, spender) }
     #[inline]
-    fn commit_transaction(&mut self) { self.spent.commit_transaction(); }
+    fn commit_transaction(&mut self) {
+        self.spent.commit_transaction();
+        self.valid.commit_transaction();
+    }
 }
 
 impl LedgerDir {

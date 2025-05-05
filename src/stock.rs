@@ -30,7 +30,7 @@ use ultrasonic::{CallError, CellAddr, ContractName, Operation, Opid};
 
 use crate::{Articles, EffectiveState, Transition};
 
-/// Stock is a persistence API for keeping and accessing a contract data.
+/// Stock is a persistence API for keeping and accessing contract data.
 ///
 /// Contract data include:
 /// - contract [`Articles`];
@@ -42,7 +42,6 @@ use crate::{Articles, EffectiveState, Transition};
 ///
 /// Trace and spending information is used in contract rollback and forward operations, which lead
 /// to a re-computation of a contract state (but leave stash and trace data unaffected).
-// TODO: Consider returning large objects by reference
 pub trait Stock {
     /// Persistence configuration type.
     type Conf;
@@ -97,6 +96,12 @@ pub trait Stock {
     /// This call MUST NOT perform any I/O operations and MUST BE a non-blocking.
     fn state(&self) -> &EffectiveState;
 
+    /// Detects whether an operation with a given `opid` participates in the current state.
+    fn is_valid(&self, opid: Opid) -> bool;
+
+    fn mark_valid(&mut self, opid: Opid);
+    fn mark_invalid(&mut self, opid: Opid);
+
     /// Detects whether an operation with a given `opid` is known to the contract.
     ///
     /// # Nota bene
@@ -146,7 +151,7 @@ pub trait Stock {
     /// matching the provided `opid`.
     fn operation(&self, opid: Opid) -> Operation;
 
-    /// Returns an iterator over all operations known to the contract (i.e. the complete contract
+    /// Returns an iterator over all operations known to the contract (i.e., the complete contract
     /// stash).
     ///
     /// # Nota bene
@@ -230,7 +235,7 @@ pub trait Stock {
     /// # Implementation instructions
     ///
     /// Specific persistence providers implementing this method MUST iterate over all state
-    /// transitions which were ever provided via [`Self::add_transition`].
+    /// transitions that were ever provided via [`Self::add_transition`].
     fn trace(&self) -> impl Iterator<Item = (Opid, Transition)>;
 
     /// Returns an id of an operation spending a provided address (operation destructible state
@@ -238,7 +243,8 @@ pub trait Stock {
     ///
     /// # Nota bene
     ///
-    /// This method is internally used in rollback procedure, and must not be accessed from outside.
+    /// This method is internally used in the rollback procedure and must not be accessed from
+    /// outside.
     ///
     /// # Blocking I/O
     ///

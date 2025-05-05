@@ -108,6 +108,9 @@ impl<S: Stock> Ledger<S> {
     #[inline]
     pub fn state(&self) -> &EffectiveState { self.0.state() }
 
+    /// Detects whether an operation with a given `opid` participates in the current state.
+    pub fn is_valid(&self, opid: Opid) -> bool { self.0.is_valid(opid) }
+
     /// Detects whether an operation with a given `opid` is known to the contract.
     ///
     /// # Nota bene
@@ -351,6 +354,7 @@ impl<S: Stock> Ledger<S> {
             self.0.update_state(|state, schema| {
                 state.rollback(transition, &schema.default_api, schema.custom_apis.keys(), &schema.types);
             })?;
+            self.0.mark_invalid(opid);
         }
         Ok(())
     }
@@ -425,7 +429,7 @@ impl<S: Stock> Ledger<S> {
 
         let opid = operation.opid();
 
-        let present = self.0.has_operation(opid);
+        let present = self.0.is_valid(opid);
         let schema = &self.0.articles().schema;
         if !present || force {
             let verified = schema
@@ -451,7 +455,7 @@ impl<S: Stock> Ledger<S> {
     /// It is required to call [`Self::commit_transaction`] after all calls to this method.
     pub fn apply(&mut self, operation: VerifiedOperation) -> Result<Transition, SerializeError> {
         let opid = operation.opid();
-        let present = self.0.has_operation(opid);
+        let present = self.0.is_valid(opid);
         self.apply_internal(opid, operation, present)
     }
 
@@ -475,6 +479,7 @@ impl<S: Stock> Ledger<S> {
         })?;
 
         self.0.add_transition(opid, &transition);
+        self.0.mark_valid(opid);
         Ok(transition)
     }
 
