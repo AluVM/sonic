@@ -64,7 +64,7 @@ pub trait Stock {
     fn new(articles: Articles, conf: Self::Conf) -> Result<Self, IssueError<Self::Error>>
     where Self: Sized;
 
-    /// Loads a contract from a persistence using the provided configuration.
+    /// Loads a contract from persistence using the provided configuration.
     ///
     /// # Panics
     ///
@@ -101,6 +101,8 @@ pub trait Stock {
     ///
     /// # Nota bene
     ///
+    /// Does not include genesis operation id.
+    ///
     /// Positive response doesn't indicate that the operation participates in the current contract
     /// state or in a current valid contract history, which may be exported.
     ///
@@ -118,6 +120,8 @@ pub trait Stock {
     ///
     /// # Nota bene
     ///
+    /// Does not include genesis operation.
+    ///
     /// If the method returns an operation, this doesn't indicate that the operation participates in
     /// the current contract state or in a current valid contract history, which/ may be exported.
     ///
@@ -127,7 +131,8 @@ pub trait Stock {
     ///
     /// # Panics
     ///
-    /// If an `opid` is not present in the contract stash.
+    /// If an `opid` is not present in the contract stash, or it corresponds to the genesis
+    /// operation.
     ///
     /// In order to avoid panics always call the method after calling `has_operation`.
     ///
@@ -145,6 +150,8 @@ pub trait Stock {
     /// stash).
     ///
     /// # Nota bene
+    ///
+    /// Does not include genesis operation.
     ///
     /// Contract stash is a broader concept than contract history. It includes operations which may
     /// not contribute to the current contract state or participate in the contract history, which

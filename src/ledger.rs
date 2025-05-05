@@ -112,6 +112,8 @@ impl<S: Stock> Ledger<S> {
     ///
     /// # Nota bene
     ///
+    /// Does not include genesis operation id.
+    ///
     /// Positive response doesn't indicate that the operation participates in the current contract
     /// state or in a current valid contract history, which may be exported.
     ///
@@ -130,6 +132,8 @@ impl<S: Stock> Ledger<S> {
     ///
     /// # Nota bene
     ///
+    /// Does not include genesis operation.
+    ///
     /// If the method returns an operation, this doesn't indicate that the operation participates in
     /// the current contract state or in a current valid contract history, which/ may be exported.
     ///
@@ -139,7 +143,8 @@ impl<S: Stock> Ledger<S> {
     ///
     /// # Panics
     ///
-    /// If an `opid` is not present in the contract stash.
+    /// If an `opid` is not present in the contract stash, or it corresponds to the genesis
+    /// operation.
     ///
     /// In order to avoid panics always call the method after calling `has_operation`.
     ///
@@ -153,6 +158,8 @@ impl<S: Stock> Ledger<S> {
     /// stash).
     ///
     /// # Nota bene
+    ///
+    /// Does not include genesis operation.
     ///
     /// Contract stash is a broader concept than contract history. It includes operations which may
     /// not contribute to the current contract state or participate in the contract history, which
@@ -172,7 +179,7 @@ impl<S: Stock> Ledger<S> {
     #[inline]
     pub fn operations(&self) -> impl Iterator<Item = (Opid, Operation)> + use<'_, S> { self.0.operations() }
 
-    /// Returns an iterator over all state transitions known to the contract (i.e. the complete
+    /// Returns an iterator over all state transitions known to the contract (i.e., the complete
     /// contract trace).
     ///
     /// # Nota bene
