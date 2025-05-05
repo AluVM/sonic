@@ -25,7 +25,7 @@ use std::fs::File;
 use std::path::PathBuf;
 
 use clap::ValueHint;
-use hypersonic::{Articles, AuthToken, CallParams, IssueParams, Schema};
+use hypersonic::{Articles, AuthToken, CallParams, IssueParams, Issuer};
 use sonic_persist_fs::LedgerDir;
 
 use crate::dump::dump_ledger;
@@ -34,8 +34,8 @@ use crate::dump::dump_ledger;
 pub enum Cmd {
     /// Issue a new HyperSONIC contract
     Issue {
-        /// Schema used to issue the contract
-        schema: PathBuf,
+        /// Issuer used to issue the contract
+        issuer: PathBuf,
 
         /// Parameters and data for the contract
         params: PathBuf,
@@ -71,11 +71,11 @@ pub enum Cmd {
         /// Contract directory
         dir: PathBuf,
 
-        /// List of tokens of authority which should serve as a contract terminals.
+        /// List of authority tokens which should serve as contract terminals.
         #[clap(short, long)]
         terminals: Vec<AuthToken>,
 
-        /// Location to save the deeds file to
+        /// Location to save the deed file to
         output: PathBuf,
     },
 
@@ -109,7 +109,7 @@ pub enum Cmd {
 impl Cmd {
     pub fn exec(self) -> anyhow::Result<()> {
         match self {
-            Cmd::Issue { schema, params, output } => issue(schema, params, output)?,
+            Cmd::Issue { issuer, params, output } => issue(issuer, params, output)?,
             Cmd::Process { articles, dir } => process(articles, dir)?,
             Cmd::State { dir } => state(dir)?,
             Cmd::Call { dir, call: path } => call(dir, path)?,
@@ -121,8 +121,8 @@ impl Cmd {
     }
 }
 
-fn issue(schema: PathBuf, form: PathBuf, output: Option<PathBuf>) -> anyhow::Result<()> {
-    let schema = Schema::load(schema)?;
+fn issue(issuer_file: PathBuf, form: PathBuf, output: Option<PathBuf>) -> anyhow::Result<()> {
+    let issuer = Issuer::load(issuer_file)?;
     let file = File::open(&form)?;
     let params = serde_yaml::from_reader::<_, IssueParams>(file)?;
 
@@ -131,7 +131,7 @@ fn issue(schema: PathBuf, form: PathBuf, output: Option<PathBuf>) -> anyhow::Res
         .with_file_name(params.name.as_str())
         .with_extension("articles");
 
-    let articles = schema.issue(params);
+    let articles = issuer.issue(params);
     articles.save(output)?;
 
     Ok(())

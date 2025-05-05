@@ -34,7 +34,7 @@ use ultrasonic::{
     Input, Issue, Operation, StateCell, StateData, StateValue,
 };
 
-use crate::{Api, Articles, DataCell, MethodName, Schema, StateAtom, StateName};
+use crate::{Api, Articles, DataCell, Issuer, MethodName, StateAtom, StateName};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -115,10 +115,10 @@ impl IssueParams {
     pub fn set_timestamp_now(&mut self) { self.timestamp = Some(Utc::now()); }
 }
 
-impl Schema {
+impl Issuer {
     pub fn start_issue(self, method: impl Into<MethodName>, consensus: Consensus, testnet: bool) -> IssueBuilder {
         let builder = Builder::new(self.call_id(method));
-        IssueBuilder { builder, schema: self, testnet, consensus }
+        IssueBuilder { builder, issuer: self, testnet, consensus }
     }
 
     pub fn start_issue_mainnet(self, method: impl Into<MethodName>, consensus: Consensus) -> IssueBuilder {
@@ -146,7 +146,7 @@ impl Schema {
 #[derive(Clone, Debug)]
 pub struct IssueBuilder {
     builder: Builder,
-    schema: Schema,
+    issuer: Issuer,
     testnet: bool,
     consensus: Consensus,
 }
@@ -155,7 +155,7 @@ impl IssueBuilder {
     pub fn append(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
         self.builder = self
             .builder
-            .add_immutable(name, data, raw, &self.schema.default_api, &self.schema.types);
+            .add_immutable(name, data, raw, &self.issuer.api, &self.issuer.types);
         self
     }
 
@@ -166,9 +166,9 @@ impl IssueBuilder {
         data: StrictVal,
         lock: Option<LibSite>,
     ) -> Self {
-        self.builder =
-            self.builder
-                .add_destructible(name, auth, data, lock, &self.schema.default_api, &self.schema.types);
+        self.builder = self
+            .builder
+            .add_destructible(name, auth, data, lock, &self.issuer.api, &self.issuer.types);
         self
     }
 
@@ -181,14 +181,16 @@ impl IssueBuilder {
             name: ContractName::Named(name.into()),
             issuer: Identity::default(),
         };
-        let genesis = self.builder.issue_genesis(self.schema.codex.codex_id());
-        let issue = Issue {
-            version: default!(),
-            meta,
-            codex: self.schema.codex.clone(),
-            genesis,
-        };
-        Articles { issue, contract_sigs: none!(), schema: self.schema }
+        let genesis = self.builder.issue_genesis(self.issuer.codex.codex_id());
+        let issue = Issue { version: default!(), meta, codex: self.issuer.codex, genesis };
+        Articles {
+            default_api: self.issuer.api,
+            custom_apis: none!(),
+            libs: self.issuer.libs,
+            types: self.issuer.types,
+            issue,
+            sig: None,
+        }
     }
 }
 

@@ -30,7 +30,7 @@ use aora::file::{FileAoraIndex, FileAoraMap, FileAuraMap};
 use aora::{AoraIndex, AoraMap, AuraMap, TransactionalMap};
 use hypersonic::{
     AcceptError, Articles, AuthToken, CellAddr, EffectiveState, IssueError, Ledger, LoadError, MergeError, Operation,
-    Opid, RawState, Schema, Stock, StockError, Transition,
+    Opid, RawState, Stock, StockError, Transition,
 };
 use strict_encoding::{SerializeError, StreamReader, StreamWriter, StrictReader, StrictWriter};
 
@@ -135,7 +135,7 @@ impl Stock for StockFs {
 
         let articles = Articles::load(path.join(Self::FILENAME_ARTICLES)).map_err(LoadError::ArticlesPersistence)?;
         let raw = RawState::load(path.join(Self::FILENAME_STATE_RAW)).map_err(LoadError::StatePersistence)?;
-        let state = EffectiveState::with(raw, &articles.schema);
+        let state = EffectiveState::with(raw, &articles);
 
         Ok(Self { path, stash, trace, spent, read, articles, state, valid })
     }
@@ -179,13 +179,13 @@ impl Stock for StockFs {
         Ok(())
     }
 
-    fn update_state<R>(&mut self, f: impl FnOnce(&mut EffectiveState, &Schema) -> R) -> Result<R, SerializeError> {
-        let res = f(&mut self.state, &self.articles.schema);
+    fn update_state<R>(&mut self, f: impl FnOnce(&mut EffectiveState, &Articles) -> R) -> Result<R, SerializeError> {
+        let res = f(&mut self.state, &self.articles);
         self.state
             .raw
             .save(self.path.join(Self::FILENAME_STATE_RAW))?;
         self.state
-            .recompute(&self.articles.schema.default_api, self.articles.schema.custom_apis.keys());
+            .recompute(&self.articles.default_api, &self.articles.custom_apis);
         Ok(res)
     }
 

@@ -44,14 +44,13 @@ pub fn dump_articles(articles: &Articles, dst: &Path) -> anyhow::Result<Opid> {
     serde_yaml::to_writer(&out, &articles.issue.codex)?;
 
     let out = File::create_new(dst.join("api-default.yaml"))?;
-    serde_yaml::to_writer(&out, &articles.schema.default_api)?;
+    serde_yaml::to_writer(&out, &articles.default_api)?;
 
-    for (api, _) in &articles.schema.custom_apis {
+    for api in &articles.custom_apis {
         let out = File::create_new(dst.join(format!("api-{}.yaml", api.name().expect("invalid api"))))?;
         serde_yaml::to_writer(&out, &api)?;
     }
 
-    // TODO: Process all content sigs
     // TODO: Process type system
     // TODO: Process AluVM libraries
 

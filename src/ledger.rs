@@ -28,7 +28,7 @@ use std::io;
 use amplify::hex::ToHex;
 use indexmap::IndexSet;
 use sonic_callreq::MethodName;
-use sonicapi::{MergeError, NamedState, OpBuilder, Schema};
+use sonicapi::{MergeError, NamedState, OpBuilder};
 use strict_encoding::{
     DecodeError, ReadRaw, SerializeError, StrictDecode, StrictEncode, StrictReader, StrictWriter, WriteRaw,
 };
@@ -76,15 +76,6 @@ impl<S: Stock> Ledger<S> {
     pub fn config(&self) -> S::Conf { self.0.config() }
 
     pub fn stock(&self) -> &S { &self.0 }
-
-    /// Provides [`Schema`] object, which includes codex, under which the contract was issued, and
-    /// interfaces for the contract under that codex.
-    ///
-    /// # Blocking I/O
-    ///
-    /// This call MUST NOT perform any I/O operations and MUST BE a non-blocking.
-    #[inline]
-    pub fn schema(&self) -> &Schema { &self.0.articles().schema }
 
     /// Provides contract id.
     ///
@@ -412,8 +403,8 @@ impl<S: Stock> Ledger<S> {
                     let _ = transition.destroyed.remove(&addr);
                 }
             }
-            self.0.update_state(|state, schema| {
-                state.rollback(transition, &schema.default_api, schema.custom_apis.keys(), &schema.types);
+            self.0.update_state(|state, articles| {
+                state.rollback(transition, &articles.default_api, &articles.custom_apis, &articles.types);
             })?;
             self.0.mark_invalid(opid);
         }
@@ -439,7 +430,7 @@ impl<S: Stock> Ledger<S> {
     }
 
     pub fn start_deed(&mut self, method: impl Into<MethodName>) -> DeedBuilder<'_, S> {
-        let builder = OpBuilder::new(self.contract_id(), self.0.articles().schema.call_id(method));
+        let builder = OpBuilder::new(self.contract_id(), self.0.articles().call_id(method));
         DeedBuilder { builder, ledger: self }
     }
 
@@ -483,11 +474,12 @@ impl<S: Stock> Ledger<S> {
         let opid = operation.opid();
 
         let present = self.0.is_valid(opid);
-        let schema = &self.0.articles().schema;
+        let articles = self.0.articles();
         if !present || force {
-            let verified = schema
+            let verified = articles
+                .issue
                 .codex
-                .verify(self.contract_id(), operation, &self.0.state().raw, schema)?;
+                .verify(self.contract_id(), operation, &self.0.state().raw, articles)?;
             self.apply_internal(opid, verified, present && !force)?;
         }
 
@@ -531,7 +523,7 @@ impl<S: Stock> Ledger<S> {
         }
 
         let transition = self.0.update_state(|state, schema| {
-            state.apply(operation, &schema.default_api, schema.custom_apis.keys(), &schema.types)
+            state.apply(operation, &schema.default_api, &schema.custom_apis, &schema.types)
         })?;
 
         self.0.add_transition(opid, &transition);

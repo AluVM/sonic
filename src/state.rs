@@ -25,7 +25,7 @@ use alloc::collections::BTreeMap;
 use std::mem;
 
 use amplify::confinement::{LargeOrdMap, SmallOrdMap};
-use sonicapi::{Api, Articles, Schema, StateAtom, StateName};
+use sonicapi::{Api, Articles, StateAtom, StateName};
 use strict_encoding::{StrictDeserialize, StrictSerialize, TypeName};
 use strict_types::{StrictVal, TypeSystem};
 use ultrasonic::{AuthToken, CallError, CellAddr, Memory, Opid, StateCell, StateData, StateValue, VerifiedOperation};
@@ -63,36 +63,30 @@ impl EffectiveState {
             .genesis
             .to_operation(articles.issue.contract_id());
 
-        let verified =
-            articles
-                .schema
-                .codex
-                .verify(articles.issue.contract_id(), genesis, &state.raw, &articles.schema)?;
+        let verified = articles
+            .issue
+            .codex
+            .verify(articles.issue.contract_id(), genesis, &state.raw, articles)?;
 
         // We do not need state transition for genesis.
-        let _ = state.apply(
-            verified,
-            &articles.schema.default_api,
-            articles.schema.custom_apis.keys(),
-            &articles.schema.types,
-        );
+        let _ = state.apply(verified, &articles.default_api, &articles.custom_apis, &articles.types);
 
         Ok(state)
     }
 
-    /// NB: Do not forget to call `recompute state` after.
-    pub fn with(raw: RawState, schema: &Schema) -> Self {
+    /// NB: Remember to call `recompute state` after.
+    pub fn with(raw: RawState, articles: &Articles) -> Self {
         let mut me = Self { raw, main: none!(), aux: none!() };
-        me.main = AdaptedState::with(&me.raw, &schema.default_api, &schema.types);
+        me.main = AdaptedState::with(&me.raw, &articles.default_api, &articles.types);
         me.aux.clear();
-        for api in schema.custom_apis.keys() {
+        for api in &articles.custom_apis {
             let Some(name) = api.name() else {
                 continue;
             };
-            let state = AdaptedState::with(&me.raw, api, &schema.types);
+            let state = AdaptedState::with(&me.raw, api, &articles.types);
             me.aux.insert(name.clone(), state);
         }
-        me.recompute(&schema.default_api, schema.custom_apis.keys());
+        me.recompute(&articles.default_api, &articles.custom_apis);
         me
     }
 

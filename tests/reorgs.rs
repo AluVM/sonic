@@ -36,7 +36,7 @@ use aluvm::{CoreConfig, LibSite};
 use amplify::num::u256;
 use commit_verify::{Digest, Sha256};
 use hypersonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc};
-use hypersonic::{Api, ApiInner, DestructibleApi, Schema};
+use hypersonic::{Api, ApiInner, DestructibleApi};
 use indexmap::{indexset, IndexSet};
 use petgraph::dot::{Config, Dot};
 use petgraph::graph::EdgeReference;
@@ -45,7 +45,7 @@ use petgraph::Graph;
 use rand::rng;
 use rand::seq::SliceRandom;
 use sonic_persist_fs::LedgerDir;
-use sonicapi::IssueParams;
+use sonicapi::{IssueParams, Issuer};
 use sonix::dump_ledger;
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
 use ultrasonic::{AuthToken, CellAddr, Codex, Consensus, Identity, Operation};
@@ -171,7 +171,7 @@ fn setup(name: &str) -> LedgerDir {
     let codex = codex();
     let api = api();
 
-    let issuer = Schema::new(codex, api, [libs::success()], types.type_system());
+    let issuer = Issuer::new(codex, api, [libs::success()], types.type_system());
 
     let seed = &[0xCA; 30][..];
     let mut auth = Sha256::digest(seed);

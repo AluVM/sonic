@@ -24,118 +24,64 @@
 use std::io;
 
 use aluvm::{Lib, LibId};
-use amplify::confinement::{SmallOrdMap, SmallOrdSet, TinyOrdMap};
+use amplify::confinement::SmallOrdSet;
 use amplify::hex::ToHex;
-use commit_verify::ReservedBytes;
-use strict_encoding::{
-    DecodeError, ReadRaw, StrictDecode, StrictEncode, StrictReader, StrictWriter, TypeName, WriteRaw,
-};
+use sonic_callreq::MethodName;
+use strict_encoding::{DecodeError, ReadRaw, StrictDecode, StrictEncode, StrictReader, StrictWriter, WriteRaw};
 use strict_types::TypeSystem;
 use ultrasonic::{CallId, Codex, LibRepo};
 
-use crate::sigs::ContentSigs;
-use crate::{Annotations, Api, MergeError, MethodName, LIB_NAME_SONIC};
+use crate::sigs::SigBlob;
+use crate::{Api, LIB_NAME_SONIC};
 
-pub const SCHEMA_MAGIC_NUMBER: [u8; 8] = *b"COISSUER";
-pub const SCHEMA_VERSION: [u8; 2] = [0x00, 0x01];
+pub const ISSUER_MAGIC_NUMBER: [u8; 8] = *b"COISSUER";
+pub const ISSUER_VERSION: [u8; 2] = [0x00, 0x01];
 
-/// A schema contains information required for the creation of a contract.
+/// An issuer contains information required for the creation of a contract.
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_SONIC)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
-pub struct Schema {
+pub struct Issuer {
     pub codex: Codex,
-    pub default_api: Api,
-    pub default_api_sigs: ContentSigs,
-    pub custom_apis: SmallOrdMap<Api, ContentSigs>,
+    pub api: Api,
     pub libs: SmallOrdSet<Lib>,
     pub types: TypeSystem,
-    pub codex_sigs: ContentSigs,
-    pub annotations: TinyOrdMap<Annotations, ContentSigs>,
-    pub reserved: ReservedBytes<8>,
+    /// Signature of the `codex.developer` over the API Id.
+    pub sig: Option<SigBlob>,
 }
 
-impl LibRepo for Schema {
+impl LibRepo for Issuer {
     fn get_lib(&self, lib_id: LibId) -> Option<&Lib> { self.libs.iter().find(|lib| lib.lib_id() == lib_id) }
 }
 
-impl Schema {
+impl Issuer {
     pub fn new(codex: Codex, api: Api, libs: impl IntoIterator<Item = Lib>, types: TypeSystem) -> Self {
-        // TODO: Ensure default API is unnamed?
-        Schema {
+        Issuer {
             codex,
-            default_api: api,
-            default_api_sigs: none!(),
-            custom_apis: none!(),
+            api,
             libs: SmallOrdSet::from_iter_checked(libs),
             types,
-            codex_sigs: none!(),
-            annotations: none!(),
-            reserved: zero!(),
+            sig: none!(),
         }
     }
 
-    pub fn api(&self, name: &TypeName) -> &Api {
-        self.custom_apis
-            .keys()
-            .find(|api| api.name() == Some(name))
-            .expect("API is not known")
-    }
-
     pub fn call_id(&self, method: impl Into<MethodName>) -> CallId {
-        self.default_api
+        self.api
             .verifier(method)
             .expect("calling to method absent in Codex API")
     }
 
-    pub fn merge(&mut self, other: Self) -> Result<bool, MergeError> {
-        if self.codex.codex_id() != other.codex.codex_id() {
-            return Err(MergeError::CodexMismatch);
-        }
-        self.codex_sigs.merge(other.codex_sigs);
-
-        if self.default_api != other.default_api {
-            let _ = self
-                .custom_apis
-                .insert(other.default_api, other.default_api_sigs);
-        } else {
-            self.default_api_sigs.merge(other.default_api_sigs);
-        }
-
-        for (api, other_sigs) in other.custom_apis {
-            let Ok(entry) = self.custom_apis.entry(api) else {
-                continue;
-            };
-            entry.or_default().merge(other_sigs);
-        }
-
-        // NB: We must not fail here, since otherwise it opens an attack vector on invalidating valid
-        // consignments by adding too many libs
-        // TODO: Return warnings instead
-        let _ = self.libs.extend(other.libs);
-        let _ = self.types.extend(other.types);
-
-        for (annotation, other_sigs) in other.annotations {
-            let Ok(entry) = self.annotations.entry(annotation) else {
-                continue;
-            };
-            entry.or_default().merge(other_sigs);
-        }
-
-        Ok(true)
-    }
-
     pub fn decode(reader: &mut StrictReader<impl ReadRaw>) -> Result<Self, DecodeError> {
         let magic_bytes = <[u8; 8]>::strict_decode(reader)?;
-        if magic_bytes != SCHEMA_MAGIC_NUMBER {
+        if magic_bytes != ISSUER_MAGIC_NUMBER {
             return Err(DecodeError::DataIntegrityError(format!(
                 "wrong contract issuer schema magic bytes {}",
                 magic_bytes.to_hex()
             )));
         }
         let version = <[u8; 2]>::strict_decode(reader)?;
-        if version != SCHEMA_VERSION {
+        if version != ISSUER_VERSION {
             return Err(DecodeError::DataIntegrityError(format!(
                 "unsupported contract issuer schema version {}",
                 u16::from_be_bytes(version)
@@ -146,9 +92,9 @@ impl Schema {
 
     pub fn encode(&self, mut writer: StrictWriter<impl WriteRaw>) -> io::Result<()> {
         // This is compatible with BinFile
-        writer = SCHEMA_MAGIC_NUMBER.strict_encode(writer)?;
+        writer = ISSUER_MAGIC_NUMBER.strict_encode(writer)?;
         // Version
-        writer = SCHEMA_VERSION.strict_encode(writer)?;
+        writer = ISSUER_VERSION.strict_encode(writer)?;
         self.strict_encode(writer)?;
         Ok(())
     }
@@ -163,10 +109,11 @@ mod _fs {
     use amplify::confinement::U24 as U24MAX;
     use strict_encoding::{DeserializeError, StreamReader, StreamWriter, StrictReader, StrictWriter};
 
-    use super::Schema;
+    use crate::Issuer;
 
-    impl Schema {
+    impl Issuer {
         pub fn load(path: impl AsRef<Path>) -> Result<Self, DeserializeError> {
+            // TODO: Use BinFile
             let file = File::open(path)?;
             let mut reader = StrictReader::with(StreamReader::new::<U24MAX>(file));
             let me = Self::decode(&mut reader)?;

@@ -56,7 +56,7 @@ extern crate serde;
 mod state;
 mod api;
 mod adaptors;
-mod schema;
+mod issuer;
 mod articles;
 mod builders;
 mod util;
@@ -68,7 +68,7 @@ pub use api::{
 };
 pub use articles::{Articles, MergeError, ARTICLES_MAGIC_NUMBER, ARTICLES_VERSION};
 pub use builders::{Builder, BuilderRef, CoreParams, IssueParams, NamedState, OpBuilder, OpBuilderRef};
-pub use schema::{Schema, SCHEMA_MAGIC_NUMBER, SCHEMA_VERSION};
+pub use issuer::{Issuer, ISSUER_MAGIC_NUMBER, ISSUER_VERSION};
 pub use sonic_callreq::*;
 pub use state::{DataCell, StateAtom, StateTy, StructData};
 pub use ultrasonic::*;

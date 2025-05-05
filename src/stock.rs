@@ -24,7 +24,7 @@
 use core::error::Error as StdError;
 use std::io;
 
-use sonicapi::{MergeError, Schema};
+use sonicapi::MergeError;
 use strict_encoding::{DeserializeError, SerializeError};
 use ultrasonic::{CallError, CellAddr, ContractName, Operation, Opid};
 
@@ -301,7 +301,7 @@ pub trait Stock {
     ///
     /// Specific persistence providers implementing this method MUST guarantee to always persist an
     /// updated state after calling the callback `f` method.
-    fn update_state<R>(&mut self, f: impl FnOnce(&mut EffectiveState, &Schema) -> R) -> Result<R, SerializeError>;
+    fn update_state<R>(&mut self, f: impl FnOnce(&mut EffectiveState, &Articles) -> R) -> Result<R, SerializeError>;
 
     /// Adds operation to the contract data.
     ///

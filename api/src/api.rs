@@ -386,6 +386,9 @@ mod _baid4 {
     }
 }
 
+#[cfg(feature = "serde")]
+ultrasonic::impl_serde_str_bin_wrapper!(ApiId, Bytes32);
+
 /// API for append-only state.
 ///
 /// API covers two main functions: taking structured data from the user input and _building_ a valid

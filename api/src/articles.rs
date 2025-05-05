@@ -23,14 +23,16 @@
 
 use std::io;
 
+use aluvm::{Lib, LibId};
+use amplify::confinement::SmallOrdSet;
 use amplify::hex::ToHex;
-use strict_encoding::{
-    DecodeError, ReadRaw, StrictDecode, StrictEncode, StrictReader, StrictWriter, TypeName, WriteRaw,
-};
-use ultrasonic::{ContractId, Issue, Opid};
+use sonic_callreq::MethodName;
+use strict_encoding::{DecodeError, ReadRaw, StrictDecode, StrictEncode, StrictReader, StrictWriter, WriteRaw};
+use strict_types::TypeSystem;
+use ultrasonic::{CallId, ContractId, Issue, LibRepo, Opid};
 
-use crate::sigs::ContentSigs;
-use crate::{Api, Schema, LIB_NAME_SONIC};
+use crate::sigs::SigBlob;
+use crate::{Api, LIB_NAME_SONIC};
 
 pub const ARTICLES_MAGIC_NUMBER: [u8; 8] = *b"ARTICLES";
 pub const ARTICLES_VERSION: [u8; 2] = [0x00, 0x01];
@@ -41,9 +43,13 @@ pub const ARTICLES_VERSION: [u8; 2] = [0x00, 0x01];
 #[strict_type(lib = LIB_NAME_SONIC)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct Articles {
+    pub default_api: Api,
+    pub custom_apis: SmallOrdSet<Api>,
+    pub libs: SmallOrdSet<Lib>,
+    pub types: TypeSystem,
+    /// Signature from the contract issuer (`issue.meta.issuer`) over the articles id.
+    pub sig: Option<SigBlob>,
     #[cfg_attr(feature = "serde", serde(flatten))]
-    pub schema: Schema,
-    pub contract_sigs: ContentSigs,
     pub issue: Issue,
 }
 
@@ -52,17 +58,21 @@ impl Articles {
 
     pub fn genesis_opid(&self) -> Opid { self.issue.genesis_opid() }
 
-    pub fn api(&self, name: &TypeName) -> &Api { self.schema.api(name) }
-
     pub fn merge(&mut self, other: Self) -> Result<bool, MergeError> {
         if self.contract_id() != other.contract_id() {
             return Err(MergeError::ContractMismatch);
         }
 
-        self.schema.merge(other.schema)?;
-        self.contract_sigs.merge(other.contract_sigs);
+        // TODO: Validate the signature and determine its timestamps
+        //       use the latest timestamp
 
         Ok(true)
+    }
+
+    pub fn call_id(&self, method: impl Into<MethodName>) -> CallId {
+        self.default_api
+            .verifier(method)
+            .expect("calling to method absent in Codex API")
     }
 
     pub fn decode(reader: &mut StrictReader<impl ReadRaw>) -> Result<Self, DecodeError> {
@@ -91,6 +101,10 @@ impl Articles {
         self.strict_encode(writer)?;
         Ok(())
     }
+}
+
+impl LibRepo for Articles {
+    fn get_lib(&self, lib_id: LibId) -> Option<&Lib> { self.libs.iter().find(|lib| lib.lib_id() == lib_id) }
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Display, Error)]

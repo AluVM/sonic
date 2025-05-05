@@ -35,8 +35,9 @@ use aluvm::{CoreConfig, LibSite};
 use amplify::num::u256;
 use commit_verify::{Digest, Sha256};
 use hypersonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc, EmbeddedReaders};
-use hypersonic::{Api, ApiInner, AppendApi, DestructibleApi, Schema};
+use hypersonic::{Api, ApiInner, AppendApi, DestructibleApi};
 use sonic_persist_fs::LedgerDir;
+use sonicapi::Issuer;
 use strict_types::{SemId, StrictVal};
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
 use ultrasonic::{AuthToken, CellAddr, Codex, Consensus, Identity};
@@ -122,7 +123,7 @@ fn main() {
     let api = api();
 
     // Creating DAO with three participants
-    let issuer = Schema::new(codex, api, [libs::success()], types.type_system());
+    let issuer = Issuer::new(codex, api, [libs::success()], types.type_system());
     let filename = "examples/dao/data/SimpleDAO.issuer";
     fs::remove_file(filename).ok();
     issuer

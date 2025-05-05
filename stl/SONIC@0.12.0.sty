@@ -1,5 +1,5 @@
 {-
-  Id: stl:YxpNy3lt-p18T1dX-cx9CNsZ-2kkw7ID-yld_fdM-BpgGM1U#copper-nirvana-billy
+  Id: stl:xm0KeLqT-zDFncty-tGBPw72-iLoBpep-RENST9Q-nfo9FQM#quota-helena-maxwell
   Name: SONIC
   Version: 0.12.0
   Description: Standard library for formally-verifiable distributed contracts
@@ -17,10 +17,8 @@ import FiniteField#report-canal-convert
   use Fe256#palace-mixer-visual
 
 import Std#delete-roman-hair
-  use AlphaCaps#picnic-soprano-aurora
   use AsciiPrintable#ultra-sunset-format
   use Bool#oxygen-complex-duet
-  use AlphaNumDash#sponsor-snake-nice
   use AlphaCapsNum#aladdin-zebra-marble
   use AlphaNumLodash#percent-bingo-caesar
   use AlphaCapsLodash#duet-hammer-labor
@@ -74,12 +72,6 @@ import StrictTypes#henry-heart-survive
   use TypeSystem#adrian-boris-sponsor
 
 
-@mnemonic(domino-waiter-orlando)
-data AnnotationName    : Std.AlphaCaps, [Std.AlphaNumDash ^ ..0xfe]
-
-@mnemonic(phantom-habitat-pegasus)
-data Annotations       : {AnnotationName -> ^ ..0xff [Byte]}
-
 @mnemonic(judge-turtle-spell)
 data Api               : embedded#1 ApiInnerEmbeddedProc | (|)
 
@@ -104,16 +96,16 @@ data AppendApiEmbeddedProc : semId StrictTypes.SemId
                        , published Std.Bool
                        , adaptor EmbeddedImmutable
 
-@mnemonic(lunch-exhibit-email)
-data Articles          : schema Schema
-                       , contractSigs ContentSigs
+@mnemonic(bruno-turbo-cannon)
+data Articles          : defaultApi Api
+                       , customApis {Api}
+                       , libs {AluVM.Lib}
+                       , types StrictTypes.TypeSystem
+                       , sig SigBlob?
                        , issue UltraSONIC.Issue
 
 @mnemonic(alpha-balsa-verona)
 data CallState         : method StrictTypes.VariantName, destructible StrictTypes.VariantName?
-
-@mnemonic(tango-helena-helium)
-data ContentSigs       : {UltraSONIC.Identity -> ^ ..0xa SigBlob}
 
 @mnemonic(cliff-mirror-table)
 data DestructibleApiEmbeddedProc : semId StrictTypes.SemId
@@ -133,17 +125,6 @@ data EmbeddedReaders   : count#1 StrictTypes.VariantName
                        | listV#32 StrictTypes.VariantName
                        | setV#34 StrictTypes.VariantName
                        | mapV2u#48 StrictTypes.VariantName
-
-@mnemonic(gloria-field-ford)
-data Schema            : codex UltraSONIC.Codex
-                       , defaultApi Api
-                       , defaultApiSigs ContentSigs
-                       , customApis {Api -> ContentSigs}
-                       , libs {AluVM.Lib}
-                       , types StrictTypes.TypeSystem
-                       , codexSigs ContentSigs
-                       , annotations {Annotations -> ^ ..0xff ContentSigs}
-                       , reserved CommitVerify.ReservedBytes8
 
 @mnemonic(insect-cello-avalon)
 data SigBlob           : [Byte ^ 1..0x1000]
