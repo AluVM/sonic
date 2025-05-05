@@ -226,7 +226,7 @@ impl<S: Stock> Ledger<S> {
         // Version
         writer = LEDGER_VERSION.strict_encode(writer)?;
         writer = self.contract_id().strict_encode(writer)?;
-        self.export_aux(terminals, writer, |_, w| Ok(w))
+        self.export_aux(terminals, writer, |_, _, w| Ok(w))
     }
 
     // TODO: Return statistics
@@ -234,13 +234,16 @@ impl<S: Stock> Ledger<S> {
         &self,
         terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
         mut writer: StrictWriter<W>,
-        mut aux: impl FnMut(Opid, StrictWriter<W>) -> io::Result<StrictWriter<W>>,
+        mut aux: impl FnMut(Opid, &Operation, StrictWriter<W>) -> io::Result<StrictWriter<W>>,
     ) -> io::Result<()> {
+        let contract_id = self.contract_id();
+
         let mut queue = terminals
             .into_iter()
             .map(|terminal| self.0.state().addr(*terminal.borrow()).opid)
             .collect::<BTreeSet<_>>();
-        let genesis_opid = self.0.articles().issue.genesis_opid();
+        let articles = self.0.articles();
+        let genesis_opid = articles.issue.genesis_opid();
         queue.remove(&genesis_opid);
         let mut opids = queue.clone();
         while let Some(opid) = queue.pop_first() {
@@ -256,15 +259,15 @@ impl<S: Stock> Ledger<S> {
         // TODO: Include all operations defining published state
 
         // Write articles
-        writer = self.0.articles().strict_encode(writer)?;
-        writer = aux(genesis_opid, writer)?;
+        writer = articles.strict_encode(writer)?;
+        writer = aux(genesis_opid, &articles.issue.genesis.to_operation(contract_id), writer)?;
         // Stream operations
         for (opid, op) in self.0.operations() {
             if !opids.remove(&opid) {
                 continue;
             }
             writer = op.strict_encode(writer)?;
-            writer = aux(opid, writer)?;
+            writer = aux(opid, &op, writer)?;
         }
 
         debug_assert!(
