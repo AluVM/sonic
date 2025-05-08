@@ -336,15 +336,17 @@ impl<S: Stock> Ledger<S> {
         // Get all subsequent operations
         loop {
             let mut count = 0usize;
-            for mut index in 0..chain.len() {
+            for index in 0..chain.len() {
                 let opid = chain[index];
                 let op = self.0.operation(opid);
                 for no in 0..op.destructible.len_u16() {
                     let addr = CellAddr::new(opid, no);
                     let Some(spent) = self.0.spent_by(addr) else { continue };
+                    if chain.contains(&spent) {
+                        continue;
+                    }
                     chain.push_front(spent);
                     count += 1;
-                    index += 1;
                 }
             }
             if count == 0 {
