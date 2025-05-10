@@ -36,6 +36,7 @@ use crate::Transition;
 /// Strict types id for the library providing data types for RGB consensus.
 pub const LIB_ID_SONIC: &str = "stl:ZZXTNLne-OlEhPFg-CJ~5vJp-GWvAFvO-wesM6i8-p0VDc0w#wolf-byte-zero";
 
+#[allow(clippy::result_large_err)]
 fn _sonic_stl() -> Result<TypeLib, CompileError> {
     LibBuilder::with(libname!(LIB_NAME_SONIC), [
         std_stl().to_dependency_types(),
