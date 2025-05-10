@@ -206,6 +206,9 @@ impl<S: Stock> Ledger<S> {
     #[inline]
     pub fn trace(&self) -> impl Iterator<Item = (Opid, Transition)> + use<'_, S> { self.0.trace() }
 
+    #[inline]
+    pub fn spent_by(&self, addr: CellAddr) -> Option<Opid> { self.0.spent_by(addr) }
+
     pub fn export_all(&self, mut writer: StrictWriter<impl WriteRaw>) -> io::Result<()> {
         // Write articles
         writer = self.0.articles().strict_encode(writer)?;
