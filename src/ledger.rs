@@ -209,6 +209,54 @@ impl<S: Stock> Ledger<S> {
     #[inline]
     pub fn spent_by(&self, addr: CellAddr) -> Option<Opid> { self.0.spent_by(addr) }
 
+    pub fn ancestors(&self, opids: impl IntoIterator<Item = Opid>) -> impl Iterator<Item = Opid> {
+        let mut chain = opids.into_iter().collect::<VecDeque<_>>();
+        // Get all subsequent operations
+        loop {
+            let mut count = 0usize;
+            for index in 0..chain.len() {
+                let opid = chain[index];
+                let op = self.0.operation(opid);
+                for inp in &op.destroying {
+                    if chain.contains(&inp.addr.opid) {
+                        continue;
+                    }
+                    chain.push_front(inp.addr.opid);
+                    count += 1;
+                }
+            }
+            if count == 0 {
+                break;
+            }
+        }
+        chain.into_iter()
+    }
+
+    pub fn descendants(&self, opids: impl IntoIterator<Item = Opid>) -> impl Iterator<Item = Opid> {
+        let mut chain = opids.into_iter().collect::<VecDeque<_>>();
+        // Get all subsequent operations
+        loop {
+            let mut count = 0usize;
+            for index in 0..chain.len() {
+                let opid = chain[index];
+                let op = self.0.operation(opid);
+                for no in 0..op.destructible.len_u16() {
+                    let addr = CellAddr::new(opid, no);
+                    let Some(spent) = self.0.spent_by(addr) else { continue };
+                    if chain.contains(&spent) {
+                        continue;
+                    }
+                    chain.push_front(spent);
+                    count += 1;
+                }
+            }
+            if count == 0 {
+                break;
+            }
+        }
+        chain.into_iter()
+    }
+
     pub fn export_all(&self, mut writer: StrictWriter<impl WriteRaw>) -> io::Result<()> {
         // Write articles
         writer = self.0.articles().strict_encode(writer)?;
@@ -335,29 +383,7 @@ impl<S: Stock> Ledger<S> {
     }
 
     pub fn rollback(&mut self, opids: impl IntoIterator<Item = Opid>) -> Result<(), SerializeError> {
-        let mut chain = opids.into_iter().collect::<VecDeque<_>>();
-        // Get all subsequent operations
-        loop {
-            let mut count = 0usize;
-            for index in 0..chain.len() {
-                let opid = chain[index];
-                let op = self.0.operation(opid);
-                for no in 0..op.destructible.len_u16() {
-                    let addr = CellAddr::new(opid, no);
-                    let Some(spent) = self.0.spent_by(addr) else { continue };
-                    if chain.contains(&spent) {
-                        continue;
-                    }
-                    chain.push_front(spent);
-                    count += 1;
-                }
-            }
-            if count == 0 {
-                break;
-            }
-        }
-
-        for opid in chain {
+        for opid in self.descendants(opids) {
             let transition = self.0.transition(opid);
             self.0.update_state(|state, schema| {
                 state.rollback(transition, &schema.default_api, schema.custom_apis.keys(), &schema.types);
