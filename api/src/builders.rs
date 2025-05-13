@@ -42,12 +42,40 @@ pub struct NamedState<T> {
     pub state: T,
 }
 
+impl NamedState<DataCell> {
+    pub fn new(name: impl Into<StateName>, data: impl Into<StrictVal>, auth: impl Into<AuthToken>) -> Self {
+        NamedState { name: name.into(), state: DataCell::new(data, auth) }
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct CoreParams {
     pub method: MethodName,
     pub global: Vec<NamedState<StateAtom>>,
     pub owned: Vec<NamedState<DataCell>>,
+}
+
+impl CoreParams {
+    pub fn new(method: impl Into<MethodName>) -> Self {
+        Self { method: method.into(), global: none!(), owned: none!() }
+    }
+
+    pub fn add_global(mut self, name: impl Into<StateName>, state: impl Into<StateAtom>) -> Self {
+        self.global
+            .push(NamedState { name: name.into(), state: state.into() });
+        self
+    }
+
+    pub fn add_owned(
+        mut self,
+        name: impl Into<StateName>,
+        data: impl Into<StrictVal>,
+        auth: impl Into<AuthToken>,
+    ) -> Self {
+        self.owned.push(NamedState::new(name, data, auth));
+        self
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]

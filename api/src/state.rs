@@ -50,3 +50,9 @@ pub struct DataCell {
     pub auth: AuthToken,
     pub lock: Option<LibSite>,
 }
+
+impl DataCell {
+    pub fn new(data: impl Into<StrictVal>, auth: impl Into<AuthToken>) -> Self {
+        Self { data: data.into(), auth: auth.into(), lock: None }
+    }
+}
