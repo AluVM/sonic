@@ -431,4 +431,55 @@ mod test {
             ])
         );
     }
+
+    #[test]
+    fn arithm_fungible() {
+        let mut calc = EmbeddedArithm::Fungible.calculator();
+        let mut acc = 0u64;
+        for n in 0..5u64 {
+            calc.accumulate(&svnum!(n)).unwrap();
+            acc += n;
+        }
+        assert_eq!(calc.diff().unwrap(), [svnum!(acc)]);
+        assert!(calc.is_satisfied(&svnum!(acc)));
+        assert!(calc.is_satisfied(&svnum!(acc - 1)));
+        assert!(!calc.is_satisfied(&svnum!(acc + 1)));
+
+        for n in 0..2u64 {
+            calc.lessen(&svnum!(n)).unwrap();
+            acc -= n;
+        }
+
+        assert_eq!(calc.diff().unwrap(), [svnum!(acc)]);
+        assert!(calc.is_satisfied(&svnum!(acc)));
+        assert!(calc.is_satisfied(&svnum!(acc - 1)));
+        assert!(!calc.is_satisfied(&svnum!(acc + 1)));
+    }
+
+    #[test]
+    fn arithm_nonfungible() {
+        let mut calc = EmbeddedArithm::NonFungible.calculator();
+        for n in 0..5u64 {
+            calc.accumulate(&svnum!(n)).unwrap();
+        }
+        assert_eq!(calc.diff().unwrap(), [svnum!(0u64), svnum!(1u64), svnum!(2u64), svnum!(3u64), svnum!(4u64)]);
+        assert!(calc.is_satisfied(&svnum!(0u64)));
+        assert!(calc.is_satisfied(&svnum!(1u64)));
+        assert!(calc.is_satisfied(&svnum!(2u64)));
+        assert!(calc.is_satisfied(&svnum!(3u64)));
+        assert!(calc.is_satisfied(&svnum!(4u64)));
+        assert!(!calc.is_satisfied(&svnum!(5u64)));
+
+        for n in 0..2u64 {
+            calc.lessen(&svnum!(n)).unwrap();
+        }
+
+        assert_eq!(calc.diff().unwrap(), [svnum!(2u64), svnum!(3u64), svnum!(4u64)]);
+        assert!(!calc.is_satisfied(&svnum!(0u64)));
+        assert!(!calc.is_satisfied(&svnum!(1u64)));
+        assert!(calc.is_satisfied(&svnum!(2u64)));
+        assert!(calc.is_satisfied(&svnum!(3u64)));
+        assert!(calc.is_satisfied(&svnum!(4u64)));
+        assert!(!calc.is_satisfied(&svnum!(5u64)));
+    }
 }
