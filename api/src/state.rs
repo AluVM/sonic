@@ -35,6 +35,24 @@ pub struct StateAtom {
     pub unverified: Option<StrictVal>,
 }
 
+impl StateAtom {
+    #[inline]
+    pub fn new_verified(val: impl Into<StrictVal>) -> Self { Self { verified: val.into(), unverified: None } }
+
+    #[inline]
+    pub fn new_unverified(val: impl Into<StrictVal>) -> Self {
+        Self { verified: StrictVal::Unit, unverified: Some(val.into()) }
+    }
+
+    #[inline]
+    pub fn new(verified: impl Into<StrictVal>, unverified: impl Into<StrictVal>) -> Self {
+        Self {
+            verified: verified.into(),
+            unverified: Some(unverified.into()),
+        }
+    }
+}
+
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct StructData {
@@ -52,6 +70,7 @@ pub struct DataCell {
 }
 
 impl DataCell {
+    #[inline]
     pub fn new(data: impl Into<StrictVal>, auth: impl Into<AuthToken>) -> Self {
         Self { data: data.into(), auth: auth.into(), lock: None }
     }
