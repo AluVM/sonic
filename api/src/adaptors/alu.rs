@@ -24,8 +24,6 @@
 #![allow(unused_variables)]
 // TODO: Implement AluVM-based APIs.
 
-use std::cmp::Ordering;
-
 use aluvm::LibSite;
 use amplify::confinement::ConfinedBlob;
 use strict_types::{SemId, StrictDumb, StrictVal, TypeSystem};
@@ -111,8 +109,6 @@ impl StateArithm for AluVMArithm {
 }
 
 impl StateCalc for () {
-    fn compare(&self, a: &StrictVal, b: &StrictVal) -> Option<Ordering> { todo!() }
-
     fn accumulate(&mut self, state: &StrictVal) -> Result<(), StateCalcError> { Err(StateCalcError::UncountableState) }
 
     fn lessen(&mut self, state: &StrictVal) -> Result<(), StateCalcError> { Err(StateCalcError::UncountableState) }

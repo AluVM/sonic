@@ -528,9 +528,6 @@ pub enum StateCalcError {
 }
 
 pub trait StateCalc {
-    /// Compares two state values (useful in sorting).
-    fn compare(&self, a: &StrictVal, b: &StrictVal) -> Option<Ordering>;
-
     /// Procedure which is called on [`StateCalc`] to accumulate an input state.
     fn accumulate(&mut self, state: &StrictVal) -> Result<(), StateCalcError>;
 
@@ -546,8 +543,6 @@ pub trait StateCalc {
 }
 
 impl StateCalc for Box<dyn StateCalc> {
-    fn compare(&self, a: &StrictVal, b: &StrictVal) -> Option<Ordering> { self.as_ref().compare(a, b) }
-
     fn accumulate(&mut self, state: &StrictVal) -> Result<(), StateCalcError> { self.as_mut().accumulate(state) }
 
     fn lessen(&mut self, state: &StrictVal) -> Result<(), StateCalcError> { self.as_mut().lessen(state) }
