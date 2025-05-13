@@ -117,7 +117,6 @@ fn api() -> Api {
     })
 }
 
-#[cfg_attr(test, test)]
 fn main() {
     let types = stl::DaoTypes::new();
     let codex = codex();

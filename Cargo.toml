@@ -57,6 +57,10 @@ name = "hypersonic"
 name = "dao"
 required-features = ["persist-file"]
 
+[[test]]
+name = "dao"
+required-features = ["persist-file"]
+
 [dependencies]
 amplify = { workspace = true }
 strict_encoding.workspace = true
