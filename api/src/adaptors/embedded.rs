@@ -59,7 +59,10 @@ pub enum EmbeddedReaders {
     #[strict_type(tag = 1)]
     Count(StateName),
 
-    /// Sum over verifiable field-element based part of state.
+    /// Sum over verifiable field-element-based part of state.
+    ///
+    /// If any of the verifiable state is absent or not in a form of unsigned integer, it is treated
+    /// as zero.
     #[strict_type(tag = 2)]
     SumV(StateName),
 
@@ -69,15 +72,15 @@ pub enum EmbeddedReaders {
     #[strict_type(tag = 0x10)]
     CountPrefixedV(StateName, TinyBlob),
      */
-    /// Convert verified state under the same state type into a vector.
+    /// Convert a verified state under the same state type into a vector.
     #[strict_type(tag = 0x20)]
     ListV(StateName),
 
-    /// Convert verified state under the same state type into a sorted set.
+    /// Convert a verified state under the same state type into a sorted set.
     #[strict_type(tag = 0x22)]
     SetV(StateName),
 
-    /// Map from field-based element state to a non-verifiable structured state
+    /// Map from a field-based element state to a non-verifiable structured state
     #[strict_type(tag = 0x30)]
     MapV2U(StateName),
 }
@@ -95,7 +98,7 @@ impl StateReader for EmbeddedReaders {
                     .into_iter()
                     .map(|atom| match &atom.verified {
                         StrictVal::Number(StrictNum::Uint(val)) => *val,
-                        _ => panic!("invalid type of state for sum aggregator"),
+                        _ => 0u64,
                     })
                     .sum::<u64>();
                 svnum!(sum)
@@ -106,18 +109,26 @@ impl StateReader for EmbeddedReaders {
                     .map(|atom| atom.verified.clone())
                     .collect(),
             ),
-            EmbeddedReaders::SetV(name) => StrictVal::Set(
-                state(name)
-                    .into_iter()
-                    .map(|atom| atom.verified.clone())
-                    .collect(),
-            ),
-            EmbeddedReaders::MapV2U(name) => StrictVal::Map(
-                state(name)
-                    .into_iter()
-                    .filter_map(|atom| atom.unverified.clone().map(|u| (atom.verified.clone(), u)))
-                    .collect(),
-            ),
+            EmbeddedReaders::SetV(name) => {
+                let mut set = Vec::new();
+                for atom in state(name) {
+                    if !set.contains(&atom.verified) {
+                        set.push(atom.verified.clone());
+                    }
+                }
+                StrictVal::Set(set)
+            }
+            EmbeddedReaders::MapV2U(name) => {
+                let mut map = Vec::new();
+                for atom in state(name) {
+                    let Some(val) = &atom.unverified else { continue };
+                    if map.iter().any(|(key, _)| &atom.verified == key) {
+                        continue;
+                    }
+                    map.push((atom.verified.clone(), val.clone()));
+                }
+                StrictVal::Map(map)
+            }
         }
     }
 }
@@ -326,5 +337,111 @@ impl StateCalc for EmbeddedCalc {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn vm_type() {
+        assert_eq!(EmbeddedProc.vm_type(), VmType::Embedded);
+    }
+
+    #[test]
+    fn verified_readers() {
+        let state = [
+            StateAtom::new_verified(5u64),
+            StateAtom::new_verified(1u64),
+            StateAtom::new_verified(2u64),
+            StateAtom::new_verified(3u64),
+            StateAtom::new_verified(4u64),
+            StateAtom::new_verified(5u64),
+        ];
+
+        let adaptor = EmbeddedReaders::Count(vname!("test1"));
+        assert_eq!(
+            adaptor.read(|name| {
+                assert_eq!(name.as_str(), "test1");
+                state.iter()
+            }),
+            svnum!(6u64)
+        );
+
+        let adaptor = EmbeddedReaders::SumV(vname!("test"));
+        assert_eq!(adaptor.read(|_| { state.iter() }), svnum!(5u64 + 1 + 2 + 3 + 4 + 5));
+
+        let adaptor = EmbeddedReaders::ListV(vname!("test"));
+        assert_eq!(adaptor.read(|_| { state.iter() }), svlist!([5u64, 1u64, 2u64, 3u64, 4u64, 5u64]));
+
+        let adaptor = EmbeddedReaders::SetV(vname!("test"));
+        assert_eq!(adaptor.read(|_| { state.iter() }), svset!([5u64, 1u64, 2u64, 3u64, 4u64]));
+
+        let adaptor = EmbeddedReaders::MapV2U(vname!("test"));
+        assert_eq!(adaptor.read(|_| { state.iter() }), StrictVal::Map(none!()));
+    }
+
+    #[test]
+    fn unverified_readers() {
+        let state = [
+            StateAtom::new_unverified(5u64),
+            StateAtom::new_unverified(1u64),
+            StateAtom::new_unverified(2u64),
+            StateAtom::new_unverified(3u64),
+            StateAtom::new_unverified(4u64),
+            StateAtom::new_unverified(5u64),
+        ];
+
+        let adaptor = EmbeddedReaders::Count(vname!("test"));
+        assert_eq!(adaptor.read(|_| { state.iter() }), svnum!(6u64));
+
+        let adaptor = EmbeddedReaders::SumV(vname!("test"));
+        assert_eq!(adaptor.read(|_| { state.iter() }), svnum!(0u64));
+
+        let adaptor = EmbeddedReaders::ListV(vname!("test"));
+        assert_eq!(adaptor.read(|_| { state.iter() }), svlist!([(), (), (), (), (), ()]));
+
+        let adaptor = EmbeddedReaders::SetV(vname!("test"));
+        assert_eq!(adaptor.read(|_| { state.iter() }), svset!([()]));
+
+        let adaptor = EmbeddedReaders::MapV2U(vname!("test"));
+        assert_eq!(adaptor.read(|_| { state.iter() }), StrictVal::Map(vec![(StrictVal::Unit, svnum!(5u64)),]));
+    }
+
+    #[test]
+    fn pair_readers() {
+        let state = [
+            StateAtom::new(5u64, "state 1"),
+            StateAtom::new(1u64, "state 2"),
+            StateAtom::new(2u64, "state 3"),
+            StateAtom::new(3u64, "state 4"),
+            StateAtom::new(4u64, "state 5"),
+            StateAtom::new(5u64, "state 6"),
+        ];
+
+        let adaptor = EmbeddedReaders::Count(vname!("test"));
+        assert_eq!(adaptor.read(|_| { state.iter() }), svnum!(6u64));
+
+        let adaptor = EmbeddedReaders::SumV(vname!("test"));
+        assert_eq!(adaptor.read(|_| { state.iter() }), svnum!(5u64 + 1 + 2 + 3 + 4 + 5));
+
+        let adaptor = EmbeddedReaders::ListV(vname!("test"));
+        assert_eq!(adaptor.read(|_| { state.iter() }), svlist!([5u64, 1u64, 2u64, 3u64, 4u64, 5u64]));
+
+        let adaptor = EmbeddedReaders::SetV(vname!("test"));
+        assert_eq!(adaptor.read(|_| { state.iter() }), svset!([5u64, 1u64, 2u64, 3u64, 4u64]));
+
+        let adaptor = EmbeddedReaders::MapV2U(vname!("test"));
+        assert_eq!(
+            adaptor.read(|_| { state.iter() }),
+            StrictVal::Map(vec![
+                (svnum!(5u64), svstr!("state 1")),
+                (svnum!(1u64), svstr!("state 2")),
+                (svnum!(2u64), svstr!("state 3")),
+                (svnum!(3u64), svstr!("state 4")),
+                (svnum!(4u64), svstr!("state 5"))
+            ])
+        );
     }
 }
