@@ -341,3 +341,16 @@ fn two_rollbacks() {
     let removed = check_rollback(ledger, vec![mid_op1, mid_op2]);
     assert_eq!(removed.len(), 158);
 }
+
+#[test]
+fn rollback_forward() {
+    let mut ledger = setup("RollbackForward");
+    let init_state = ledger.state().main.clone();
+    let (mid_opid, _) = ledger.operations().skip(50).next().unwrap();
+    println!("Rolling back {} and its descendants", mid_opid);
+    ledger.rollback([mid_opid]).unwrap();
+    println!("Applying {} and its descendants back", mid_opid);
+    ledger.forward([mid_opid]).unwrap();
+    dump_ledger("tests/data/RollbackForward.contract", "tests/data/RollbackForward.dump", true).unwrap();
+    assert_eq!(ledger.state().main, init_state);
+}
