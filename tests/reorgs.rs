@@ -39,6 +39,8 @@ use hypersonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc};
 use hypersonic::persistance::LedgerDir;
 use hypersonic::{Api, ApiInner, DestructibleApi, Schema};
 use petgraph::dot::{Config, Dot};
+use petgraph::graph::EdgeReference;
+use petgraph::prelude::NodeIndex;
 use petgraph::Graph;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
@@ -170,13 +172,19 @@ fn setup(name: &str) -> LedgerDir {
     }
     assert_eq!(owned.keys().collect::<BTreeSet<_>>(), prev.iter().collect::<BTreeSet<_>>());
 
-    let mut graph = Graph::<String, ()>::new();
+    ledger
+}
+
+fn graph(name: &str, ledger: &LedgerDir) {
+    let mut graph = Graph::<(String, bool), ()>::new();
     let genesis_opid = ledger.articles().issue.genesis_opid();
     let mut nodes = bmap! {
-        genesis_opid => graph.add_node("0".to_string())
+        genesis_opid => graph.add_node(("0".to_string(), true))
     };
     for (opid, op) in ledger.operations() {
-        let node = graph.add_node(opid.to_string()[..2].to_string());
+        let id = opid.to_string()[..2].to_string();
+        let valid = ledger.is_valid(opid);
+        let node = graph.add_node((id, valid));
         nodes.insert(opid, node);
         for inp in &op.destroying {
             graph.add_edge(node, nodes[&inp.addr.opid], ());
@@ -184,10 +192,17 @@ fn setup(name: &str) -> LedgerDir {
     }
 
     // Generate a DOT format representation of the graph.
-    let graph = format!("{:?}", Dot::with_config(&graph, &[Config::EdgeNoLabel]));
+    let node_attr = |_: &Graph<(String, bool), ()>, (_, (name, valid)): (NodeIndex, &(String, bool))| {
+        let color = match *valid {
+            true => "green",
+            false => "red",
+        };
+        format!("label=\"{name}\", color={color}, style=filled")
+    };
+    let edge_attr = |_: &Graph<(String, bool), ()>, _: EdgeReference<'_, ()>| String::new();
+    let dot = Dot::with_attr_getters(&graph, &[Config::EdgeNoLabel], &edge_attr, &node_attr);
+    let graph = format!("{dot:?}");
     fs::write(format!("tests/data/{name}.dot"), graph).unwrap();
-
-    ledger
 }
 
 mod libs {
@@ -312,6 +327,7 @@ fn single_rollback() {
     println!("Rolling back {} and its descendants", mid_opid);
     ledger.rollback([mid_opid]).unwrap();
     dump_ledger("tests/data/SingleRollback.contract", "tests/data/SingleRollback.dump", true).unwrap();
+    graph("SingleRollback", &ledger);
     let removed = check_rollback(ledger, vec![mid_op]);
     assert_eq!(removed.len(), 31);
 }
@@ -324,6 +340,7 @@ fn double_rollback() {
     println!("Rolling back {mid_opid1}, {mid_opid2} and their descendants");
     ledger.rollback([mid_opid1, mid_opid2]).unwrap();
     dump_ledger("tests/data/DoubleRollback.contract", "tests/data/DoubleRollback.dump", true).unwrap();
+    graph("DoubleRollback", &ledger);
     let removed = check_rollback(ledger, vec![mid_op1, mid_op2]);
     assert_eq!(removed.len(), 158);
 }
@@ -338,6 +355,7 @@ fn two_rollbacks() {
     println!("Rolling back {mid_opid2} and its descendants");
     ledger.rollback([mid_opid2]).unwrap();
     dump_ledger("tests/data/TwoRollbacks.contract", "tests/data/TwoRollbacks.dump", true).unwrap();
+    graph("TwoRollbacks", &ledger);
     let removed = check_rollback(ledger, vec![mid_op1, mid_op2]);
     assert_eq!(removed.len(), 158);
 }
@@ -352,5 +370,23 @@ fn rollback_forward() {
     println!("Applying {} and its descendants back", mid_opid);
     ledger.forward([mid_opid]).unwrap();
     dump_ledger("tests/data/RollbackForward.contract", "tests/data/RollbackForward.dump", true).unwrap();
+    graph("RollbackForward", &ledger);
     assert_eq!(ledger.state().main, init_state);
+}
+
+#[test]
+fn partial_forward() {
+    let mut ledger = setup("PartialForward");
+    let (mid_opid1, _) = ledger.operations().nth(50).unwrap();
+    let (mid_opid2, _) = ledger.operations().nth(30).unwrap();
+    println!("Rolling back {mid_opid2} and its descendants");
+    ledger.rollback([mid_opid2]).unwrap();
+    let mid_state = ledger.state().main.clone();
+    println!("Rolling back {mid_opid1} and its descendants");
+    ledger.rollback([mid_opid1]).unwrap();
+    println!("Applying {mid_opid2} and its descendants back");
+    ledger.forward([mid_opid1]).unwrap();
+    dump_ledger("tests/data/PartialForward.contract", "tests/data/PartialForward.dump", true).unwrap();
+    graph("PartialForward", &ledger);
+    assert_eq!(ledger.state().main, mid_state);
 }

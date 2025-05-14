@@ -210,6 +210,32 @@ impl<S: Stock> Ledger<S> {
     #[inline]
     pub fn spent_by(&self, addr: CellAddr) -> Option<Opid> { self.0.spent_by(addr) }
 
+    /// # Nota bene
+    ///
+    /// Ancestors do include the original operations
+    pub fn ancestors(&self, opids: impl IntoIterator<Item = Opid>) -> impl DoubleEndedIterator<Item = Opid> {
+        let mut chain = opids.into_iter().collect::<IndexSet<_>>();
+        // Get all subsequent operations
+        let mut index = 0usize;
+        let genesis_opid = self.articles().issue.genesis_opid();
+        while let Some(opid) = chain.get_index(index).copied() {
+            if opid != genesis_opid {
+                let op = self.0.operation(opid);
+                for inp in op.destroying {
+                    let parent = inp.addr.opid;
+                    if !chain.contains(&parent) {
+                        chain.insert(parent);
+                    }
+                }
+            }
+            index += 1;
+        }
+        chain.into_iter()
+    }
+
+    /// # Nota bene
+    ///
+    /// Descendants do include the original operations
     pub fn descendants(&self, opids: impl IntoIterator<Item = Opid>) -> impl DoubleEndedIterator<Item = Opid> {
         let mut chain = opids.into_iter().collect::<IndexSet<_>>();
         // Get all subsequent operations
@@ -219,10 +245,9 @@ impl<S: Stock> Ledger<S> {
             for no in 0..op.destructible.len_u16() {
                 let addr = CellAddr::new(opid, no);
                 let Some(spent) = self.0.spent_by(addr) else { continue };
-                if chain.contains(&spent) {
-                    continue;
+                if !chain.contains(&spent) {
+                    chain.insert(spent);
                 }
-                chain.insert(spent);
             }
             index += 1;
         }
@@ -380,8 +405,16 @@ impl<S: Stock> Ledger<S> {
 
     pub fn forward(&mut self, opids: impl IntoIterator<Item = Opid>) -> Result<(), AcceptError> {
         for opid in self.descendants(opids) {
-            let op = self.0.operation(opid);
-            self.apply_verify(op, true)?;
+            debug_assert!(!self.is_valid(opid));
+            if self
+                .ancestors([opid])
+                .filter(|id| *id != opid)
+                .all(|id| self.is_valid(id))
+            {
+                let op = self.0.operation(opid);
+                self.apply_verify(op, true)?;
+                debug_assert!(self.is_valid(opid));
+            }
         }
         self.commit_transaction();
         Ok(())
