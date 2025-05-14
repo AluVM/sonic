@@ -77,6 +77,9 @@ sonic-callreq.workspace = true
 aora = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 
+[dev-dependencies]
+sonix = { path = "./cli" }
+
 [features]
 default = ["std"]
 all = ["stl", "std", "serde", "persist-file"]

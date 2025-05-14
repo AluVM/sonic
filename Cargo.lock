@@ -442,6 +442,7 @@ dependencies = [
  "serde",
  "sonic-api",
  "sonic-callreq",
+ "sonix",
  "strict_encoding",
  "strict_types",
  "ultrasonic",

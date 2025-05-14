@@ -38,6 +38,7 @@ use commit_verify::{Digest, Sha256};
 use hypersonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc};
 use hypersonic::persistance::LedgerDir;
 use hypersonic::{Api, ApiInner, DestructibleApi, Schema};
+use sonix::dump_ledger;
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
 use ultrasonic::{AuthToken, CellAddr, Codex, Consensus, Identity};
 
@@ -226,4 +227,7 @@ mod stl {
 }
 
 #[test]
-fn no_reorgs() { setup(); }
+fn no_reorgs() {
+    setup();
+    dump_ledger("tests/data/Reorg.contract", "tests/data/Reorg.dump", true).unwrap();
+}
