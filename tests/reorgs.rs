@@ -40,8 +40,8 @@ use hypersonic::persistance::LedgerDir;
 use hypersonic::{Api, ApiInner, DestructibleApi, Schema};
 use petgraph::dot::{Config, Dot};
 use petgraph::Graph;
-use rand::rng;
 use rand::seq::SliceRandom;
+use rand::thread_rng;
 use sonicapi::IssueParams;
 use sonix::dump_ledger;
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
@@ -142,7 +142,7 @@ fn setup(name: &str) -> LedgerDir {
 
     for round in 0u16..10 {
         // shuffle outputs to create twisted DAG
-        prev.shuffle(&mut rng());
+        prev.shuffle(&mut thread_rng());
         let mut iter = prev.into_iter();
         let mut new_prev = vec![];
         while let Some((first, second)) = iter.next().zip(iter.next()) {
@@ -308,7 +308,7 @@ fn check_rollback(ledger: LedgerDir, mut removed: Vec<Operation>) -> Vec<Operati
 #[test]
 fn single_rollback() {
     let mut ledger = setup("SingleRollback");
-    let (mid_opid, mid_op) = ledger.operations().skip(50).next().unwrap();
+    let (mid_opid, mid_op) = ledger.operations().nth(50).unwrap();
     println!("Rolling back {} and its descendants", mid_opid);
     ledger.rollback([mid_opid]).unwrap();
     dump_ledger("tests/data/SingleRollback.contract", "tests/data/SingleRollback.dump", true).unwrap();
@@ -319,8 +319,8 @@ fn single_rollback() {
 #[test]
 fn double_rollback() {
     let mut ledger = setup("DoubleRollback");
-    let (mid_opid1, mid_op1) = ledger.operations().skip(50).next().unwrap();
-    let (mid_opid2, mid_op2) = ledger.operations().skip(30).next().unwrap();
+    let (mid_opid1, mid_op1) = ledger.operations().nth(50).unwrap();
+    let (mid_opid2, mid_op2) = ledger.operations().nth(30).unwrap();
     println!("Rolling back {mid_opid1}, {mid_opid2} and their descendants");
     ledger.rollback([mid_opid1, mid_opid2]).unwrap();
     dump_ledger("tests/data/DoubleRollback.contract", "tests/data/DoubleRollback.dump", true).unwrap();
@@ -331,8 +331,8 @@ fn double_rollback() {
 #[test]
 fn two_rollbacks() {
     let mut ledger = setup("TwoRollbacks");
-    let (mid_opid1, mid_op1) = ledger.operations().skip(50).next().unwrap();
-    let (mid_opid2, mid_op2) = ledger.operations().skip(30).next().unwrap();
+    let (mid_opid1, mid_op1) = ledger.operations().nth(50).unwrap();
+    let (mid_opid2, mid_op2) = ledger.operations().nth(30).unwrap();
     println!("Rolling back {mid_opid1} and its descendants");
     ledger.rollback([mid_opid1]).unwrap();
     println!("Rolling back {mid_opid2} and its descendants");
@@ -346,7 +346,7 @@ fn two_rollbacks() {
 fn rollback_forward() {
     let mut ledger = setup("RollbackForward");
     let init_state = ledger.state().main.clone();
-    let (mid_opid, _) = ledger.operations().skip(50).next().unwrap();
+    let (mid_opid, _) = ledger.operations().nth(50).unwrap();
     println!("Rolling back {} and its descendants", mid_opid);
     ledger.rollback([mid_opid]).unwrap();
     println!("Applying {} and its descendants back", mid_opid);

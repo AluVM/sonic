@@ -61,7 +61,7 @@ pub fn dump_ledger(src: impl AsRef<Path>, dst: impl AsRef<Path>, force: bool) ->
     let dst = dst.as_ref();
 
     if force {
-        let _ = fs::remove_dir_all(&dst);
+        let _ = fs::remove_dir_all(dst);
     }
     fs::create_dir_all(dst)?;
 
