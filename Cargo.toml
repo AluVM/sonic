@@ -61,6 +61,10 @@ required-features = ["persist-file"]
 name = "dao"
 required-features = ["persist-file"]
 
+[[test]]
+name = "reorgs"
+required-features = ["persist-file"]
+
 [dependencies]
 amplify = { workspace = true }
 strict_encoding.workspace = true

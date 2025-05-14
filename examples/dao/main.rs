@@ -355,7 +355,7 @@ mod stl {
             *self
                 .0
                 .resolve(name)
-                .unwrap_or_else(|| panic!("type '{name}' is absent in standard RGBContract type library"))
+                .unwrap_or_else(|| panic!("type '{name}' is absent in the type library"))
         }
     }
 }
