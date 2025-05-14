@@ -23,8 +23,11 @@
 
 #[macro_use]
 extern crate clap;
+#[macro_use]
+extern crate anyhow;
 
 mod cmd;
+mod dump;
 
 use clap::Parser;
 use cmd::Cmd;

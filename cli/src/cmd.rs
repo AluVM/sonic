@@ -21,11 +21,15 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+use std::fs;
 use std::fs::File;
 use std::path::PathBuf;
 
+use clap::ValueHint;
 use hypersonic::persistance::LedgerDir;
 use hypersonic::{Articles, AuthToken, CallParams, IssueParams, Schema};
+
+use crate::dump::dump_ledger;
 
 #[derive(Parser)]
 pub enum Cmd {
@@ -84,6 +88,23 @@ pub enum Cmd {
         /// File with deeds to accept
         input: PathBuf,
     },
+
+    /// Dump ledger data into multiple debug files
+    Dump {
+        /// Remove the destination directory if it already exists
+        #[clap(short, long, global = true)]
+        force: bool,
+
+        /// Source data to process
+        #[clap(value_hint = ValueHint::FilePath)]
+        src: PathBuf,
+
+        /// Destination directory to put dump files
+        ///
+        /// If skipped, adds the `dump` subdirectory to the `src` path.
+        #[clap(value_hint = ValueHint::FilePath)]
+        dst: Option<PathBuf>,
+    },
 }
 
 impl Cmd {
@@ -95,6 +116,7 @@ impl Cmd {
             Cmd::Call { dir, call: path } => call(dir, path)?,
             Cmd::Export { dir, terminals, output } => export(dir, terminals, output)?,
             Cmd::Accept { dir, input } => accept(dir, input)?,
+            Cmd::Dump { force, src, dst } => dump(force, src, dst)?,
         }
         Ok(())
     }
@@ -152,4 +174,22 @@ fn accept(dir: PathBuf, input: PathBuf) -> anyhow::Result<()> {
     let mut ledger = LedgerDir::load(dir)?;
     ledger.accept_from_file(input)?;
     Ok(())
+}
+
+fn dump(force: bool, src: PathBuf, dst: Option<PathBuf>) -> anyhow::Result<()> {
+    match src.extension() {
+        Some(ext) if ext == "contract" => {
+            let dst = dst
+                .as_ref()
+                .map(|p| p.to_owned())
+                .unwrap_or_else(|| src.join("dump"));
+            if force {
+                let _ = fs::remove_dir_all(&dst);
+            }
+            dump_ledger(&src, dst).inspect_err(|_| println!())?;
+            Ok(())
+        }
+        Some(_) => Err(anyhow!("Can't detect the type for '{}': the extension is not recognized", src.display())),
+        None => Err(anyhow!("The path '{}' can't be recognized as known data", src.display())),
+    }
 }
