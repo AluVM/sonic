@@ -45,7 +45,7 @@ use rand::seq::SliceRandom;
 use sonicapi::IssueParams;
 use sonix::dump_ledger;
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
-use ultrasonic::{AuthToken, CellAddr, Codex, Consensus, Identity};
+use ultrasonic::{AuthToken, CellAddr, Codex, Consensus, Identity, Operation};
 
 fn codex() -> Codex {
     let lib = libs::success();
@@ -170,6 +170,23 @@ fn setup(name: &str) -> LedgerDir {
     }
     assert_eq!(owned.keys().collect::<BTreeSet<_>>(), prev.iter().collect::<BTreeSet<_>>());
 
+    let mut graph = Graph::<String, ()>::new();
+    let genesis_opid = ledger.articles().issue.genesis_opid();
+    let mut nodes = bmap! {
+        genesis_opid => graph.add_node("0".to_string())
+    };
+    for (opid, op) in ledger.operations() {
+        let node = graph.add_node(opid.to_string()[..2].to_string());
+        nodes.insert(opid, node);
+        for inp in &op.destroying {
+            graph.add_edge(node, nodes[&inp.addr.opid], ());
+        }
+    }
+
+    // Generate a DOT format representation of the graph.
+    let graph = format!("{:?}", Dot::with_config(&graph, &[Config::EdgeNoLabel]));
+    fs::write(format!("tests/data/{name}.dot"), graph).unwrap();
+
     ledger
 }
 
@@ -246,15 +263,9 @@ fn no_reorgs() {
     dump_ledger("tests/data/NoReorgs.contract", "tests/data/NoReorgs.dump", true).unwrap();
 }
 
-#[test]
-fn simple_rollback() {
-    let mut ledger = setup("SimpleRollback");
-    let (mid_opid, mid_op) = ledger.operations().skip(50).next().unwrap();
-    println!("Rolling back {} and its descendants", mid_opid);
-    ledger.rollback([mid_opid]).unwrap();
-    dump_ledger("tests/data/SimpleRollback.contract", "tests/data/SimpleRollback.dump", true).unwrap();
+fn check_rollback(ledger: LedgerDir, mut removed: Vec<Operation>) -> Vec<Operation> {
+    let opids = removed.iter().map(|op| op.opid()).collect::<BTreeSet<_>>();
 
-    let mut removed = vec![mid_op];
     let mut index = 0usize;
     while let Some(op) = removed.get(index) {
         let opid = op.opid();
@@ -267,27 +278,16 @@ fn simple_rollback() {
         }
         index += 1;
     }
-    assert_eq!(removed.len(), 31);
 
     println!("List of operations which must be rolled back (descendants):");
     let removed_opids = removed.iter().map(|op| op.opid()).collect::<BTreeSet<_>>();
-    let descendants = ledger.descendants([mid_opid]).collect::<BTreeSet<_>>();
+    let descendants = ledger.descendants(opids).collect::<BTreeSet<_>>();
     assert_eq!(removed_opids, descendants);
     for opid in descendants {
         println!("- {opid}");
     }
 
-    let mut graph = Graph::<String, ()>::new();
-    let genesis_opid = ledger.articles().issue.genesis_opid();
-    let mut nodes = bmap! {
-        genesis_opid => graph.add_node("0".to_string())
-    };
-    for (opid, op) in ledger.operations() {
-        let node = graph.add_node(opid.to_string()[..2].to_string());
-        nodes.insert(opid, node);
-        for inp in &op.destroying {
-            graph.add_edge(node, nodes[&inp.addr.opid], ());
-        }
+    for (opid, _) in ledger.operations() {
         if removed_opids.contains(&opid) {
             assert!(!ledger.is_valid(opid));
         } else {
@@ -295,13 +295,49 @@ fn simple_rollback() {
         }
     }
 
-    // Generate a DOT format representation of the graph.
-    let graph = format!("{:?}", Dot::with_config(&graph, &[Config::EdgeNoLabel]));
-    fs::write("tests/data/SimpleRollback.dot", graph).unwrap();
-
-    // Now we check that no outputs of the rolled-back ops participates in the valid state
+    // Now we check that no outputs of the rolled-back ops participate in the valid state
     let state = ledger.state().main.owned.get("amount").unwrap();
+    eprintln!("Not rolled back outputs:");
     for addr in state.keys() {
         assert!(!removed_opids.contains(&addr.opid));
     }
+
+    removed
+}
+
+#[test]
+fn single_rollback() {
+    let mut ledger = setup("SingleRollback");
+    let (mid_opid, mid_op) = ledger.operations().skip(50).next().unwrap();
+    println!("Rolling back {} and its descendants", mid_opid);
+    ledger.rollback([mid_opid]).unwrap();
+    dump_ledger("tests/data/SingleRollback.contract", "tests/data/SingleRollback.dump", true).unwrap();
+    let removed = check_rollback(ledger, vec![mid_op]);
+    assert_eq!(removed.len(), 31);
+}
+
+#[test]
+fn double_rollback() {
+    let mut ledger = setup("DoubleRollback");
+    let (mid_opid1, mid_op1) = ledger.operations().skip(50).next().unwrap();
+    let (mid_opid2, mid_op2) = ledger.operations().skip(30).next().unwrap();
+    println!("Rolling back {mid_opid1}, {mid_opid2} and their descendants");
+    ledger.rollback([mid_opid1, mid_opid2]).unwrap();
+    dump_ledger("tests/data/DoubleRollback.contract", "tests/data/DoubleRollback.dump", true).unwrap();
+    let removed = check_rollback(ledger, vec![mid_op1, mid_op2]);
+    assert_eq!(removed.len(), 158);
+}
+
+#[test]
+fn two_rollbacks() {
+    let mut ledger = setup("TwoRollbacks");
+    let (mid_opid1, mid_op1) = ledger.operations().skip(50).next().unwrap();
+    let (mid_opid2, mid_op2) = ledger.operations().skip(30).next().unwrap();
+    println!("Rolling back {mid_opid1} and its descendants");
+    ledger.rollback([mid_opid1]).unwrap();
+    println!("Rolling back {mid_opid2} and its descendants");
+    ledger.rollback([mid_opid2]).unwrap();
+    dump_ledger("tests/data/TwoRollbacks.contract", "tests/data/TwoRollbacks.dump", true).unwrap();
+    let removed = check_rollback(ledger, vec![mid_op1, mid_op2]);
+    assert_eq!(removed.len(), 158);
 }

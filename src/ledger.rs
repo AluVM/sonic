@@ -26,6 +26,7 @@ use core::borrow::Borrow;
 use std::io;
 
 use amplify::hex::ToHex;
+use indexmap::IndexSet;
 use sonic_callreq::MethodName;
 use sonicapi::{MergeError, NamedState, OpBuilder, Schema};
 use strict_encoding::{
@@ -233,10 +234,10 @@ impl<S: Stock> Ledger<S> {
     }
 
     pub fn descendants(&self, opids: impl IntoIterator<Item = Opid>) -> impl Iterator<Item = Opid> {
-        let mut chain = opids.into_iter().collect::<Vec<_>>();
+        let mut chain = opids.into_iter().collect::<IndexSet<_>>();
         // Get all subsequent operations
         let mut index = 0usize;
-        while let Some(opid) = chain.get(index).copied() {
+        while let Some(opid) = chain.get_index(index).copied() {
             let op = self.0.operation(opid);
             for no in 0..op.destructible.len_u16() {
                 let addr = CellAddr::new(opid, no);
@@ -244,7 +245,7 @@ impl<S: Stock> Ledger<S> {
                 if chain.contains(&spent) {
                     continue;
                 }
-                chain.push(spent);
+                chain.insert(spent);
             }
             index += 1;
         }
@@ -378,7 +379,19 @@ impl<S: Stock> Ledger<S> {
 
     pub fn rollback(&mut self, opids: impl IntoIterator<Item = Opid>) -> Result<(), SerializeError> {
         for opid in self.descendants(opids) {
-            let transition = self.0.transition(opid);
+            let mut transition = self.0.transition(opid);
+            // We need to filter out already invalidated inputs
+            let inputs = transition
+                .destroyed
+                .keys()
+                .copied()
+                .collect::<IndexSet<_>>();
+            for addr in inputs {
+                if !self.is_valid(addr.opid) {
+                    // empty destroyed is allowed
+                    let _ = transition.destroyed.remove(&addr);
+                }
+            }
             self.0.update_state(|state, schema| {
                 state.rollback(transition, &schema.default_api, schema.custom_apis.keys(), &schema.types);
             })?;

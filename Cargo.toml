@@ -74,6 +74,7 @@ aluvm.workspace = true
 ultrasonic.workspace = true
 sonic-api.workspace = true
 sonic-callreq.workspace = true
+indexmap.workspace = true
 aora = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 
