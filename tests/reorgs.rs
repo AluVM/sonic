@@ -38,6 +38,8 @@ use commit_verify::{Digest, Sha256};
 use hypersonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc};
 use hypersonic::persistance::LedgerDir;
 use hypersonic::{Api, ApiInner, DestructibleApi, Schema};
+use petgraph::dot::{Config, Dot};
+use petgraph::Graph;
 use rand::rng;
 use rand::seq::SliceRandom;
 use sonicapi::IssueParams;
@@ -248,6 +250,7 @@ fn no_reorgs() {
 fn simple_rollback() {
     let mut ledger = setup("SimpleRollback");
     let (mid_opid, mid_op) = ledger.operations().skip(50).next().unwrap();
+    println!("Rolling back {} and its descendants", mid_opid);
     ledger.rollback([mid_opid]).unwrap();
     dump_ledger("tests/data/SimpleRollback.contract", "tests/data/SimpleRollback.dump", true).unwrap();
 
@@ -266,19 +269,39 @@ fn simple_rollback() {
     }
     assert_eq!(removed.len(), 31);
 
+    println!("List of operations which must be rolled back (descendants):");
     let removed_opids = removed.iter().map(|op| op.opid()).collect::<BTreeSet<_>>();
-    let state = ledger.state().main.owned.get("amount").unwrap();
-    for (opid, _) in ledger.operations() {
+    let descendants = ledger.descendants([mid_opid]).collect::<BTreeSet<_>>();
+    assert_eq!(removed_opids, descendants);
+    for opid in descendants {
+        println!("- {opid}");
+    }
+
+    let mut graph = Graph::<String, ()>::new();
+    let genesis_opid = ledger.articles().issue.genesis_opid();
+    let mut nodes = bmap! {
+        genesis_opid => graph.add_node("0".to_string())
+    };
+    for (opid, op) in ledger.operations() {
+        let node = graph.add_node(opid.to_string()[..2].to_string());
+        nodes.insert(opid, node);
+        for inp in &op.destroying {
+            graph.add_edge(node, nodes[&inp.addr.opid], ());
+        }
         if removed_opids.contains(&opid) {
             assert!(!ledger.is_valid(opid));
         } else {
             assert!(ledger.is_valid(opid));
         }
     }
+
+    // Generate a DOT format representation of the graph.
+    let graph = format!("{:?}", Dot::with_config(&graph, &[Config::EdgeNoLabel]));
+    fs::write("tests/data/SimpleRollback.dot", graph).unwrap();
+
     // Now we check that no outputs of the rolled-back ops participates in the valid state
+    let state = ledger.state().main.owned.get("amount").unwrap();
     for addr in state.keys() {
-        if (removed_opids.contains(&addr.opid)) {
-            eprintln!("- {addr}");
-        }
+        assert!(!removed_opids.contains(&addr.opid));
     }
 }

@@ -233,28 +233,22 @@ impl<S: Stock> Ledger<S> {
     }
 
     pub fn descendants(&self, opids: impl IntoIterator<Item = Opid>) -> impl Iterator<Item = Opid> {
-        let mut chain = opids.into_iter().collect::<VecDeque<_>>();
+        let mut chain = opids.into_iter().collect::<Vec<_>>();
         // Get all subsequent operations
-        loop {
-            let mut count = 0usize;
-            for index in 0..chain.len() {
-                let opid = chain[index];
-                let op = self.0.operation(opid);
-                for no in 0..op.destructible.len_u16() {
-                    let addr = CellAddr::new(opid, no);
-                    let Some(spent) = self.0.spent_by(addr) else { continue };
-                    if chain.contains(&spent) {
-                        continue;
-                    }
-                    chain.push_front(spent);
-                    count += 1;
+        let mut index = 0usize;
+        while let Some(opid) = chain.get(index).copied() {
+            let op = self.0.operation(opid);
+            for no in 0..op.destructible.len_u16() {
+                let addr = CellAddr::new(opid, no);
+                let Some(spent) = self.0.spent_by(addr) else { continue };
+                if chain.contains(&spent) {
+                    continue;
                 }
+                chain.push(spent);
             }
-            if count == 0 {
-                break;
-            }
+            index += 1;
         }
-        chain.into_iter()
+        chain.into_iter().rev()
     }
 
     pub fn export_all(&self, mut writer: StrictWriter<impl WriteRaw>) -> io::Result<()> {

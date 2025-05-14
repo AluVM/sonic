@@ -80,6 +80,7 @@ serde = { workspace = true, optional = true }
 [dev-dependencies]
 sonix = { path = "./cli" }
 rand = "0.9.1"
+petgraph = "0.8.1"
 
 [features]
 default = ["std"]
