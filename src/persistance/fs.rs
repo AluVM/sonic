@@ -140,10 +140,11 @@ impl Stock for StockFs {
     #[inline]
     fn state(&self) -> &EffectiveState { &self.state }
 
+    #[inline]
     fn is_valid(&self, opid: Opid) -> bool { self.valid.get(opid).map(bool::from).unwrap_or_default() }
-
+    #[inline]
     fn mark_valid(&mut self, opid: Opid) { self.valid.insert_or_update(opid, OpValidity::Valid) }
-
+    #[inline]
     fn mark_invalid(&mut self, opid: Opid) { self.valid.insert_or_update(opid, OpValidity::Invalid) }
 
     #[inline]

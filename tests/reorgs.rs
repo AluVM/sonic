@@ -30,7 +30,7 @@ extern crate strict_types;
 
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::Path;
+use std::path::PathBuf;
 
 use aluvm::{CoreConfig, LibSite};
 use amplify::num::u256;
@@ -38,6 +38,8 @@ use commit_verify::{Digest, Sha256};
 use hypersonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc};
 use hypersonic::persistance::LedgerDir;
 use hypersonic::{Api, ApiInner, DestructibleApi, Schema};
+use rand::rng;
+use rand::seq::SliceRandom;
 use sonicapi::IssueParams;
 use sonix::dump_ledger;
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
@@ -93,7 +95,7 @@ fn api() -> Api {
     })
 }
 
-fn setup() -> LedgerDir {
+fn setup(name: &str) -> LedgerDir {
     let types = stl::FungibleTypes::new();
     let codex = codex();
     let api = api();
@@ -112,48 +114,57 @@ fn setup() -> LedgerDir {
     let mut issue = IssueParams::new_testnet("FungibleTest", Consensus::None);
     for _ in 0u16..10 {
         issue.push_owned_unlocked("amount", next_auth(), svnum!(100u64));
+        issue.push_owned_unlocked("amount", next_auth(), svnum!(100u64));
     }
     let articles = issuer.issue(issue);
     let opid = articles.issue.genesis_opid();
 
-    let contract_path = Path::new("tests/data/Reorg.contract");
+    let contract_path = PathBuf::from(format!("tests/data/{name}.contract"));
     if contract_path.exists() {
-        fs::remove_dir_all(contract_path).expect("Unable to remove a contract file");
+        fs::remove_dir_all(&contract_path).expect("Unable to remove a contract file");
     }
-    fs::create_dir_all(contract_path).expect("Unable to create a contract folder");
-    let mut ledger = LedgerDir::new(articles, contract_path.to_path_buf()).expect("Can't issue a contract");
+    fs::create_dir_all(&contract_path).expect("Unable to create a contract folder");
+    let mut ledger = LedgerDir::new(articles, contract_path).expect("Can't issue a contract");
 
     let owned = &ledger.state().main.owned;
     assert_eq!(owned.len(), 1);
     let owned = owned.get("amount").unwrap();
+    assert_eq!(owned.len(), 20);
     let mut prev = vec![];
     for (addr, val) in owned {
         assert_eq!(val, &svnum!(100u64));
         assert_eq!(addr.opid, opid);
         prev.push(*addr);
     }
+    assert_eq!(prev.len(), 20);
 
-    for _ in 0u16..10 {
+    for round in 0u16..10 {
+        // shuffle outputs to create twisted DAG
+        prev.shuffle(&mut rng());
+        let mut iter = prev.into_iter();
         let mut new_prev = vec![];
-        for prevout in prev {
+        while let Some((first, second)) = iter.next().zip(iter.next()) {
             let opid = ledger
                 .start_deed("transfer")
-                .using(prevout, svnum!(0u64))
-                .assign("amount", next_auth(), svnum!(100u64), None)
+                .using(first, svnum!(0u64))
+                .using(second, svnum!(0u64))
+                .assign("amount", next_auth(), svnum!(100u64 - round as u64), None)
+                .assign("amount", next_auth(), svnum!(100u64 - round as u64), None)
                 .commit()
                 .unwrap();
             new_prev.push(CellAddr::new(opid, 0));
+            new_prev.push(CellAddr::new(opid, 1));
         }
         prev = new_prev;
     }
 
     let owned = &ledger.state().main.owned;
     assert_eq!(owned.len(), 1);
-    assert_eq!(prev.len(), 10);
+    assert_eq!(prev.len(), 20);
     let owned = owned.get("amount").unwrap();
-    assert_eq!(owned.len(), 10);
+    assert_eq!(owned.len(), 20);
     for (_, val) in owned.iter() {
-        assert_eq!(val, &svnum!(100u64));
+        assert_eq!(val, &svnum!(91u64));
     }
     assert_eq!(owned.keys().collect::<BTreeSet<_>>(), prev.iter().collect::<BTreeSet<_>>());
 
@@ -229,6 +240,45 @@ mod stl {
 
 #[test]
 fn no_reorgs() {
-    setup();
-    dump_ledger("tests/data/Reorg.contract", "tests/data/Reorg.dump", true).unwrap();
+    setup("NoReorgs");
+    dump_ledger("tests/data/NoReorgs.contract", "tests/data/NoReorgs.dump", true).unwrap();
+}
+
+#[test]
+fn simple_rollback() {
+    let mut ledger = setup("SimpleRollback");
+    let (mid_opid, mid_op) = ledger.operations().skip(50).next().unwrap();
+    ledger.rollback([mid_opid]).unwrap();
+    dump_ledger("tests/data/SimpleRollback.contract", "tests/data/SimpleRollback.dump", true).unwrap();
+
+    let mut removed = vec![mid_op];
+    let mut index = 0usize;
+    while let Some(op) = removed.get(index) {
+        let opid = op.opid();
+        for no in 0..op.destructible.len_u16() {
+            let Some(child) = ledger.spent_by(CellAddr::new(opid, no)) else {
+                continue;
+            };
+            let child = ledger.operation(child);
+            removed.push(child);
+        }
+        index += 1;
+    }
+    assert_eq!(removed.len(), 31);
+
+    let removed_opids = removed.iter().map(|op| op.opid()).collect::<BTreeSet<_>>();
+    let state = ledger.state().main.owned.get("amount").unwrap();
+    for (opid, _) in ledger.operations() {
+        if removed_opids.contains(&opid) {
+            assert!(!ledger.is_valid(opid));
+        } else {
+            assert!(ledger.is_valid(opid));
+        }
+    }
+    // Now we check that no outputs of the rolled-back ops participates in the valid state
+    for addr in state.keys() {
+        if (removed_opids.contains(&addr.opid)) {
+            eprintln!("- {addr}");
+        }
+    }
 }

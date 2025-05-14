@@ -390,6 +390,7 @@ impl<S: Stock> Ledger<S> {
             })?;
             self.0.mark_invalid(opid);
         }
+        self.commit_transaction();
         Ok(())
     }
 
