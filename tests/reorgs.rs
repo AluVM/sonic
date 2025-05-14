@@ -38,6 +38,7 @@ use commit_verify::{Digest, Sha256};
 use hypersonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc};
 use hypersonic::persistance::LedgerDir;
 use hypersonic::{Api, ApiInner, DestructibleApi, Schema};
+use sonicapi::IssueParams;
 use sonix::dump_ledger;
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
 use ultrasonic::{AuthToken, CellAddr, Codex, Consensus, Identity};
@@ -108,11 +109,11 @@ fn setup() -> LedgerDir {
         AuthToken::from(buf)
     };
 
-    let mut issue = issuer.start_issue_testnet("issue", Consensus::None);
+    let mut issue = IssueParams::new_testnet("FungibleTest", Consensus::None);
     for _ in 0u16..10 {
-        issue = issue.assign("amount", next_auth(), svnum!(100u64), None);
+        issue.push_owned_unlocked("amount", next_auth(), svnum!(100u64));
     }
-    let articles = issue.finish("FungibleTest", 1732529307);
+    let articles = issuer.issue(issue);
     let opid = articles.issue.genesis_opid();
 
     let contract_path = Path::new("tests/data/Reorg.contract");

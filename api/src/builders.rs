@@ -21,6 +21,8 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+use std::ops::{Deref, DerefMut};
+
 use aluvm::LibSite;
 use amplify::confinement::SmallVec;
 use amplify::num::u256;
@@ -43,8 +45,8 @@ pub struct NamedState<T> {
 }
 
 impl NamedState<DataCell> {
-    pub fn new(name: impl Into<StateName>, data: impl Into<StrictVal>, auth: impl Into<AuthToken>) -> Self {
-        NamedState { name: name.into(), state: DataCell::new(data, auth) }
+    pub fn new_unlocked(name: impl Into<StateName>, auth: impl Into<AuthToken>, data: impl Into<StrictVal>) -> Self {
+        NamedState { name: name.into(), state: DataCell::new_unlocked(auth, data) }
     }
 }
 
@@ -61,20 +63,18 @@ impl CoreParams {
         Self { method: method.into(), global: none!(), owned: none!() }
     }
 
-    pub fn add_global(mut self, name: impl Into<StateName>, state: impl Into<StateAtom>) -> Self {
+    pub fn push_global_verified(&mut self, name: impl Into<StateName>, state: impl Into<StateAtom>) {
         self.global
             .push(NamedState { name: name.into(), state: state.into() });
-        self
     }
 
-    pub fn add_owned(
-        mut self,
+    pub fn push_owned_unlocked(
+        &mut self,
         name: impl Into<StateName>,
-        data: impl Into<StrictVal>,
         auth: impl Into<AuthToken>,
-    ) -> Self {
-        self.owned.push(NamedState::new(name, data, auth));
-        self
+        data: impl Into<StrictVal>,
+    ) {
+        self.owned.push(NamedState::new_unlocked(name, auth, data));
     }
 }
 
@@ -87,6 +87,32 @@ pub struct IssueParams {
     pub timestamp: Option<DateTime<Utc>>,
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub core: CoreParams,
+}
+
+impl Deref for IssueParams {
+    type Target = CoreParams;
+
+    fn deref(&self) -> &Self::Target { &self.core }
+}
+
+impl DerefMut for IssueParams {
+    fn deref_mut(&mut self) -> &mut Self::Target { &mut self.core }
+}
+
+impl IssueParams {
+    pub fn new_testnet(name: impl Into<TypeName>, consensus: Consensus) -> Self {
+        Self {
+            name: name.into(),
+            consensus,
+            testnet: true,
+            timestamp: None,
+            core: CoreParams::new("issue"),
+        }
+    }
+
+    pub fn set_timestamp(&mut self, timestamp: DateTime<Utc>) { self.timestamp = Some(timestamp); }
+
+    pub fn set_timestamp_now(&mut self) { self.timestamp = Some(Utc::now()); }
 }
 
 impl Schema {
