@@ -195,12 +195,12 @@ impl IssueBuilder {
 #[derive(Clone, Debug)]
 pub struct Builder {
     call_id: CallId,
-    destructible: SmallVec<StateCell>,
-    immutable: SmallVec<StateData>,
+    destructible_out: SmallVec<StateCell>,
+    immutable_out: SmallVec<StateData>,
 }
 
 impl Builder {
-    pub fn new(call_id: CallId) -> Self { Builder { call_id, destructible: none!(), immutable: none!() } }
+    pub fn new(call_id: CallId) -> Self { Builder { call_id, destructible_out: none!(), immutable_out: none!() } }
 
     pub fn add_immutable(
         mut self,
@@ -211,7 +211,9 @@ impl Builder {
         sys: &TypeSystem,
     ) -> Self {
         let data = api.build_immutable(name, data, raw, sys);
-        self.immutable.push(data).expect("too many state elements");
+        self.immutable_out
+            .push(data)
+            .expect("too many state elements");
         self
     }
 
@@ -226,7 +228,7 @@ impl Builder {
     ) -> Self {
         let data = api.build_destructible(name, data, sys);
         let cell = StateCell { data, auth, lock };
-        self.destructible
+        self.destructible_out
             .push(cell)
             .expect("too many state elements");
         self
@@ -234,14 +236,14 @@ impl Builder {
 
     pub fn issue_genesis(self, codex_id: CodexId) -> Genesis {
         Genesis {
+            version: default!(),
             codex_id,
             call_id: self.call_id,
             nonce: fe256::from(u256::ZERO),
             blank1: zero!(),
             blank2: zero!(),
-            destructible: self.destructible,
-            immutable: self.immutable,
-            reserved: zero!(),
+            destructible_out: self.destructible_out,
+            immutable_out: self.immutable_out,
         }
     }
 }
@@ -284,15 +286,20 @@ impl<'c> BuilderRef<'c> {
 #[derive(Clone, Debug)]
 pub struct OpBuilder {
     contract_id: ContractId,
-    destroying: SmallVec<Input>,
-    reading: SmallVec<CellAddr>,
+    destructible_in: SmallVec<Input>,
+    immutable_in: SmallVec<CellAddr>,
     inner: Builder,
 }
 
 impl OpBuilder {
     pub fn new(contract_id: ContractId, call_id: CallId) -> Self {
         let inner = Builder::new(call_id);
-        Self { contract_id, destroying: none!(), reading: none!(), inner }
+        Self {
+            contract_id,
+            destructible_in: none!(),
+            immutable_in: none!(),
+            inner,
+        }
     }
 
     pub fn add_immutable(
@@ -323,7 +330,7 @@ impl OpBuilder {
     }
 
     pub fn access(mut self, addr: CellAddr) -> Self {
-        self.reading
+        self.immutable_in
             .push(addr)
             .expect("number of read memory cells exceeds 64k limit");
         self
@@ -332,7 +339,7 @@ impl OpBuilder {
     pub fn destroy(mut self, addr: CellAddr, _witness: StrictVal) -> Self {
         // TODO: Convert witness
         let input = Input { addr, witness: StateValue::None };
-        self.destroying
+        self.destructible_in
             .push(input)
             .expect("number of inputs exceeds 64k limit");
         self
@@ -340,14 +347,14 @@ impl OpBuilder {
 
     pub fn finalize(self) -> Operation {
         Operation {
+            version: default!(),
             contract_id: self.contract_id,
             call_id: self.inner.call_id,
             nonce: fe256::from(u256::ZERO),
-            destroying: self.destroying,
-            reading: self.reading,
-            destructible: self.inner.destructible,
-            immutable: self.inner.immutable,
-            reserved: zero!(),
+            destructible_in: self.destructible_in,
+            immutable_in: self.immutable_in,
+            destructible_out: self.inner.destructible_out,
+            immutable_out: self.inner.immutable_out,
         }
     }
 }

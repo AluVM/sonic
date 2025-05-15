@@ -131,7 +131,6 @@ fn codex() -> Codex {
             0 => LibSite::new(lib_id, 0),
             1 => LibSite::new(lib_id, 0),
         },
-        reserved: default!(),
     }
 }
 
@@ -253,7 +252,7 @@ fn graph(name: &str, ledger: &LedgerDir) {
         let valid = ledger.is_valid(opid);
         let node = graph.add_node((id, valid));
         nodes.insert(opid, node);
-        for inp in &op.destroying {
+        for inp in &op.destructible_in {
             graph.add_edge(node, nodes[&inp.addr.opid], ());
         }
     }
@@ -284,7 +283,7 @@ fn check_rollback(ledger: LedgerDir, mut removed: Vec<Operation>) -> Vec<Operati
     let mut index = 0usize;
     while let Some(op) = removed.get(index) {
         let opid = op.opid();
-        for no in 0..op.destructible.len_u16() {
+        for no in 0..op.destructible_out.len_u16() {
             let Some(child) = ledger.spent_by(CellAddr::new(opid, no)) else {
                 continue;
             };

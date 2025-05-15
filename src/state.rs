@@ -170,7 +170,7 @@ impl EffectiveState {
 pub struct RawState {
     /// Tokens of authority
     pub auth: LargeOrdMap<AuthToken, CellAddr>,
-    pub immutable: LargeOrdMap<CellAddr, StateData>,
+    pub global: LargeOrdMap<CellAddr, StateData>,
     pub owned: LargeOrdMap<CellAddr, StateCell>,
 }
 
@@ -178,8 +178,8 @@ impl StrictSerialize for RawState {}
 impl StrictDeserialize for RawState {}
 
 impl Memory for RawState {
-    fn read_once(&self, addr: CellAddr) -> Option<StateCell> { self.owned.get(&addr).copied() }
-    fn immutable(&self, addr: CellAddr) -> Option<StateValue> { self.immutable.get(&addr).map(|data| data.value) }
+    fn destructible(&self, addr: CellAddr) -> Option<StateCell> { self.owned.get(&addr).copied() }
+    fn immutable(&self, addr: CellAddr) -> Option<StateValue> { self.global.get(&addr).map(|data| data.value) }
 }
 
 impl RawState {
@@ -196,7 +196,7 @@ impl RawState {
         let op = op.into_operation();
         let mut transition = Transition::new(opid);
 
-        for input in op.destroying {
+        for input in op.destructible_in {
             let res = self
                 .owned
                 .remove(&input.addr)
@@ -211,7 +211,7 @@ impl RawState {
             debug_assert!(res.is_none());
         }
 
-        for (no, cell) in op.destructible.into_iter().enumerate() {
+        for (no, cell) in op.destructible_out.into_iter().enumerate() {
             let addr = CellAddr::new(opid, no as u16);
             self.auth
                 .insert(cell.auth, addr)
@@ -219,9 +219,9 @@ impl RawState {
             self.owned.insert(addr, cell).expect("state too large");
         }
 
-        self.immutable
+        self.global
             .extend(
-                op.immutable
+                op.immutable_out
                     .into_iter()
                     .enumerate()
                     .map(|(no, data)| (CellAddr::new(opid, no as u16), data)),
@@ -234,11 +234,11 @@ impl RawState {
     pub(self) fn rollback(&mut self, transition: Transition) {
         let opid = transition.opid;
 
-        let mut immutable = mem::take(&mut self.immutable);
+        let mut immutable = mem::take(&mut self.global);
         let mut owned = mem::take(&mut self.owned);
         immutable = LargeOrdMap::from_iter_checked(immutable.into_iter().filter(|(addr, _)| addr.opid != opid));
         owned = LargeOrdMap::from_iter_checked(owned.into_iter().filter(|(addr, _)| addr.opid != opid));
-        self.immutable = immutable;
+        self.global = immutable;
         self.owned = owned;
 
         // TODO: Use `retain` instead of the above workaround once supported by amplify
@@ -264,7 +264,7 @@ pub struct AdaptedState {
 impl AdaptedState {
     pub fn with(raw: &RawState, api: &Api, sys: &TypeSystem) -> Self {
         let mut me = AdaptedState::default();
-        for (addr, state) in &raw.immutable {
+        for (addr, state) in &raw.global {
             if let Some((name, atom)) = api.convert_immutable(state, sys) {
                 me.immutable.entry(name).or_default().insert(*addr, atom);
             }
@@ -296,7 +296,7 @@ impl AdaptedState {
     pub(self) fn apply(&mut self, op: &VerifiedOperation, api: &Api, sys: &TypeSystem) {
         let opid = op.opid();
         let op = op.as_operation();
-        for (no, state) in op.immutable.iter().enumerate() {
+        for (no, state) in op.immutable_out.iter().enumerate() {
             if let Some((name, atom)) = api.convert_immutable(state, sys) {
                 self.immutable
                     .entry(name)
@@ -305,12 +305,12 @@ impl AdaptedState {
             }
             // TODO: Warn if no state is present
         }
-        for input in &op.destroying {
+        for input in &op.destructible_in {
             for map in self.owned.values_mut() {
                 map.remove(&input.addr);
             }
         }
-        for (no, state) in op.destructible.iter().enumerate() {
+        for (no, state) in op.destructible_out.iter().enumerate() {
             if let Some((name, atom)) = api.convert_destructible(state.data, sys) {
                 self.owned
                     .entry(name)

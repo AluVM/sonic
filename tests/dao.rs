@@ -57,7 +57,6 @@ fn codex() -> Codex {
             1 => LibSite::new(lib_id, 0),
             2 => LibSite::new(lib_id, 0),
         },
-        reserved: default!(),
     }
 }
 
