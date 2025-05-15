@@ -49,6 +49,73 @@ use sonix::dump_ledger;
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
 use ultrasonic::{AuthToken, CellAddr, Codex, Consensus, Identity, Operation};
 
+mod libs {
+    use aluvm::{aluasm, Lib};
+
+    pub fn success() -> Lib {
+        let code = aluasm! {
+            stop;
+        };
+        Lib::assemble(&code).unwrap()
+    }
+}
+
+mod stl {
+    use strict_types::stl::std_stl;
+    use strict_types::{LibBuilder, SemId, SymbolicSys, SystemBuilder, TypeLib, TypeSystem};
+
+    use super::*;
+
+    pub const LIB_NAME_FUNGIBLE: &str = "Fungible";
+
+    #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, Display, From)]
+    #[display(inner)]
+    #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+    #[strict_type(lib = LIB_NAME_FUNGIBLE)]
+    pub struct Amount(u64);
+
+    pub fn stl() -> TypeLib {
+        LibBuilder::with(libname!(LIB_NAME_FUNGIBLE), [std_stl().to_dependency_types()])
+            .transpile::<Amount>()
+            .compile()
+            .expect("invalid Fungible type library")
+    }
+
+    #[derive(Debug)]
+    pub struct FungibleTypes(SymbolicSys);
+
+    impl Default for FungibleTypes {
+        fn default() -> Self { FungibleTypes::new() }
+    }
+
+    impl FungibleTypes {
+        pub fn new() -> Self {
+            Self(
+                SystemBuilder::new()
+                    .import(std_stl())
+                    .unwrap()
+                    .import(stl())
+                    .unwrap()
+                    .finalize()
+                    .unwrap(),
+            )
+        }
+
+        pub fn type_system(&self) -> TypeSystem {
+            let types = stl().types;
+            let types = types.iter().map(|(tn, ty)| ty.sem_id_named(tn));
+            self.0.as_types().extract(types).unwrap()
+        }
+
+        pub fn get(&self, name: &'static str) -> SemId {
+            *self
+                .0
+                .resolve(name)
+                .unwrap_or_else(|| panic!("type '{name}' is absent in the type library"))
+        }
+    }
+}
+
 fn codex() -> Codex {
     let lib = libs::success();
     let lib_id = lib.lib_id();
@@ -121,7 +188,7 @@ fn setup(name: &str) -> LedgerDir {
         issue.push_owned_unlocked("amount", next_auth(), svnum!(100u64));
     }
     let articles = issuer.issue(issue);
-    let opid = articles.issue.genesis_opid();
+    let opid = articles.genesis_opid();
 
     let contract_path = PathBuf::from(format!("tests/data/{name}.contract"));
     if contract_path.exists() {
@@ -203,73 +270,6 @@ fn graph(name: &str, ledger: &LedgerDir) {
     let dot = Dot::with_attr_getters(&graph, &[Config::EdgeNoLabel], &edge_attr, &node_attr);
     let graph = format!("{dot:?}");
     fs::write(format!("tests/data/{name}.dot"), graph).unwrap();
-}
-
-mod libs {
-    use aluvm::{aluasm, Lib};
-
-    pub fn success() -> Lib {
-        let code = aluasm! {
-            stop;
-        };
-        Lib::assemble(&code).unwrap()
-    }
-}
-
-mod stl {
-    use strict_types::stl::std_stl;
-    use strict_types::{LibBuilder, SemId, SymbolicSys, SystemBuilder, TypeLib, TypeSystem};
-
-    use super::*;
-
-    pub const LIB_NAME_FUNGIBLE: &str = "Fungible";
-
-    #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, Display, From)]
-    #[display(inner)]
-    #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-    #[strict_type(lib = LIB_NAME_FUNGIBLE)]
-    pub struct Amount(u64);
-
-    pub fn stl() -> TypeLib {
-        LibBuilder::with(libname!(LIB_NAME_FUNGIBLE), [std_stl().to_dependency_types()])
-            .transpile::<Amount>()
-            .compile()
-            .expect("invalid Fungible type library")
-    }
-
-    #[derive(Debug)]
-    pub struct FungibleTypes(SymbolicSys);
-
-    impl Default for FungibleTypes {
-        fn default() -> Self { FungibleTypes::new() }
-    }
-
-    impl FungibleTypes {
-        pub fn new() -> Self {
-            Self(
-                SystemBuilder::new()
-                    .import(std_stl())
-                    .unwrap()
-                    .import(stl())
-                    .unwrap()
-                    .finalize()
-                    .unwrap(),
-            )
-        }
-
-        pub fn type_system(&self) -> TypeSystem {
-            let types = stl().types;
-            let types = types.iter().map(|(tn, ty)| ty.sem_id_named(tn));
-            self.0.as_types().extract(types).unwrap()
-        }
-
-        pub fn get(&self, name: &'static str) -> SemId {
-            *self
-                .0
-                .resolve(name)
-                .unwrap_or_else(|| panic!("type '{name}' is absent in the type library"))
-        }
-    }
 }
 
 #[test]
