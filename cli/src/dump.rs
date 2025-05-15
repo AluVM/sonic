@@ -94,7 +94,7 @@ pub fn dump_ledger(src: impl AsRef<Path>, dst: impl AsRef<Path>, force: bool) ->
     print!("Processing state ... ");
     let state = ledger.state();
 
-    let out = File::create_new(dst.join("state.yaml"))?;
+    let out = File::create_new(dst.join("state-default.yaml"))?;
     serde_yaml::to_writer(&out, &state.main)?;
     let out = File::create_new(dst.join("state-raw.yaml"))?;
     serde_yaml::to_writer(&out, &state.raw)?;
