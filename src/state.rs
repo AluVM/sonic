@@ -334,7 +334,6 @@ impl AdaptedState {
             if let Some((name, value)) = api.convert_destructible(cell.data, sys) {
                 self.owned.entry(name).or_default().insert(*addr, value);
             }
-            // TODO: Warn if no state is present
         }
     }
 }

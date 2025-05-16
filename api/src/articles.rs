@@ -27,7 +27,7 @@ use amplify::hex::ToHex;
 use strict_encoding::{
     DecodeError, ReadRaw, StrictDecode, StrictEncode, StrictReader, StrictWriter, TypeName, WriteRaw,
 };
-use ultrasonic::{ContractId, Issue};
+use ultrasonic::{ContractId, Issue, Opid};
 
 use crate::sigs::ContentSigs;
 use crate::{Api, Schema, LIB_NAME_SONIC};
@@ -49,6 +49,8 @@ pub struct Articles {
 
 impl Articles {
     pub fn contract_id(&self) -> ContractId { self.issue.contract_id() }
+
+    pub fn genesis_opid(&self) -> Opid { self.issue.genesis_opid() }
 
     pub fn api(&self, name: &TypeName) -> &Api { self.schema.api(name) }
 

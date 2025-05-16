@@ -71,7 +71,7 @@ pub struct DataCell {
 
 impl DataCell {
     #[inline]
-    pub fn new(data: impl Into<StrictVal>, auth: impl Into<AuthToken>) -> Self {
+    pub fn new_unlocked(auth: impl Into<AuthToken>, data: impl Into<StrictVal>) -> Self {
         Self { data: data.into(), auth: auth.into(), lock: None }
     }
 }

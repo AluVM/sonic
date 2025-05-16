@@ -4,9 +4,9 @@
 ![Tests](https://github.com/AluVM/sonic/workflows/Tests/badge.svg)
 [![codecov](https://codecov.io/gh/AluVM/sonic/branch/master/graph/badge.svg)](https://codecov.io/gh/AluVM/sonic)
 
-[![crates.io](https://img.shields.io/crates/v/sonic)](https://crates.io/crates/sonic)
-[![Docs](https://docs.rs/sonic/badge.svg)](https://docs.rs/sonic)
-[![License](https://img.shields.io/crates/l/sonic)](./LICENSE)
+[![crates.io](https://img.shields.io/crates/v/hypersonic)](https://crates.io/crates/sonic)
+[![Docs](https://docs.rs/hypersonic/badge.svg)](https://docs.rs/sonic)
+[![License](https://img.shields.io/crates/l/hypersonic)](./LICENSE)
 
 ## What is it
 

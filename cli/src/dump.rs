@@ -29,7 +29,7 @@ use anyhow::Context;
 use hypersonic::persistance::LedgerDir;
 use hypersonic::{Articles, Opid};
 
-fn dump_articles(articles: &Articles, dst: &Path) -> anyhow::Result<Opid> {
+pub fn dump_articles(articles: &Articles, dst: &Path) -> anyhow::Result<Opid> {
     let genesis_opid = articles.issue.genesis_opid();
     let out = File::create_new(dst.join(format!("0000-genesis-{genesis_opid}.yaml")))
         .context("can't create dump files; try to use the `--force` flag")?;
@@ -56,8 +56,13 @@ fn dump_articles(articles: &Articles, dst: &Path) -> anyhow::Result<Opid> {
     Ok(genesis_opid)
 }
 
-pub fn dump_ledger(src: &Path, dst: impl AsRef<Path>) -> anyhow::Result<()> {
+pub fn dump_ledger(src: impl AsRef<Path>, dst: impl AsRef<Path>, force: bool) -> anyhow::Result<()> {
+    let src = src.as_ref();
     let dst = dst.as_ref();
+
+    if force {
+        let _ = fs::remove_dir_all(dst);
+    }
     fs::create_dir_all(dst)?;
 
     print!("Reading contract ledger from '{}' ... ", src.display());
@@ -89,7 +94,7 @@ pub fn dump_ledger(src: &Path, dst: impl AsRef<Path>) -> anyhow::Result<()> {
     print!("Processing state ... ");
     let state = ledger.state();
 
-    let out = File::create_new(dst.join("state.yaml"))?;
+    let out = File::create_new(dst.join("state-default.yaml"))?;
     serde_yaml::to_writer(&out, &state.main)?;
     let out = File::create_new(dst.join("state-raw.yaml"))?;
     serde_yaml::to_writer(&out, &state.raw)?;

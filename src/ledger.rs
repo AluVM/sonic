@@ -21,11 +21,12 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use alloc::collections::{BTreeSet, VecDeque};
+use alloc::collections::BTreeSet;
 use core::borrow::Borrow;
 use std::io;
 
 use amplify::hex::ToHex;
+use indexmap::IndexSet;
 use sonic_callreq::MethodName;
 use sonicapi::{MergeError, NamedState, OpBuilder, Schema};
 use strict_encoding::{
@@ -209,50 +210,46 @@ impl<S: Stock> Ledger<S> {
     #[inline]
     pub fn spent_by(&self, addr: CellAddr) -> Option<Opid> { self.0.spent_by(addr) }
 
-    pub fn ancestors(&self, opids: impl IntoIterator<Item = Opid>) -> impl Iterator<Item = Opid> {
-        let mut chain = opids.into_iter().collect::<VecDeque<_>>();
+    /// # Nota bene
+    ///
+    /// Ancestors do include the original operations
+    pub fn ancestors(&self, opids: impl IntoIterator<Item = Opid>) -> impl DoubleEndedIterator<Item = Opid> {
+        let mut chain = opids.into_iter().collect::<IndexSet<_>>();
         // Get all subsequent operations
-        loop {
-            let mut count = 0usize;
-            for index in 0..chain.len() {
-                let opid = chain[index];
+        let mut index = 0usize;
+        let genesis_opid = self.articles().issue.genesis_opid();
+        while let Some(opid) = chain.get_index(index).copied() {
+            if opid != genesis_opid {
                 let op = self.0.operation(opid);
-                for inp in &op.destroying {
-                    if chain.contains(&inp.addr.opid) {
-                        continue;
+                for inp in op.destroying {
+                    let parent = inp.addr.opid;
+                    if !chain.contains(&parent) {
+                        chain.insert(parent);
                     }
-                    chain.push_front(inp.addr.opid);
-                    count += 1;
                 }
             }
-            if count == 0 {
-                break;
-            }
+            index += 1;
         }
         chain.into_iter()
     }
 
-    pub fn descendants(&self, opids: impl IntoIterator<Item = Opid>) -> impl Iterator<Item = Opid> {
-        let mut chain = opids.into_iter().collect::<VecDeque<_>>();
+    /// # Nota bene
+    ///
+    /// Descendants do include the original operations
+    pub fn descendants(&self, opids: impl IntoIterator<Item = Opid>) -> impl DoubleEndedIterator<Item = Opid> {
+        let mut chain = opids.into_iter().collect::<IndexSet<_>>();
         // Get all subsequent operations
-        loop {
-            let mut count = 0usize;
-            for index in 0..chain.len() {
-                let opid = chain[index];
-                let op = self.0.operation(opid);
-                for no in 0..op.destructible.len_u16() {
-                    let addr = CellAddr::new(opid, no);
-                    let Some(spent) = self.0.spent_by(addr) else { continue };
-                    if chain.contains(&spent) {
-                        continue;
-                    }
-                    chain.push_front(spent);
-                    count += 1;
+        let mut index = 0usize;
+        while let Some(opid) = chain.get_index(index).copied() {
+            let op = self.0.operation(opid);
+            for no in 0..op.destructible.len_u16() {
+                let addr = CellAddr::new(opid, no);
+                let Some(spent) = self.0.spent_by(addr) else { continue };
+                if !chain.contains(&spent) {
+                    chain.insert(spent);
                 }
             }
-            if count == 0 {
-                break;
-            }
+            index += 1;
         }
         chain.into_iter()
     }
@@ -383,37 +380,41 @@ impl<S: Stock> Ledger<S> {
     }
 
     pub fn rollback(&mut self, opids: impl IntoIterator<Item = Opid>) -> Result<(), SerializeError> {
-        for opid in self.descendants(opids) {
-            let transition = self.0.transition(opid);
+        for opid in self.descendants(opids).rev() {
+            let mut transition = self.0.transition(opid);
+            // We need to filter out already invalidated inputs
+            let inputs = transition
+                .destroyed
+                .keys()
+                .copied()
+                .collect::<IndexSet<_>>();
+            for addr in inputs {
+                if !self.is_valid(addr.opid) {
+                    // empty destroyed is allowed
+                    let _ = transition.destroyed.remove(&addr);
+                }
+            }
             self.0.update_state(|state, schema| {
                 state.rollback(transition, &schema.default_api, schema.custom_apis.keys(), &schema.types);
             })?;
             self.0.mark_invalid(opid);
         }
+        self.commit_transaction();
         Ok(())
     }
 
     pub fn forward(&mut self, opids: impl IntoIterator<Item = Opid>) -> Result<(), AcceptError> {
-        let mut all = opids.into_iter().collect::<VecDeque<_>>();
-        let mut queue = VecDeque::with_capacity(all.len());
-
-        while let Some(opid) = all.pop_front() {
-            let op = self.0.operation(opid);
-            queue.push_front(op);
-            let op = &queue[0];
-            for prev in &op.reading {
-                if all.contains(&prev.opid) {
-                    all.push_front(prev.opid);
-                }
+        for opid in self.descendants(opids) {
+            debug_assert!(!self.is_valid(opid));
+            if self
+                .ancestors([opid])
+                .filter(|id| *id != opid)
+                .all(|id| self.is_valid(id))
+            {
+                let op = self.0.operation(opid);
+                self.apply_verify(op, true)?;
+                debug_assert!(self.is_valid(opid));
             }
-            for prev in &op.destroying {
-                if all.contains(&prev.addr.opid) {
-                    all.push_front(prev.addr.opid);
-                }
-            }
-        }
-        for op in queue {
-            self.apply_verify(op, true)?;
         }
         self.commit_transaction();
         Ok(())

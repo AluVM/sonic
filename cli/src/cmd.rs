@@ -21,7 +21,6 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use std::fs;
 use std::fs::File;
 use std::path::PathBuf;
 
@@ -183,10 +182,7 @@ fn dump(force: bool, src: PathBuf, dst: Option<PathBuf>) -> anyhow::Result<()> {
                 .as_ref()
                 .map(|p| p.to_owned())
                 .unwrap_or_else(|| src.join("dump"));
-            if force {
-                let _ = fs::remove_dir_all(&dst);
-            }
-            dump_ledger(&src, dst).inspect_err(|_| println!())?;
+            dump_ledger(&src, dst, force).inspect_err(|_| println!())?;
             Ok(())
         }
         Some(_) => Err(anyhow!("Can't detect the type for '{}': the extension is not recognized", src.display())),

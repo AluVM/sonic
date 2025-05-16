@@ -61,6 +61,10 @@ required-features = ["persist-file"]
 name = "dao"
 required-features = ["persist-file"]
 
+[[test]]
+name = "reorgs"
+required-features = ["persist-file"]
+
 [dependencies]
 amplify = { workspace = true }
 strict_encoding.workspace = true
@@ -70,8 +74,14 @@ aluvm.workspace = true
 ultrasonic.workspace = true
 sonic-api.workspace = true
 sonic-callreq.workspace = true
+indexmap.workspace = true
 aora = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+sonix = { path = "./cli" }
+rand = "0.8.4"
+petgraph = "0.8.1"
 
 [features]
 default = ["std"]
@@ -101,3 +111,6 @@ wasm-bindgen-test = "0.3"
 
 [package.metadata.docs.rs]
 features = ["all"]
+
+[patch.crates-io]
+commit_verify = { git = "https://github.com/LNP-BP/client_side_validation", branch = "v0.12" }
