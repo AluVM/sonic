@@ -108,7 +108,7 @@ impl EffectiveState {
     }
 
     /// Re-evaluates computable part of the state
-    pub(crate) fn recompute<'a>(&mut self, default_api: &Api, custom_apis: impl IntoIterator<Item = &'a Api>) {
+    pub fn recompute<'a>(&mut self, default_api: &Api, custom_apis: impl IntoIterator<Item = &'a Api>) {
         self.main.compute(default_api);
         self.aux = bmap! {};
         for api in custom_apis {
