@@ -324,7 +324,7 @@ fn check_rollback(ledger: LedgerDir, mut removed: Vec<Operation>) -> Vec<Operati
 fn single_rollback() {
     let mut ledger = setup("SingleRollback");
     let (mid_opid, mid_op) = ledger.operations().nth(50).unwrap();
-    println!("Rolling back {} and its descendants", mid_opid);
+    println!("Rolling back {mid_opid} and its descendants");
     ledger.rollback([mid_opid]).unwrap();
     dump_ledger("tests/data/SingleRollback.contract", "tests/data/SingleRollback.dump", true).unwrap();
     graph("SingleRollback", &ledger);
@@ -365,9 +365,9 @@ fn rollback_forward() {
     let mut ledger = setup("RollbackForward");
     let init_state = ledger.state().main.clone();
     let (mid_opid, _) = ledger.operations().nth(50).unwrap();
-    println!("Rolling back {} and its descendants", mid_opid);
+    println!("Rolling back {mid_opid} and its descendants");
     ledger.rollback([mid_opid]).unwrap();
-    println!("Applying {} and its descendants back", mid_opid);
+    println!("Applying {mid_opid} and its descendants back");
     ledger.forward([mid_opid]).unwrap();
     dump_ledger("tests/data/RollbackForward.contract", "tests/data/RollbackForward.dump", true).unwrap();
     graph("RollbackForward", &ledger);
