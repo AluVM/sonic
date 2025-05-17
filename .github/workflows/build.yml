@@ -36,6 +36,7 @@ jobs:
         feature:
           - std
           - persist-file
+          - vesper
           - stl
           - serde
     steps:
