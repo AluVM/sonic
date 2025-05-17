@@ -28,13 +28,16 @@ use std::path::{Path, PathBuf};
 
 use aora::file::{FileAoraMap, FileAuraMap};
 use aora::{AoraMap, AuraMap, TransactionalMap};
-use sonicapi::{Articles, MergeError, Schema};
+use hypersonic::{
+    AcceptError, Articles, AuthToken, CellAddr, EffectiveState, IssueError, Ledger, LoadError, MergeError, Operation,
+    Opid, RawState, Schema, Stock, StockError, Transition,
+};
 use strict_encoding::{SerializeError, StreamReader, StreamWriter, StrictReader, StrictWriter};
-use ultrasonic::{AuthToken, CellAddr, Operation, Opid};
 
-use crate::{AcceptError, EffectiveState, IssueError, Ledger, LoadError, RawState, Stock, StockError, Transition};
-
-pub type LedgerDir = Ledger<StockFs>;
+#[derive(Wrapper, WrapperMut, Debug, From)]
+#[wrapper(Deref)]
+#[wrapper_mut(DerefMut)]
+pub struct LedgerDir(Ledger<StockFs>);
 
 const STASH_MAGIC: u64 = u64::from_be_bytes(*b"RGBSTASH");
 const TRACE_MAGIC: u64 = u64::from_be_bytes(*b"RGBTRACE");
@@ -194,6 +197,12 @@ impl Stock for StockFs {
 }
 
 impl LedgerDir {
+    pub fn new(articles: Articles, conf: PathBuf) -> Result<Self, IssueError<io::Error>> {
+        Ledger::new(articles, conf).map(Self)
+    }
+
+    pub fn load(conf: PathBuf) -> Result<Self, LoadError<io::Error>> { Ledger::load(conf).map(Self) }
+
     pub fn backup_to_file(&mut self, output: impl AsRef<Path>) -> io::Result<()> {
         let file = File::create_new(output)?;
         let writer = StrictWriter::with(StreamWriter::new::<{ usize::MAX }>(file));
@@ -216,5 +225,5 @@ impl LedgerDir {
         self.accept(&mut reader)
     }
 
-    pub fn path(&self) -> &Path { &self.0.path }
+    pub fn path(&self) -> &Path { &self.0.stock().path }
 }

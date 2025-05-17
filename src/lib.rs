@@ -57,7 +57,6 @@ pub use ultrasonic::*;
 
 mod state;
 mod stock;
-pub mod persistance;
 mod deed;
 mod ledger;
 #[cfg(feature = "stl")]

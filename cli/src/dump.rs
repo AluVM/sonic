@@ -26,8 +26,8 @@ use std::fs::File;
 use std::path::Path;
 
 use anyhow::Context;
-use hypersonic::persistance::LedgerDir;
 use hypersonic::{Articles, Opid};
+use sonic_persist_fs::LedgerDir;
 
 pub fn dump_articles(articles: &Articles, dst: &Path) -> anyhow::Result<Opid> {
     let genesis_opid = articles.issue.genesis_opid();

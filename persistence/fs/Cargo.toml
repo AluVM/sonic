@@ -1,23 +1,25 @@
 [package]
-name = "sonix"
-description = "Command-line tool for working with SONIC machines and contracts"
-categories = ["command-line-utilities", "science"]
+name = "sonic-persist-fs"
 version.workspace = true
 authors.workspace = true
+description = "Filesystem persistence for SONIC smart contracts"
 repository.workspace = true
 homepage.workspace = true
 keywords.workspace = true
+categories = ["algorithms", "cryptography", "science", "no-std"]
 readme.workspace = true
 license.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+exclude = [".github"]
 
 [dependencies]
-hypersonic = { workspace = true, features = ["serde"] }
-sonic-persist-fs.workspace = true
-anyhow = "1.0.93"
-clap = { version = "4.5.21", features = ["derive"] }
-serde_yaml.workspace = true
+amplify.workspace = true
+strict_encoding.workspace = true
+hypersonic.workspace = true
+aora.workspace = true
+
+[features]
 
 [lints.rust]
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(coverage_nightly)'] }

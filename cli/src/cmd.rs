@@ -25,8 +25,8 @@ use std::fs::File;
 use std::path::PathBuf;
 
 use clap::ValueHint;
-use hypersonic::persistance::LedgerDir;
 use hypersonic::{Articles, AuthToken, CallParams, IssueParams, Schema};
+use sonic_persist_fs::LedgerDir;
 
 use crate::dump::dump_ledger;
 

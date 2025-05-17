@@ -35,7 +35,6 @@ jobs:
       matrix:
         feature:
           - std
-          - persist-file
           - vesper
           - stl
           - serde

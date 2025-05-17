@@ -21,8 +21,11 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-#[cfg(feature = "persist-file")]
+#![cfg_attr(coverage_nightly, feature(coverage_attribute), coverage(off))]
+
+#[macro_use]
+extern crate amplify;
+
 mod fs;
 
-#[cfg(feature = "persist-file")]
 pub use fs::{LedgerDir, StockFs};

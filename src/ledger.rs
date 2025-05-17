@@ -45,7 +45,7 @@ pub const LEDGER_VERSION: [u8; 2] = [0x00, 0x01];
 // We need the persistence trait (`Stock`) in order to allow different persistence storage
 // implementations.
 #[derive(Clone, Debug)]
-pub struct Ledger<S: Stock>(pub(crate) S);
+pub struct Ledger<S: Stock>(S);
 
 impl<S: Stock> Ledger<S> {
     /// Instantiates a new contract from the provided articles, creating its persistence with the
@@ -74,6 +74,8 @@ impl<S: Stock> Ledger<S> {
     pub fn load(conf: S::Conf) -> Result<Self, LoadError<S::Error>> { S::load(conf).map(Self) }
 
     pub fn config(&self) -> S::Conf { self.0.config() }
+
+    pub fn stock(&self) -> &S { &self.0 }
 
     /// Provides [`Schema`] object, which includes codex, under which the contract was issued, and
     /// interfaces for the contract under that codex.

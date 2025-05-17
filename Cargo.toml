@@ -1,6 +1,6 @@
 [workspace]
-members = [".", "api", "cli", "callreq"]
-default-members = [".", "api", "callreq"]
+members = [".", "api", "cli", "callreq", "persistence/fs"]
+default-members = [".", "api", "callreq", "persistence/fs"]
 resolver = "2"
 
 [workspace.package]
@@ -23,6 +23,7 @@ aluvm = "=0.12.0-beta.6"
 ultrasonic = "=0.12.0-beta.6"
 sonic-api = { version = "=0.12.0-beta.6", path = "api" }
 sonic-callreq = { version = "=0.12.0-beta.6", path = "callreq" }
+sonic-persist-fs = { version = "=0.12.0-beta.6", path = "persistence/fs" }
 hypersonic = { version = "=0.12.0-beta.6", path = "." }
 aora = ">=0.6.3"
 baid64 = "0.4.1"
@@ -55,15 +56,12 @@ name = "hypersonic"
 
 [[example]]
 name = "dao"
-required-features = ["persist-file"]
 
 [[test]]
 name = "dao"
-required-features = ["persist-file"]
 
 [[test]]
 name = "reorgs"
-required-features = ["persist-file"]
 
 [dependencies]
 amplify = { workspace = true }
@@ -75,23 +73,22 @@ ultrasonic.workspace = true
 sonic-api.workspace = true
 sonic-callreq.workspace = true
 indexmap.workspace = true
-aora = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 
 [dev-dependencies]
 sonix = { path = "./cli" }
+sonic-persist-fs.workspace = true
 rand = "0.9.1"
 petgraph = "0.8.1"
 
 [features]
 default = ["std"]
-all = ["stl", "vesper", "std", "serde", "persist-file"]
+all = ["stl", "vesper", "std", "serde"]
 
 std = ["sonic-api/std", "sonic-callreq/std"]
 vesper = ["ultrasonic/vesper"]
 stl = ["commit_verify/stl", "ultrasonic/stl", "strict_types/armor"]
 
-persist-file = ["std", "aora"]
 serde = [
     "dep:serde",
     "amplify/serde",

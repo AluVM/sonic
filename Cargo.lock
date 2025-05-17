@@ -479,7 +479,6 @@ version = "0.12.0-beta.6"
 dependencies = [
  "aluvm",
  "amplify",
- "aora",
  "commit_verify",
  "getrandom 0.2.16",
  "getrandom 0.3.3",
@@ -489,6 +488,7 @@ dependencies = [
  "serde",
  "sonic-api",
  "sonic-callreq",
+ "sonic-persist-fs",
  "sonix",
  "strict_encoding",
  "strict_types",
@@ -863,6 +863,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "sonic-persist-fs"
+version = "0.12.0-beta.6"
+dependencies = [
+ "amplify",
+ "aora",
+ "hypersonic",
+ "strict_encoding",
+]
+
+[[package]]
 name = "sonix"
 version = "0.12.0-beta.6"
 dependencies = [
@@ -870,6 +880,7 @@ dependencies = [
  "clap",
  "hypersonic",
  "serde_yaml",
+ "sonic-persist-fs",
 ]
 
 [[package]]
