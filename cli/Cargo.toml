@@ -13,10 +13,10 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-amplify.workspace = true
-strict_encoding.workspace = true
 hypersonic = { workspace = true, features = ["serde", "persist-file"] }
-serde.workspace = true
 anyhow = "1.0.93"
 clap = { version = "4.5.21", features = ["derive"] }
 serde_yaml.workspace = true
+
+[lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(coverage_nightly)'] }

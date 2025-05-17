@@ -310,6 +310,7 @@ pub enum CallReqParseError<E1: Error, E2: Error> {
 
 #[cfg(test)]
 mod test {
+    #![cfg_attr(coverage_nightly, coverage(off))]
     use ultrasonic::{AuthToken, ContractId};
 
     use super::*;

@@ -56,6 +56,7 @@ pub fn sonic_stl() -> TypeLib { _sonic_stl().expect("invalid strict type SONIC l
 
 #[cfg(test)]
 mod test {
+    #![cfg_attr(coverage_nightly, coverage(off))]
     use super::*;
 
     #[test]

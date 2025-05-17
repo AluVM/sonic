@@ -248,9 +248,9 @@ impl StateCalc for EmbeddedCalc {
             }
             EmbeddedCalc::Fungible(value) => {
                 let (val, add) = match (state, value) {
-                    // TODO: Remove unsafe once rust supports `if let` guards
+                    // TODO: Use `if let` guards to avoid `unwrap` once rust supports them
                     (StrictVal::String(s), StrictVal::Number(StrictNum::Uint(val))) if u64::from_str(s).is_ok() => {
-                        let add = unsafe { u64::from_str(s).unwrap_unchecked() };
+                        let add = u64::from_str(s).unwrap();
                         (val, add)
                     }
                     (StrictVal::Number(StrictNum::Uint(add)), StrictVal::Number(StrictNum::Uint(val))) => (val, *add),
@@ -274,9 +274,9 @@ impl StateCalc for EmbeddedCalc {
             }
             EmbeddedCalc::Fungible(value) => {
                 let (val, dec) = match (state, value) {
-                    // TODO: Remove unsafe once rust supports `if let` guards
+                    // TODO: Use `if let` guards to avoid `unwrap` once rust supports them
                     (StrictVal::String(s), StrictVal::Number(StrictNum::Uint(val))) if u64::from_str(s).is_ok() => {
-                        let dec = unsafe { u64::from_str(s).unwrap_unchecked() };
+                        let dec = u64::from_str(s).unwrap();
                         (val, dec)
                     }
                     (StrictVal::Number(StrictNum::Uint(dec)), StrictVal::Number(StrictNum::Uint(val))) => (val, *dec),
@@ -329,6 +329,7 @@ impl StateCalc for EmbeddedCalc {
 
 #[cfg(test)]
 mod test {
+    #![cfg_attr(coverage_nightly, coverage(off))]
     use super::*;
 
     #[test]
