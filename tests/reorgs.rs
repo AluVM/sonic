@@ -42,8 +42,8 @@ use petgraph::dot::{Config, Dot};
 use petgraph::graph::EdgeReference;
 use petgraph::prelude::NodeIndex;
 use petgraph::Graph;
+use rand::rng;
 use rand::seq::SliceRandom;
-use rand::thread_rng;
 use sonicapi::IssueParams;
 use sonix::dump_ledger;
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
@@ -210,7 +210,7 @@ fn setup(name: &str) -> LedgerDir {
 
     for round in 0u16..10 {
         // shuffle outputs to create twisted DAG
-        prev.shuffle(&mut thread_rng());
+        prev.shuffle(&mut rng());
         let mut iter = prev.into_iter();
         let mut new_prev = vec![];
         while let Some((first, second)) = iter.next().zip(iter.next()) {
