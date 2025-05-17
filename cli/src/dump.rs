@@ -24,12 +24,16 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::fs::File;
+use std::io::Write;
 use std::path::Path;
 
+use amplify::confinement::U24 as U24MAX;
 use anyhow::Context;
-use hypersonic::{Articles, CellAddr, Opid};
+use baid64::DisplayBaid64;
+use hypersonic::{Articles, CellAddr, Instr, Opid};
 use serde::{Deserialize, Serialize};
 use sonic_persist_fs::LedgerDir;
+use strict_encoding::StrictSerialize;
 
 pub fn dump_articles(articles: &Articles, dst: &Path) -> anyhow::Result<Opid> {
     let genesis_opid = articles.issue.genesis_opid();
@@ -51,8 +55,19 @@ pub fn dump_articles(articles: &Articles, dst: &Path) -> anyhow::Result<Opid> {
         serde_yaml::to_writer(&out, &api)?;
     }
 
-    // TODO: Process type system
-    // TODO: Process AluVM libraries
+    for lib in &articles.libs {
+        let lib_id = lib.lib_id();
+        let name = lib_id.to_baid64_mnemonic();
+        lib.strict_serialize_to_file::<U24MAX>(dst.join(format!("{name}.alu")))?;
+        let out = File::create_new(dst.join(format!("{name}.aluasm")))?;
+        lib.print_disassemble::<Instr<_>>(out)?;
+    }
+
+    articles
+        .types
+        .strict_serialize_to_file::<U24MAX>(dst.join("types.sts"))?;
+    let mut out = File::create_new(dst.join("types.sty"))?;
+    write!(out, "{}", articles.types)?;
 
     Ok(genesis_opid)
 }

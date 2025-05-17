@@ -876,12 +876,15 @@ dependencies = [
 name = "sonix"
 version = "0.12.0-beta.6"
 dependencies = [
+ "amplify",
  "anyhow",
+ "baid64",
  "clap",
  "hypersonic",
  "serde",
  "serde_yaml",
  "sonic-persist-fs",
+ "strict_encoding",
 ]
 
 [[package]]
