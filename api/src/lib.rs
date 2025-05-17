@@ -61,7 +61,7 @@ mod articles;
 mod builders;
 mod util;
 
-pub use adaptors::{alu, embedded};
+pub use adaptors::{/* alu, */ embedded};
 pub use api::{
     Api, ApiId, ApiInner, ApiVm, AppendApi, DestructibleApi, StateAdaptor, StateArithm, StateCalc, StateCalcError,
     StateReader,

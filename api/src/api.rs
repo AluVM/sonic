@@ -65,14 +65,15 @@ pub(super) const TOTAL_BYTES: usize = USED_FIEL_BYTES * 3;
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_SONIC, tags = custom, dumb = Self::Embedded(strict_dumb!()))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
+#[non_exhaustive]
 pub enum Api {
     #[from]
     #[strict_type(tag = 1)]
     Embedded(ApiInner<EmbeddedProc>),
-
+    /*
     #[from]
     #[strict_type(tag = 2)]
-    Alu(ApiInner<aluvm::Vm>),
+    Alu(ApiInner<aluvm::Vm>),*/
 }
 
 impl PartialEq for Api {
@@ -101,49 +102,49 @@ impl Api {
     pub fn vm_type(&self) -> VmType {
         match self {
             Api::Embedded(_) => VmType::Embedded,
-            Api::Alu(_) => VmType::AluVM,
+            //Api::Alu(_) => VmType::AluVM,
         }
     }
 
     pub fn codex_id(&self) -> CodexId {
         match self {
             Api::Embedded(api) => api.codex_id,
-            Api::Alu(api) => api.codex_id,
+            //Api::Alu(api) => api.codex_id,
         }
     }
 
     pub fn timestamp(&self) -> i64 {
         match self {
             Api::Embedded(api) => api.timestamp,
-            Api::Alu(api) => api.timestamp,
+            //Api::Alu(api) => api.timestamp,
         }
     }
 
     pub fn name(&self) -> Option<&TypeName> {
         match self {
             Api::Embedded(api) => api.name.as_ref(),
-            Api::Alu(api) => api.name.as_ref(),
+            //Api::Alu(api) => api.name.as_ref(),
         }
     }
 
     pub fn conforms(&self) -> Option<&TypeName> {
         match self {
             Api::Embedded(api) => api.conforms.as_ref(),
-            Api::Alu(api) => api.conforms.as_ref(),
+            //Api::Alu(api) => api.conforms.as_ref(),
         }
     }
 
     pub fn developer(&self) -> &Identity {
         match self {
             Api::Embedded(api) => &api.developer,
-            Api::Alu(api) => &api.developer,
+            //Api::Alu(api) => &api.developer,
         }
     }
 
     pub fn default_call(&self) -> Option<&CallState> {
         match self {
             Api::Embedded(api) => api.default_call.as_ref(),
-            Api::Alu(api) => api.default_call.as_ref(),
+            //Api::Alu(api) => api.default_call.as_ref(),
         }
     }
 
@@ -151,7 +152,7 @@ impl Api {
         let method = method.into();
         match self {
             Api::Embedded(api) => api.verifiers.get(&method),
-            Api::Alu(api) => api.verifiers.get(&method),
+            //Api::Alu(api) => api.verifiers.get(&method),
         }
         .copied()
     }
@@ -159,7 +160,7 @@ impl Api {
     pub fn readers(&self) -> Box<dyn Iterator<Item = &MethodName> + '_> {
         match self {
             Api::Embedded(api) => Box::new(api.readers.keys()),
-            Api::Alu(api) => Box::new(api.readers.keys()),
+            //Api::Alu(api) => Box::new(api.readers.keys()),
         }
     }
 
@@ -174,11 +175,11 @@ impl Api {
                 .get(name)
                 .expect("state name is unknown for the API")
                 .read(state),
-            Api::Alu(api) => api
-                .readers
-                .get(name)
-                .expect("state name is unknown for the API")
-                .read(state),
+            /*Api::Alu(api) => api
+            .readers
+            .get(name)
+            .expect("state name is unknown for the API")
+            .read(state),*/
         }
     }
 
@@ -191,15 +192,14 @@ impl Api {
                     }
                 }
                 None
-            }
-            Api::Alu(api) => {
-                for (name, adaptor) in &api.append_only {
-                    if let Some(atom) = adaptor.convert(data, sys) {
-                        return Some((name.clone(), atom));
-                    }
-                }
-                None
-            }
+            } /*Api::Alu(api) => {
+                  for (name, adaptor) in &api.append_only {
+                      if let Some(atom) = adaptor.convert(data, sys) {
+                          return Some((name.clone(), atom));
+                      }
+                  }
+                  None
+              }*/
         }
     }
 
@@ -216,15 +216,14 @@ impl Api {
                     }
                 }
                 None
-            }
-            Api::Alu(api) => {
-                for (name, adaptor) in &api.destructible {
-                    if let Some(atom) = adaptor.convert(value, sys) {
-                        return Some((name.clone(), atom));
-                    }
-                }
-                None
-            }
+            } /*Api::Alu(api) => {
+                  for (name, adaptor) in &api.destructible {
+                      if let Some(atom) = adaptor.convert(value, sys) {
+                          return Some((name.clone(), atom));
+                      }
+                  }
+                  None
+              }*/
         }
     }
 
@@ -242,11 +241,11 @@ impl Api {
                 .get(&name)
                 .expect("state name is unknown for the API")
                 .build(data, raw, sys),
-            Api::Alu(api) => api
-                .append_only
-                .get(&name)
-                .expect("state name is unknown for the API")
-                .build(data, raw, sys),
+            /*Api::Alu(api) => api
+            .append_only
+            .get(&name)
+            .expect("state name is unknown for the API")
+            .build(data, raw, sys),*/
         }
     }
 
@@ -258,11 +257,11 @@ impl Api {
                 .get(&name)
                 .expect("state name is unknown for the API")
                 .build(data, sys),
-            Api::Alu(api) => api
-                .destructible
-                .get(&name)
-                .expect("state name is unknown for the API")
-                .build(data, sys),
+            /*Api::Alu(api) => api
+            .destructible
+            .get(&name)
+            .expect("state name is unknown for the API")
+            .build(data, sys),*/
         }
     }
 
@@ -275,13 +274,13 @@ impl Api {
                 .expect("state name is unknown for the API")
                 .arithmetics
                 .calculator(),
-            #[allow(clippy::let_unit_value)]
+            /*#[allow(clippy::let_unit_value)]
             Api::Alu(api) => api
                 .destructible
                 .get(&name)
                 .expect("state name is unknown for the API")
                 .arithmetics
-                .calculator(),
+                .calculator(),*/
         }
     }
 }

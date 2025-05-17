@@ -1,5 +1,5 @@
 {-
-  Id: stl:3vkBljCX-yklYzmU-c30AKKv-kGkTYcB-40YmTMV-chmtTnc#meaning-canoe-gloria
+  Id: stl:YxpNy3lt-p18T1dX-cx9CNsZ-2kkw7ID-yld_fdM-BpgGM1U#copper-nirvana-billy
   Name: SONIC
   Version: 0.12.0
   Description: Standard library for formally-verifiable distributed contracts
@@ -74,26 +74,14 @@ import StrictTypes#henry-heart-survive
   use TypeSystem#adrian-boris-sponsor
 
 
-@mnemonic(blast-limbo-normal)
-data AluAdaptor        : converter AluVM.LibSite, builder AluVM.LibSite
-
-@mnemonic(compass-today-needle)
-data AluReader         : AluVM.LibSite
-
-@mnemonic(harvest-express-harvest)
-data AluVMArithm       : accumulate AluVM.LibSite
-                       , lessen AluVM.LibSite
-                       , diff AluVM.LibSite
-
 @mnemonic(domino-waiter-orlando)
 data AnnotationName    : Std.AlphaCaps, [Std.AlphaNumDash ^ ..0xfe]
 
 @mnemonic(phantom-habitat-pegasus)
 data Annotations       : {AnnotationName -> ^ ..0xff [Byte]}
 
-@mnemonic(fuji-asia-cadet)
-data Api               : embedded#1 ApiInnerEmbeddedProc
-                       | alu ApiInnerVm
+@mnemonic(judge-turtle-spell)
+data Api               : embedded#1 ApiInnerEmbeddedProc | (|)
 
 @mnemonic(mars-cello-avalon)
 data ApiInnerEmbeddedProc : version CommitVerify.ReservedBytes2
@@ -110,32 +98,11 @@ data ApiInnerEmbeddedProc : version CommitVerify.ReservedBytes2
                        , verifiers {StrictTypes.VariantName -> ^ ..0xff U16}
                        , errors {U256 -> ^ ..0xff [Unicode ^ ..0xff]}
 
-@mnemonic(evident-trapeze-comedy)
-data ApiInnerVm        : version CommitVerify.ReservedBytes2
-                       , codexId UltraSONIC.CodexId
-                       , timestamp I64
-                       , name StrictTypes.TypeName?
-                       , developer UltraSONIC.Identity
-                       , conforms StrictTypes.TypeName?
-                       , defaultCall CallState?
-                       , reserved CommitVerify.ReservedBytes8
-                       , appendOnly {StrictTypes.VariantName -> ^ ..0xff AppendApiVm}
-                       , destructible {StrictTypes.VariantName -> ^ ..0xff DestructibleApiVm}
-                       , readers {StrictTypes.VariantName -> ^ ..0xff AluReader}
-                       , verifiers {StrictTypes.VariantName -> ^ ..0xff U16}
-                       , errors {U256 -> ^ ..0xff [Unicode ^ ..0xff]}
-
 @mnemonic(serial-iron-galaxy)
 data AppendApiEmbeddedProc : semId StrictTypes.SemId
                        , rawSemId StrictTypes.SemId
                        , published Std.Bool
                        , adaptor EmbeddedImmutable
-
-@mnemonic(alamo-spoon-mega)
-data AppendApiVm       : semId StrictTypes.SemId
-                       , rawSemId StrictTypes.SemId
-                       , published Std.Bool
-                       , adaptor AluAdaptor
 
 @mnemonic(lunch-exhibit-email)
 data Articles          : schema Schema
@@ -152,11 +119,6 @@ data ContentSigs       : {UltraSONIC.Identity -> ^ ..0xa SigBlob}
 data DestructibleApiEmbeddedProc : semId StrictTypes.SemId
                        , arithmetics EmbeddedArithm
                        , adaptor EmbeddedImmutable
-
-@mnemonic(octopus-input-africa)
-data DestructibleApiVm : semId StrictTypes.SemId
-                       , arithmetics AluVMArithm
-                       , adaptor AluAdaptor
 
 @mnemonic(state-single-random)
 data EmbeddedArithm    : nonFungible | fungible
