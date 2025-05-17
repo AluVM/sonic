@@ -72,9 +72,9 @@ extern crate core;
 
 mod data;
 #[cfg(feature = "uri")]
-mod uri;
+pub mod uri;
 mod builder;
 
-pub use data::{CallRequest, CallScope, CallState, Endpoint, MethodName, StateName};
+pub use data::{CallRequest, CallScope, CallState, Endpoint, Layer1, MethodName, ParseLayer1Error, StateName};
 
 pub const LIB_NAME_SONIC: &str = "SONIC";
