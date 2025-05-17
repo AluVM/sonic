@@ -28,7 +28,7 @@ use std::io;
 use amplify::hex::ToHex;
 use indexmap::IndexSet;
 use sonic_callreq::MethodName;
-use sonicapi::{MergeError, NamedState, OpBuilder};
+use sonicapi::{MergeError, NamedState, OpBuilder, SigValidator};
 use strict_encoding::{
     DecodeError, ReadRaw, SerializeError, StrictDecode, StrictEncode, StrictReader, StrictWriter, WriteRaw,
 };
@@ -340,14 +340,22 @@ impl<S: Stock> Ledger<S> {
         Ok(())
     }
 
-    pub fn merge_articles(&mut self, new_articles: Articles) -> Result<(), StockError<MergeError>> {
+    pub fn merge_articles(
+        &mut self,
+        new_articles: Articles,
+        sig_validator: impl SigValidator,
+    ) -> Result<(), StockError<MergeError>> {
         self.0.update_articles(|articles| {
-            articles.merge(new_articles)?;
+            articles.merge(new_articles, sig_validator)?;
             Ok(())
         })
     }
 
-    pub fn accept(&mut self, reader: &mut StrictReader<impl ReadRaw>) -> Result<(), AcceptError> {
+    pub fn accept(
+        &mut self,
+        reader: &mut StrictReader<impl ReadRaw>,
+        sig_validator: impl SigValidator,
+    ) -> Result<(), AcceptError> {
         let magic_bytes = <[u8; 8]>::strict_decode(reader)?;
         if magic_bytes != LEDGER_MAGIC_NUMBER {
             return Err(DecodeError::DataIntegrityError(format!(
@@ -371,10 +379,11 @@ impl<S: Stock> Ledger<S> {
             return Err(AcceptError::Articles(MergeError::ContractMismatch));
         }
 
-        self.merge_articles(articles).map_err(|e| match e {
-            StockError::Inner(e) => AcceptError::Articles(e),
-            StockError::Serialize(e) => AcceptError::Io(e),
-        })?;
+        self.merge_articles(articles, sig_validator)
+            .map_err(|e| match e {
+                StockError::Inner(e) => AcceptError::Articles(e),
+                StockError::Serialize(e) => AcceptError::Io(e),
+            })?;
 
         loop {
             let op = match Operation::strict_decode(reader) {

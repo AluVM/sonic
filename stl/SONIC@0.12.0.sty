@@ -1,5 +1,5 @@
 {-
-  Id: stl:xm0KeLqT-zDFncty-tGBPw72-iLoBpep-RENST9Q-nfo9FQM#quota-helena-maxwell
+  Id: stl:i9uVYEh3-Kqx0g90-6p~7pRf-3GNTpCy-f0ySFyr-k~dYJpI#east-editor-year
   Name: SONIC
   Version: 0.12.0
   Description: Standard library for formally-verifiable distributed contracts
@@ -96,12 +96,12 @@ data AppendApiEmbeddedProc : semId StrictTypes.SemId
                        , published Std.Bool
                        , adaptor EmbeddedImmutable
 
-@mnemonic(bruno-turbo-cannon)
+@mnemonic(byte-academy-ariel)
 data Articles          : defaultApi Api
                        , customApis {Api}
+                       , sig SigBlob?
                        , libs {AluVM.Lib}
                        , types StrictTypes.TypeSystem
-                       , sig SigBlob?
                        , issue UltraSONIC.Issue
 
 @mnemonic(alpha-balsa-verona)

@@ -30,7 +30,7 @@ use aora::file::{FileAoraIndex, FileAoraMap, FileAuraMap};
 use aora::{AoraIndex, AoraMap, AuraMap, TransactionalMap};
 use hypersonic::{
     AcceptError, Articles, AuthToken, CellAddr, EffectiveState, IssueError, Ledger, LoadError, MergeError, Operation,
-    Opid, RawState, Stock, StockError, Transition,
+    Opid, RawState, SigValidator, Stock, StockError, Transition,
 };
 use strict_encoding::{SerializeError, StreamReader, StreamWriter, StrictReader, StrictWriter};
 
@@ -227,10 +227,14 @@ impl LedgerDir {
         self.export(terminals, writer)
     }
 
-    pub fn accept_from_file(&mut self, input: impl AsRef<Path>) -> Result<(), AcceptError> {
+    pub fn accept_from_file(
+        &mut self,
+        input: impl AsRef<Path>,
+        sig_validator: impl SigValidator,
+    ) -> Result<(), AcceptError> {
         let file = File::open(input)?;
         let mut reader = StrictReader::with(StreamReader::new::<{ usize::MAX }>(file));
-        self.accept(&mut reader)
+        self.accept(&mut reader, sig_validator)
     }
 
     pub fn path(&self) -> &Path { &self.0.stock().path }

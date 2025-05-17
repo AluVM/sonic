@@ -31,8 +31,7 @@ use strict_encoding::{DecodeError, ReadRaw, StrictDecode, StrictEncode, StrictRe
 use strict_types::TypeSystem;
 use ultrasonic::{CallId, Codex, LibRepo};
 
-use crate::sigs::SigBlob;
-use crate::{Api, LIB_NAME_SONIC};
+use crate::{Api, SigBlob, LIB_NAME_SONIC};
 
 pub const ISSUER_MAGIC_NUMBER: [u8; 8] = *b"COISSUER";
 pub const ISSUER_VERSION: [u8; 2] = [0x00, 0x01];

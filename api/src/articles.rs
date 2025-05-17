@@ -21,21 +21,34 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+use core::error::Error;
 use std::io;
 
 use aluvm::{Lib, LibId};
-use amplify::confinement::SmallOrdSet;
+use amplify::confinement::{NonEmptyBlob, SmallOrdSet};
 use amplify::hex::ToHex;
+use amplify::Bytes32;
+use commit_verify::{CommitId, CommitmentId, DigestExt, Sha256};
 use sonic_callreq::MethodName;
 use strict_encoding::{DecodeError, ReadRaw, StrictDecode, StrictEncode, StrictReader, StrictWriter, WriteRaw};
 use strict_types::TypeSystem;
-use ultrasonic::{CallId, ContractId, Issue, LibRepo, Opid};
+use ultrasonic::{CallId, ContractId, Identity, Issue, LibRepo, Opid};
 
-use crate::sigs::SigBlob;
-use crate::{Api, LIB_NAME_SONIC};
+use crate::{Api, ApiId, LIB_NAME_SONIC};
 
 pub const ARTICLES_MAGIC_NUMBER: [u8; 8] = *b"ARTICLES";
 pub const ARTICLES_VERSION: [u8; 2] = [0x00, 0x01];
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONIC)]
+#[derive(CommitEncode)]
+#[commit_encode(strategy = strict, id = ArticlesId)]
+struct ArticlesCommitment {
+    pub contract_id: ContractId,
+    pub default_api_id: ApiId,
+    pub custom_api_ids: SmallOrdSet<ApiId>,
+}
 
 /// Articles contain the contract and all related codex and API information for interacting with it.
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -45,26 +58,55 @@ pub const ARTICLES_VERSION: [u8; 2] = [0x00, 0x01];
 pub struct Articles {
     pub default_api: Api,
     pub custom_apis: SmallOrdSet<Api>,
-    pub libs: SmallOrdSet<Lib>,
-    pub types: TypeSystem,
     /// Signature from the contract issuer (`issue.meta.issuer`) over the articles id.
     pub sig: Option<SigBlob>,
+    pub libs: SmallOrdSet<Lib>,
+    pub types: TypeSystem,
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub issue: Issue,
 }
 
 impl Articles {
+    fn articles_id(&self) -> ArticlesId {
+        let custom_api_ids = SmallOrdSet::from_iter_checked(self.custom_apis.iter().map(Api::api_id));
+        ArticlesCommitment {
+            contract_id: self.contract_id(),
+            default_api_id: self.default_api.api_id(),
+            custom_api_ids,
+        }
+        .commit_id()
+    }
+
     pub fn contract_id(&self) -> ContractId { self.issue.contract_id() }
 
     pub fn genesis_opid(&self) -> Opid { self.issue.genesis_opid() }
 
-    pub fn merge(&mut self, other: Self) -> Result<bool, MergeError> {
+    pub fn merge(&mut self, other: Self, sig_validator: impl SigValidator) -> Result<bool, MergeError> {
         if self.contract_id() != other.contract_id() {
             return Err(MergeError::ContractMismatch);
         }
 
-        // TODO: Validate the signature and determine its timestamps
-        //       use the latest timestamp
+        let ts1 = self
+            .sig
+            .as_ref()
+            .and_then(|sig| {
+                sig_validator
+                    .validate_sig(self.articles_id().to_byte_array(), &self.issue.meta.issuer, sig)
+                    .ok()
+            })
+            .unwrap_or_default();
+        let Some(sig) = &other.sig else { return Ok(false) };
+        let ts2 = sig_validator
+            .validate_sig(other.articles_id().to_byte_array(), &other.issue.meta.issuer, sig)
+            .map_err(|_| MergeError::InvalidSignature)?;
+
+        if ts2 > ts1 {
+            self.default_api = other.default_api;
+            self.custom_apis = other.custom_apis;
+            self.sig = other.sig;
+            self.libs = other.libs;
+            self.types = other.types;
+        }
 
         Ok(true)
     }
@@ -107,6 +149,46 @@ impl LibRepo for Articles {
     fn get_lib(&self, lib_id: LibId) -> Option<&Lib> { self.libs.iter().find(|lib| lib.lib_id() == lib_id) }
 }
 
+#[derive(Wrapper, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, From)]
+#[wrapper(Deref, BorrowSlice, Hex, Index, RangeOps)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONIC)]
+struct ArticlesId(
+    #[from]
+    #[from([u8; 32])]
+    Bytes32,
+);
+
+impl From<Sha256> for ArticlesId {
+    fn from(hasher: Sha256) -> Self { hasher.finish().into() }
+}
+
+impl CommitmentId for ArticlesId {
+    const TAG: &'static str = "urn:ubideco:sonic:articles#2025-05-18";
+}
+
+pub trait SigValidator {
+    /// Validate the signature using the provided identity information.
+    ///
+    /// # Returns
+    ///
+    /// If successful, returns the timestamp of ths signature.
+    fn validate_sig(&self, message: impl Into<[u8; 32]>, identity: &Identity, sig: &SigBlob)
+        -> Result<u64, impl Error>;
+}
+
+#[derive(Wrapper, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, From, Display)]
+#[wrapper(Deref, AsSlice, BorrowSlice, Hex)]
+#[display(LowerHex)]
+#[derive(StrictType, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONIC)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(transparent))]
+pub struct SigBlob(NonEmptyBlob<4096>);
+
+impl Default for SigBlob {
+    fn default() -> Self { SigBlob(NonEmptyBlob::with(0)) }
+}
+
 #[derive(Clone, Eq, PartialEq, Debug, Display, Error)]
 #[display(doc_comments)]
 pub enum MergeError {
@@ -115,6 +197,9 @@ pub enum MergeError {
 
     /// codex id for the merged schema doesn't match
     CodexMismatch,
+
+    /// invalid signature over the contract articles.
+    InvalidSignature,
 }
 
 #[cfg(feature = "std")]

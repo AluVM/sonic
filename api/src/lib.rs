@@ -59,20 +59,18 @@ mod adaptors;
 mod issuer;
 mod articles;
 mod builders;
-mod util;
 
 pub use adaptors::{/* alu, */ embedded};
 pub use api::{
     Api, ApiId, ApiInner, ApiVm, AppendApi, DestructibleApi, StateAdaptor, StateArithm, StateCalc, StateCalcError,
     StateReader,
 };
-pub use articles::{Articles, MergeError, ARTICLES_MAGIC_NUMBER, ARTICLES_VERSION};
+pub use articles::{Articles, MergeError, SigBlob, SigValidator, ARTICLES_MAGIC_NUMBER, ARTICLES_VERSION};
 pub use builders::{Builder, BuilderRef, CoreParams, IssueParams, NamedState, OpBuilder, OpBuilderRef};
 pub use issuer::{Issuer, ISSUER_MAGIC_NUMBER, ISSUER_VERSION};
 pub use sonic_callreq::*;
 pub use state::{DataCell, StateAtom, StateTy, StructData};
 pub use ultrasonic::*;
-pub use util::{sigs, AnnotationName, Annotations};
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
 #[repr(u8)]

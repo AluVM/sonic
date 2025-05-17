@@ -95,6 +95,7 @@ rec Articles
         map errors, len 0..MAX8
           is key, U256
           str value, len 0..MAX8
+    bytes some, len 1..4096, option, wrapped, aka SigBlob, tag 1
   set libs, len 0..MAX16
     rec Lib
       set isae, len 0..MAX8
@@ -142,7 +143,6 @@ rec Articles
         rec Sizing
           is min, U64
           is max, U64
-    bytes some, len 1..4096, option, wrapped, aka SigBlob, tag 1
   rec issue, Issue
     bytes version, len 1, aka ReservedBytes1
     rec meta, ContractMeta

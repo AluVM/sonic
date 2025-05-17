@@ -21,11 +21,13 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+use std::convert::Infallible;
+use std::error::Error;
 use std::fs::File;
 use std::path::PathBuf;
 
 use clap::ValueHint;
-use hypersonic::{Articles, AuthToken, CallParams, IssueParams, Issuer};
+use hypersonic::{Articles, AuthToken, CallParams, Identity, IssueParams, Issuer, SigBlob, SigValidator};
 use sonic_persist_fs::LedgerDir;
 
 use crate::dump::dump_ledger;
@@ -170,8 +172,15 @@ fn export(dir: PathBuf, terminals: impl IntoIterator<Item = AuthToken>, output: 
 }
 
 fn accept(dir: PathBuf, input: PathBuf) -> anyhow::Result<()> {
+    // TODO: Use some real signature validator
+    pub struct DumbValidator;
+    impl SigValidator for DumbValidator {
+        fn validate_sig(&self, _: impl Into<[u8; 32]>, _: &Identity, _: &SigBlob) -> Result<u64, impl Error> {
+            Result::<_, Infallible>::Ok(0)
+        }
+    }
     let mut ledger = LedgerDir::load(dir)?;
-    ledger.accept_from_file(input)?;
+    ledger.accept_from_file(input, DumbValidator)?;
     Ok(())
 }
 
