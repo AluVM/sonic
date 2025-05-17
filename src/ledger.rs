@@ -210,6 +210,8 @@ impl<S: Stock> Ledger<S> {
     pub fn trace(&self) -> impl Iterator<Item = (Opid, Transition)> + use<'_, S> { self.0.trace() }
 
     #[inline]
+    pub fn read_by(&self, addr: CellAddr) -> impl Iterator<Item = Opid> + use<'_, S> { self.0.read_by(addr) }
+    #[inline]
     pub fn spent_by(&self, addr: CellAddr) -> Option<Opid> { self.0.spent_by(addr) }
 
     /// # Nota bene

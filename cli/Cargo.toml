@@ -17,6 +17,7 @@ hypersonic = { workspace = true, features = ["serde"] }
 sonic-persist-fs.workspace = true
 anyhow = "1.0.93"
 clap = { version = "4.5.21", features = ["derive"] }
+serde.workspace = true
 serde_yaml.workspace = true
 
 [lints.rust]

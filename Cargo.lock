@@ -879,6 +879,7 @@ dependencies = [
  "anyhow",
  "clap",
  "hypersonic",
+ "serde",
  "serde_yaml",
  "sonic-persist-fs",
 ]
@@ -1036,7 +1037,7 @@ checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 [[package]]
 name = "ultrasonic"
 version = "0.12.0-beta.6"
-source = "git+https://github.com/AluVM/ultrasonic?branch=revision#c5ce687108cb67ca5fe7cbb32541b070a21d3cf5"
+source = "git+https://github.com/AluVM/ultrasonic?branch=revision#c7ab4f8d536966f16f5708c6ee873ffaebb7eddf"
 dependencies = [
  "amplify",
  "baid64",

@@ -21,12 +21,14 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::fs::File;
 use std::path::Path;
 
 use anyhow::Context;
-use hypersonic::{Articles, Opid};
+use hypersonic::{Articles, CellAddr, Opid};
+use serde::{Deserialize, Serialize};
 use sonic_persist_fs::LedgerDir;
 
 pub fn dump_articles(articles: &Articles, dst: &Path) -> anyhow::Result<Opid> {
@@ -41,11 +43,11 @@ pub fn dump_articles(articles: &Articles, dst: &Path) -> anyhow::Result<Opid> {
     let out = File::create_new(dst.join(format!("codex-{:#}.yaml", articles.issue.codex.codex_id())))?;
     serde_yaml::to_writer(&out, &articles.issue.codex)?;
 
-    let out = File::create_new(dst.join("api.default.yaml"))?;
+    let out = File::create_new(dst.join("api-default.yaml"))?;
     serde_yaml::to_writer(&out, &articles.schema.default_api)?;
 
     for (api, _) in &articles.schema.custom_apis {
-        let out = File::create_new(dst.join(format!("api.{}.yaml", api.name().expect("invalid api"))))?;
+        let out = File::create_new(dst.join(format!("api-{}.yaml", api.name().expect("invalid api"))))?;
         serde_yaml::to_writer(&out, &api)?;
     }
 
@@ -54,6 +56,13 @@ pub fn dump_articles(articles: &Articles, dst: &Path) -> anyhow::Result<Opid> {
     // TODO: Process AluVM libraries
 
     Ok(genesis_opid)
+}
+
+#[derive(Clone, Debug, Default)]
+#[derive(Serialize, Deserialize)]
+pub struct OpLinks {
+    pub readers: BTreeMap<u16, Opid>,
+    pub spenders: BTreeMap<u16, Opid>,
 }
 
 pub fn dump_ledger(src: impl AsRef<Path>, dst: impl AsRef<Path>, force: bool) -> anyhow::Result<()> {
@@ -79,6 +88,22 @@ pub fn dump_ledger(src: impl AsRef<Path>, dst: impl AsRef<Path>, force: bool) ->
     for (no, (opid, op)) in ledger.operations().enumerate() {
         let out = File::create_new(dst.join(format!("{:04}-op-{opid}.yaml", no + 1)))?;
         serde_yaml::to_writer(&out, &op)?;
+        let out = File::create_new(dst.join(format!("{:04}-links-{opid}.yaml", no + 1)))?;
+        let mut links = OpLinks::default();
+        for no in 0..op.immutable_out.len_u16() {
+            links.readers.extend(
+                ledger
+                    .read_by(CellAddr::new(opid, no))
+                    .map(|child| (no, child)),
+            );
+        }
+        for no in 0..op.destructible_out.len_u16() {
+            let Some(child) = ledger.spent_by(CellAddr::new(opid, no)) else {
+                continue;
+            };
+            links.spenders.insert(no, child);
+        }
+        serde_yaml::to_writer(&out, &links)?;
         print!("\rProcessing operations ... {} processed", no + 1);
     }
     println!();
