@@ -26,8 +26,8 @@ use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use aora::file::{FileAoraMap, FileAuraMap};
-use aora::{AoraMap, AuraMap, TransactionalMap};
+use aora::file::{FileAoraIndex, FileAoraMap, FileAuraMap};
+use aora::{AoraIndex, AoraMap, AuraMap, TransactionalMap};
 use hypersonic::{
     AcceptError, Articles, AuthToken, CellAddr, EffectiveState, IssueError, Ledger, LoadError, MergeError, Operation,
     Opid, RawState, Schema, Stock, StockError, Transition,
@@ -42,6 +42,7 @@ pub struct LedgerDir(Ledger<StockFs>);
 const STASH_MAGIC: u64 = u64::from_be_bytes(*b"RGBSTASH");
 const TRACE_MAGIC: u64 = u64::from_be_bytes(*b"RGBTRACE");
 const SPENT_MAGIC: u64 = u64::from_be_bytes(*b"RGBSPENT");
+const READ_MAGIC: u64 = u64::from_be_bytes(*b"RGBREAD ");
 const VALID_MAGIC: u64 = u64::from_be_bytes(*b"RGBVALID");
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -84,6 +85,7 @@ pub struct StockFs {
     trace: FileAoraMap<Opid, Transition, TRACE_MAGIC, 1>,
     valid: FileAuraMap<Opid, OpValidity, VALID_MAGIC, 1, 32, 1>,
     spent: FileAuraMap<CellAddr, Opid, SPENT_MAGIC, 1, 34>,
+    read: FileAoraIndex<CellAddr, Opid, READ_MAGIC, 1, 34>,
     articles: Articles,
     state: EffectiveState,
 }
@@ -105,6 +107,7 @@ impl Stock for StockFs {
         let stash = FileAoraMap::create_new(&path, "stash").map_err(IssueError::OtherPersistence)?;
         let trace = FileAoraMap::create_new(&path, "trace").map_err(IssueError::OtherPersistence)?;
         let spent = FileAuraMap::create_new(&path, "spent").map_err(IssueError::OtherPersistence)?;
+        let read = FileAoraIndex::create_new(&path, "read").map_err(IssueError::OtherPersistence)?;
         let mut valid = FileAuraMap::create_new(&path, "valid").map_err(IssueError::OtherPersistence)?;
 
         articles
@@ -118,7 +121,7 @@ impl Stock for StockFs {
         valid.insert_only(articles.issue.genesis_opid(), OpValidity::Valid);
         valid.commit_transaction();
 
-        Ok(Self { path, stash, trace, spent, articles, state, valid })
+        Ok(Self { path, stash, trace, spent, read, articles, state, valid })
     }
 
     fn load(path: PathBuf) -> Result<Self, LoadError<io::Error>> {
@@ -127,13 +130,14 @@ impl Stock for StockFs {
         let stash = FileAoraMap::open(&path, "stash").map_err(LoadError::OtherPersistence)?;
         let trace = FileAoraMap::open(&path, "trace").map_err(LoadError::OtherPersistence)?;
         let spent = FileAuraMap::open(&path, "spent").map_err(LoadError::OtherPersistence)?;
+        let read = FileAoraIndex::open(&path, "read").map_err(LoadError::OtherPersistence)?;
         let valid = FileAuraMap::open(&path, "valid").map_err(LoadError::OtherPersistence)?;
 
         let articles = Articles::load(path.join(Self::FILENAME_ARTICLES)).map_err(LoadError::ArticlesPersistence)?;
         let raw = RawState::load(path.join(Self::FILENAME_STATE_RAW)).map_err(LoadError::StatePersistence)?;
         let state = EffectiveState::with(raw, &articles.schema);
 
-        Ok(Self { path, stash, trace, spent, articles, state, valid })
+        Ok(Self { path, stash, trace, spent, read, articles, state, valid })
     }
 
     fn config(&self) -> Self::Conf { self.path.clone() }
@@ -161,6 +165,8 @@ impl Stock for StockFs {
     #[inline]
     fn trace(&self) -> impl Iterator<Item = (Opid, Transition)> { self.trace.iter() }
     #[inline]
+    fn read_by(&self, addr: CellAddr) -> impl Iterator<Item = Opid> { self.read.get(addr) }
+    #[inline]
     fn spent_by(&self, addr: CellAddr) -> Option<Opid> { self.spent.get(addr) }
 
     fn update_articles(
@@ -187,6 +193,8 @@ impl Stock for StockFs {
     fn add_operation(&mut self, opid: Opid, operation: &Operation) { self.stash.insert(opid, operation) }
     #[inline]
     fn add_transition(&mut self, opid: Opid, transition: &Transition) { self.trace.insert(opid, transition) }
+    #[inline]
+    fn add_reading(&mut self, addr: CellAddr, spender: Opid) { self.read.push(addr, spender); }
     #[inline]
     fn add_spending(&mut self, spent: CellAddr, spender: Opid) { self.spent.insert_or_update(spent, spender) }
     #[inline]

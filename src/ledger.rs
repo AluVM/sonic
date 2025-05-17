@@ -223,6 +223,12 @@ impl<S: Stock> Ledger<S> {
         while let Some(opid) = chain.get_index(index).copied() {
             if opid != genesis_opid {
                 let op = self.0.operation(opid);
+                for inp in op.immutable_in {
+                    let parent = inp.opid;
+                    if !chain.contains(&parent) {
+                        chain.insert(parent);
+                    }
+                }
                 for inp in op.destructible_in {
                     let parent = inp.addr.opid;
                     if !chain.contains(&parent) {
@@ -244,6 +250,14 @@ impl<S: Stock> Ledger<S> {
         let mut index = 0usize;
         while let Some(opid) = chain.get_index(index).copied() {
             let op = self.0.operation(opid);
+            for no in 0..op.immutable_out.len_u16() {
+                let addr = CellAddr::new(opid, no);
+                for read in self.0.read_by(addr) {
+                    if !chain.contains(&read) {
+                        chain.insert(read);
+                    }
+                }
+            }
             for no in 0..op.destructible_out.len_u16() {
                 let addr = CellAddr::new(opid, no);
                 let Some(spent) = self.0.spent_by(addr) else { continue };
@@ -507,6 +521,9 @@ impl<S: Stock> Ledger<S> {
         }
 
         let op = operation.as_operation();
+        for read in &op.immutable_in {
+            self.0.add_reading(*read, opid);
+        }
         for prevout in &op.destructible_in {
             self.0.add_spending(prevout.addr, opid);
         }

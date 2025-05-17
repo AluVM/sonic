@@ -238,13 +238,32 @@ pub trait Stock {
     /// transitions that were ever provided via [`Self::add_transition`].
     fn trace(&self) -> impl Iterator<Item = (Opid, Transition)>;
 
+    /// Returns an id of an operation reading a provided address (operation immutable state
+    /// output).
+    ///
+    /// # Nota bene
+    ///
+    /// This method is internally used in computing operation descendants and must not be accessed
+    /// from outside.
+    ///
+    /// # Blocking I/O
+    ///
+    /// This call MAY BE blocking.
+    ///
+    /// # Implementation instructions
+    ///
+    /// Specific persistence providers implementing this method MUST guarantee to always return a
+    /// non-empty iterator for all `addr` which were at least once provided via
+    /// [`Self::add_reading`] as an `addr` argument.
+    fn read_by(&self, addr: CellAddr) -> impl Iterator<Item = Opid>;
+
     /// Returns an id of an operation spending a provided address (operation destructible state
     /// output).
     ///
     /// # Nota bene
     ///
-    /// This method is internally used in the rollback procedure and must not be accessed from
-    /// outside.
+    /// This method is internally used in computing operation descendants and must not be accessed
+    /// from outside.
     ///
     /// # Blocking I/O
     ///
@@ -322,8 +341,8 @@ pub trait Stock {
     ///   the `transition` itself matches the known data for it.
     fn add_transition(&mut self, opid: Opid, transition: &Transition);
 
-    /// Registers given operation output (`spent`) to be spent (used as an input) in operation
-    /// `spender`.
+    /// Registers a given operation immutable output (`addr`) to be read (used as an input) in
+    /// operation `reader`.
     ///
     /// # Blocking I/O
     ///
@@ -332,7 +351,19 @@ pub trait Stock {
     /// # Implementation instructions
     ///
     /// Specific persistence providers implementing this method MUST:
-    /// - immediately store the new spending information;
+    /// - add the `reader` to the list of readers who had accessed the address.
+    fn add_reading(&mut self, addr: CellAddr, reader: Opid);
+
+    /// Registers a given operation destructible output (`spent`) to be spent (used as an input) in
+    /// operation `spender`.
+    ///
+    /// # Blocking I/O
+    ///
+    /// This call MAY BE blocking.
+    ///
+    /// # Implementation instructions
+    ///
+    /// Specific persistence providers implementing this method MUST:
     /// - silently update `spender` if the provided `spent` cell address were previously spent by a
     ///   different operation.
     fn add_spending(&mut self, spent: CellAddr, spender: Opid);
