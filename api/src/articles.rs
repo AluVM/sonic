@@ -195,7 +195,7 @@ pub enum MergeError {
     /// contract id for the merged contract articles doesn't match
     ContractMismatch,
 
-    /// codex id for the merged schema doesn't match
+    /// codex id for the merged articles doesn't match
     CodexMismatch,
 
     /// invalid signature over the contract articles.

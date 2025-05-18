@@ -75,14 +75,14 @@ impl Issuer {
         let magic_bytes = <[u8; 8]>::strict_decode(reader)?;
         if magic_bytes != ISSUER_MAGIC_NUMBER {
             return Err(DecodeError::DataIntegrityError(format!(
-                "wrong contract issuer schema magic bytes {}",
+                "wrong contract issuer magic bytes {}",
                 magic_bytes.to_hex()
             )));
         }
         let version = <[u8; 2]>::strict_decode(reader)?;
         if version != ISSUER_VERSION {
             return Err(DecodeError::DataIntegrityError(format!(
-                "unsupported contract issuer schema version {}",
+                "unsupported contract issuer version {}",
                 u16::from_be_bytes(version)
             )));
         }

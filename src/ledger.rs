@@ -359,7 +359,7 @@ impl<S: Stock> Ledger<S> {
         let magic_bytes = <[u8; 8]>::strict_decode(reader)?;
         if magic_bytes != LEDGER_MAGIC_NUMBER {
             return Err(DecodeError::DataIntegrityError(format!(
-                "wrong contract issuer schema magic bytes {}",
+                "wrong contract ledger magic bytes {}",
                 magic_bytes.to_hex()
             ))
             .into());
@@ -367,7 +367,7 @@ impl<S: Stock> Ledger<S> {
         let version = <[u8; 2]>::strict_decode(reader)?;
         if version != LEDGER_VERSION {
             return Err(DecodeError::DataIntegrityError(format!(
-                "unsupported contract issuer schema version {}",
+                "unsupported contract ledger version {}",
                 u16::from_be_bytes(version)
             ))
             .into());
@@ -531,8 +531,8 @@ impl<S: Stock> Ledger<S> {
             self.0.add_spending(prevout.addr, opid);
         }
 
-        let transition = self.0.update_state(|state, schema| {
-            state.apply(operation, &schema.default_api, &schema.custom_apis, &schema.types)
+        let transition = self.0.update_state(|state, articles| {
+            state.apply(operation, &articles.default_api, &articles.custom_apis, &articles.types)
         })?;
 
         self.0.add_transition(opid, &transition);

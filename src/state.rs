@@ -123,7 +123,6 @@ impl EffectiveState {
     ) -> Transition {
         self.main.apply(&op, default_api, sys);
         for api in custom_apis {
-            // TODO: Remove name from API itself.
             // Skip default API (it is already processed as `main` above)
             let Some(name) = api.name() else {
                 continue;
