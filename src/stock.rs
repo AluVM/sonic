@@ -21,11 +21,10 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use core::error::Error as StdError;
-use std::io;
+use core::error::Error;
 
-use sonicapi::MergeError;
-use strict_encoding::{DeserializeError, SerializeError};
+use sonicapi::ArticlesError;
+use strict_encoding::SerializeError;
 use ultrasonic::{CallError, CellAddr, ContractName, Operation, Opid};
 
 use crate::{Articles, EffectiveState, Transition};
@@ -46,10 +45,6 @@ pub trait Stock {
     /// Persistence configuration type.
     type Conf;
 
-    /// Error type specific to a persistence implementation, which may happen during the
-    /// construction.
-    type Error: StdError;
-
     /// Creates a new contract from the provided articles, creating its persistence using a given
     /// implementation-specific configuration.
     ///
@@ -60,7 +55,7 @@ pub trait Stock {
     /// # Blocking I/O
     ///
     /// This call MAY perform any I/O operations.
-    fn new(articles: Articles, conf: Self::Conf) -> Result<Self, IssueError<Self::Error>>
+    fn new(articles: Articles, state: EffectiveState, conf: Self::Conf) -> Result<Self, impl Error>
     where Self: Sized;
 
     /// Loads a contract from persistence using the provided configuration.
@@ -72,7 +67,7 @@ pub trait Stock {
     /// # Blocking I/O
     ///
     /// This call MAY perform any I/O operations.
-    fn load(conf: Self::Conf) -> Result<Self, LoadError<Self::Error>>
+    fn load(conf: Self::Conf) -> Result<Self, impl Error>
     where Self: Sized;
 
     /// Returns a copy of the config object used during the stock construction.
@@ -286,10 +281,8 @@ pub trait Stock {
     ///
     /// Specific persistence providers implementing this method MUST guarantee to always persist an
     /// updated state after calling the callback `f` method.
-    fn update_articles(
-        &mut self,
-        f: impl FnOnce(&mut Articles) -> Result<(), MergeError>,
-    ) -> Result<(), StockError<MergeError>>;
+    fn update_articles(&mut self, f: impl FnOnce(&mut Articles) -> Result<(), ArticlesError>)
+        -> Result<(), impl Error>;
 
     /// Updates contract effective state inside a callback method.
     ///
@@ -377,39 +370,11 @@ pub trait Stock {
 }
 
 #[derive(Debug, Display, Error, From)]
-#[display(inner)]
-pub enum StockError<E: StdError> {
-    Inner(E),
-
-    #[from]
-    Serialize(io::Error),
-}
-
-#[derive(Debug, Display, Error, From)]
 #[display(doc_comments)]
-pub enum IssueError<E: StdError> {
+pub enum IssueError<E: Error> {
     /// unable to issue a new contract '{0}' due to invalid genesis data. Specifically, {1}
     Genesis(ContractName, CallError),
 
-    /// unable to save contract articles - {0}
-    ArticlesPersistence(io::Error),
-
-    /// unable to save contract state data - {0}
-    StatePersistence(SerializeError),
-
     #[display(inner)]
-    OtherPersistence(E),
-}
-
-#[derive(Debug, Display, Error, From)]
-#[display(doc_comments)]
-pub enum LoadError<E: StdError> {
-    /// unable to load contract articles - {0}
-    ArticlesPersistence(DeserializeError),
-
-    /// unable to load contract state data - {0}
-    StatePersistence(DeserializeError),
-
-    #[display(inner)]
-    OtherPersistence(E),
+    Persistence(E),
 }

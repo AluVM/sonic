@@ -34,7 +34,7 @@ use ultrasonic::{
     Input, Issue, Operation, StateCell, StateData, StateValue,
 };
 
-use crate::{Api, Articles, DataCell, Issuer, MethodName, StateAtom, StateName};
+use crate::{Api, ApiDescriptor, Articles, DataCell, Issuer, MethodName, StateAtom, StateName};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -183,14 +183,14 @@ impl IssueBuilder {
         };
         let genesis = self.builder.issue_genesis(self.issuer.codex.codex_id());
         let issue = Issue { version: default!(), meta, codex: self.issuer.codex, genesis };
-        Articles {
-            default_api: self.issuer.api,
-            custom_apis: none!(),
+        let apis = ApiDescriptor {
+            default: self.issuer.api,
+            custom: none!(),
             libs: self.issuer.libs,
             types: self.issuer.types,
-            issue,
             sig: None,
-        }
+        };
+        Articles::with(apis, issue).expect("broken issue builder")
     }
 }
 

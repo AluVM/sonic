@@ -26,10 +26,12 @@ sonic-callreq = { version = "=0.12.0-beta.6", path = "callreq" }
 sonic-persist-fs = { version = "=0.12.0-beta.6", path = "persistence/fs" }
 hypersonic = { version = "=0.12.0-beta.6", path = "." }
 aora = ">=0.6.3"
+binfile = "0.2.0"
 baid64 = "0.4.1"
 indexmap = "2.9.0"
 chrono = "0.4.38"
 serde = { version = "1", features = ["derive"] }
+toml = "0.8.22"
 serde_yaml = "0.9.34"
 
 [package]
@@ -83,8 +85,9 @@ petgraph = "0.8.1"
 
 [features]
 default = ["std"]
-all = ["stl", "vesper", "std", "serde"]
+all = ["stl", "vesper", "binfile", "std", "serde"]
 
+binfile = ["sonic-api/binfile"]
 std = ["sonic-api/std", "sonic-callreq/std"]
 vesper = ["ultrasonic/vesper"]
 stl = ["commit_verify/stl", "ultrasonic/stl", "strict_types/armor"]

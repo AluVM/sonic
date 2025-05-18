@@ -35,8 +35,8 @@ use std::path::PathBuf;
 use aluvm::{CoreConfig, LibSite};
 use amplify::num::u256;
 use commit_verify::{Digest, Sha256};
-use hypersonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc};
-use hypersonic::{Api, ApiInner, DestructibleApi};
+use hypersonic::embedded::{EmbeddedArithm, EmbeddedImmutable};
+use hypersonic::{Api, DestructibleApi};
 use indexmap::{indexset, IndexSet};
 use petgraph::dot::{Config, Dot};
 use petgraph::graph::EdgeReference;
@@ -140,11 +140,11 @@ fn api() -> Api {
 
     let codex = codex();
 
-    Api::Embedded(ApiInner::<EmbeddedProc> {
+    Api {
         version: default!(),
+        adaptor: default!(),
         codex_id: codex.codex_id(),
         timestamp: 1732529307,
-        name: None,
         developer: Identity::default(),
         conforms: None,
         default_call: None,
@@ -163,7 +163,7 @@ fn api() -> Api {
         },
         errors: Default::default(),
         reserved: Default::default(),
-    })
+    }
 }
 
 fn setup(name: &str) -> LedgerDir {
@@ -244,7 +244,7 @@ fn setup(name: &str) -> LedgerDir {
 
 fn graph(name: &str, ledger: &LedgerDir) {
     let mut graph = Graph::<(String, bool), ()>::new();
-    let genesis_opid = ledger.articles().issue.genesis_opid();
+    let genesis_opid = ledger.articles().genesis_opid();
     let mut nodes = bmap! {
         genesis_opid => graph.add_node(("0".to_string(), true))
     };

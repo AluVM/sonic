@@ -65,6 +65,11 @@ impl Issuer {
         }
     }
 
+    /// Get a [`CallId`] for a method from the default API.
+    ///
+    /// # Panics
+    ///
+    /// If the method name is not known.
     pub fn call_id(&self, method: impl Into<MethodName>) -> CallId {
         self.api
             .verifier(method)
@@ -99,21 +104,23 @@ impl Issuer {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "binfile")]
 mod _fs {
-    use std::fs::File;
     use std::io::{self, Read};
     use std::path::Path;
 
     use amplify::confinement::U24 as U24MAX;
+    use binfile::BinFile;
     use strict_encoding::{DeserializeError, StreamReader, StreamWriter, StrictReader, StrictWriter};
 
     use crate::Issuer;
 
+    pub const ISSUER_MAGIC_NUMBER: u64 = u64::from_be_bytes(*b"COISSUER");
+    pub const ISSUER_VERSION: u16 = 0;
+
     impl Issuer {
         pub fn load(path: impl AsRef<Path>) -> Result<Self, DeserializeError> {
-            // TODO: Use BinFile
-            let file = File::open(path)?;
+            let file = BinFile::<ISSUER_MAGIC_NUMBER, ISSUER_VERSION>::open(path)?;
             let mut reader = StrictReader::with(StreamReader::new::<U24MAX>(file));
             let me = Self::decode(&mut reader)?;
             match reader.unbox().unconfine().read_exact(&mut [0u8; 1]) {
@@ -124,7 +131,7 @@ mod _fs {
         }
 
         pub fn save(&self, path: impl AsRef<Path>) -> io::Result<()> {
-            let file = File::create_new(path)?;
+            let file = BinFile::<ISSUER_MAGIC_NUMBER, ISSUER_VERSION>::create_new(path)?;
             let writer = StrictWriter::with(StreamWriter::new::<U24MAX>(file));
             self.encode(writer)
         }

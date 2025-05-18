@@ -1,5 +1,5 @@
 {-
-  Id: stl:i9uVYEh3-Kqx0g90-6p~7pRf-3GNTpCy-f0ySFyr-k~dYJpI#east-editor-year
+  Id: stl:9RYZVmfP-VagYo3W-EcqiSzz-sos38kk-F_hcrPJ-NQPfwxI#isotope-million-western
   Name: SONIC
   Version: 0.12.0
   Description: Standard library for formally-verifiable distributed contracts
@@ -46,6 +46,7 @@ import UltraSONIC#condor-evening-stone
   use Issue#acrobat-frozen-margo
   use StateData#amigo-igor-panel
   use Opid#storm-dragon-brain
+  use ContractId#uniform-welcome-papa
   use StateValue#bamboo-morgan-edition
   use AuthToken#western-america-patrol
   use CodexId#cargo-season-impact
@@ -72,14 +73,21 @@ import StrictTypes#henry-heart-survive
   use TypeSystem#adrian-boris-sponsor
 
 
-@mnemonic(judge-turtle-spell)
-data Api               : embedded#1 ApiInnerEmbeddedProc | (|)
+@mnemonic(picasso-planet-wedding)
+data ApiDescriptor     : default ApiInnerEmbeddedProc
+                       , custom {StrictTypes.TypeName -> ApiInnerEmbeddedProc}
+                       , libs {AluVM.Lib}
+                       , types StrictTypes.TypeSystem
+                       , sig SigBlob?
 
-@mnemonic(mars-cello-avalon)
-data ApiInnerEmbeddedProc : version CommitVerify.ReservedBytes2
+@mnemonic(sharp-section-left)
+data ApiId             : [Byte ^ 32]
+
+@mnemonic(shine-detect-antonio)
+data ApiInnerEmbeddedProc : version CommitVerify.ReservedBytes1
+                       , adaptor CommitVerify.ReservedBytes1
                        , codexId UltraSONIC.CodexId
                        , timestamp I64
-                       , name StrictTypes.TypeName?
                        , developer UltraSONIC.Identity
                        , conforms StrictTypes.TypeName?
                        , defaultCall CallState?
@@ -96,13 +104,16 @@ data AppendApiEmbeddedProc : semId StrictTypes.SemId
                        , published Std.Bool
                        , adaptor EmbeddedImmutable
 
-@mnemonic(byte-academy-ariel)
-data Articles          : defaultApi Api
-                       , customApis {Api}
-                       , sig SigBlob?
-                       , libs {AluVM.Lib}
-                       , types StrictTypes.TypeSystem
-                       , issue UltraSONIC.Issue
+@mnemonic(active-grille-vienna)
+data Articles          : apis ApiDescriptor, issue UltraSONIC.Issue
+
+@mnemonic(distant-east-ritual)
+data ArticlesCommitment : contractId UltraSONIC.ContractId
+                       , defaultApiId ApiId
+                       , customApiIds {StrictTypes.TypeName -> ApiId}
+
+@mnemonic(danube-pilot-karate)
+data ArticlesId        : [Byte ^ 32]
 
 @mnemonic(alpha-balsa-verona)
 data CallState         : method StrictTypes.VariantName, destructible StrictTypes.VariantName?

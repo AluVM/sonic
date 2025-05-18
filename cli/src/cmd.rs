@@ -27,14 +27,14 @@ use std::fs::File;
 use std::path::PathBuf;
 
 use clap::ValueHint;
-use hypersonic::{Articles, AuthToken, CallParams, Identity, IssueParams, Issuer, SigBlob, SigValidator};
+use hypersonic::{AuthToken, CallParams, Identity, IssueParams, Issuer, SigBlob, SigValidator};
 use sonic_persist_fs::LedgerDir;
 
 use crate::dump::dump_ledger;
 
 #[derive(Parser)]
 pub enum Cmd {
-    /// Issue a new HyperSONIC contract
+    /// Issue a new SONIC contract
     Issue {
         /// Issuer used to issue the contract
         issuer: PathBuf,
@@ -42,16 +42,8 @@ pub enum Cmd {
         /// Parameters and data for the contract
         params: PathBuf,
 
-        /// Output file which will contain articles of the contract
+        /// Output contract directory
         output: Option<PathBuf>,
-    },
-
-    /// Process contract articles into a contract directory
-    Process {
-        /// Contract articles to process
-        articles: PathBuf,
-        /// Directory to put the contract directory inside
-        dir: Option<PathBuf>,
     },
 
     /// Print out a contract state
@@ -112,7 +104,6 @@ impl Cmd {
     pub fn exec(self) -> anyhow::Result<()> {
         match self {
             Cmd::Issue { issuer, params, output } => issue(issuer, params, output)?,
-            Cmd::Process { articles, dir } => process(articles, dir)?,
             Cmd::State { dir } => state(dir)?,
             Cmd::Call { dir, call: path } => call(dir, path)?,
             Cmd::Export { dir, terminals, output } => export(dir, terminals, output)?,
@@ -131,20 +122,10 @@ fn issue(issuer_file: PathBuf, form: PathBuf, output: Option<PathBuf>) -> anyhow
     let path = output.unwrap_or(form);
     let output = path
         .with_file_name(params.name.as_str())
-        .with_extension("articles");
+        .with_extension("contract");
 
     let articles = issuer.issue(params);
-    articles.save(output)?;
-
-    Ok(())
-}
-
-fn process(articles_path: PathBuf, dir: Option<PathBuf>) -> anyhow::Result<()> {
-    let articles = Articles::load(&articles_path)?;
-    let path = dir
-        .or_else(|| Some(articles_path.parent()?.to_path_buf()))
-        .ok_or(anyhow::anyhow!("invalid path for creating the contract"))?;
-    LedgerDir::new(articles, path)?;
+    LedgerDir::new(articles, output)?;
 
     Ok(())
 }

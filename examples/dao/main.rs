@@ -36,8 +36,8 @@ use std::path::Path;
 use aluvm::{CoreConfig, LibSite};
 use amplify::num::u256;
 use commit_verify::{Digest, Sha256};
-use hypersonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc, EmbeddedReaders};
-use hypersonic::{Api, ApiInner, AppendApi, DestructibleApi};
+use hypersonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedReaders};
+use hypersonic::{Api, AppendApi, DestructibleApi};
 use sonic_persist_fs::LedgerDir;
 use sonicapi::Issuer;
 use strict_types::{SemId, StrictVal};
@@ -68,11 +68,11 @@ fn api() -> Api {
 
     let codex = codex();
 
-    Api::Embedded(ApiInner::<EmbeddedProc> {
+    Api {
         version: default!(),
+        adaptor: default!(),
         codex_id: codex.codex_id(),
         timestamp: 1732529307,
-        name: None,
         developer: Identity::default(),
         conforms: None,
         default_call: None,
@@ -116,7 +116,7 @@ fn api() -> Api {
         },
         errors: Default::default(),
         reserved: Default::default(),
-    })
+    }
 }
 
 #[cfg_attr(test, test)]
@@ -131,7 +131,7 @@ fn main() {
     fs::remove_file(filename).ok();
     issuer
         .save(filename)
-        .expect("unable to save issuer to a file");
+        .expect("unable to save an issuer to a file");
 
     let seed = &[0xCA; 30][..];
     let mut auth = Sha256::digest(seed);
@@ -159,7 +159,7 @@ fn main() {
         .assign("signers", carol_auth, svnum!(2u64), None)
 
         .finish("WonderlandDAO", 1732529307);
-    let opid = articles.issue.genesis_opid();
+    let opid = articles.genesis_opid();
 
     let contract_path = Path::new("examples/dao/data/WonderlandDAO.contract");
     if contract_path.exists() {

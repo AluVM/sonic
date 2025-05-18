@@ -25,7 +25,7 @@ use alloc::collections::BTreeMap;
 use std::mem;
 
 use amplify::confinement::{LargeOrdMap, SmallOrdMap};
-use sonicapi::{Api, Articles, StateAtom, StateName};
+use sonicapi::{Api, ApiDescriptor, Articles, StateAtom, StateName, StateReader};
 use strict_encoding::{StrictDeserialize, StrictSerialize, TypeName};
 use strict_types::{StrictVal, TypeSystem};
 use ultrasonic::{AuthToken, CallError, CellAddr, Memory, Opid, StateCell, StateData, StateValue, VerifiedOperation};
@@ -55,38 +55,31 @@ pub struct EffectiveState {
 }
 
 impl EffectiveState {
-    pub fn from_genesis(articles: &Articles) -> Result<Self, CallError> {
+    pub fn with_articles(articles: &Articles) -> Result<Self, CallError> {
         let mut state = EffectiveState::default();
 
-        let genesis = articles
-            .issue
-            .genesis
-            .to_operation(articles.issue.contract_id());
+        let contract_id = articles.contract_id();
+        let genesis = articles.genesis().to_operation(contract_id);
 
         let verified = articles
-            .issue
-            .codex
-            .verify(articles.issue.contract_id(), genesis, &state.raw, articles)?;
+            .codex()
+            .verify(contract_id, genesis, &state.raw, articles)?;
 
         // We do not need state transition for genesis.
-        let _ = state.apply(verified, &articles.default_api, &articles.custom_apis, &articles.types);
+        let _ = state.apply(verified, articles.apis());
 
         Ok(state)
     }
 
-    /// NB: Remember to call `recompute state` after.
-    pub fn with(raw: RawState, articles: &Articles) -> Self {
+    pub fn with_raw_state(raw: RawState, articles: &Articles) -> Self {
         let mut me = Self { raw, main: none!(), aux: none!() };
-        me.main = AdaptedState::with(&me.raw, &articles.default_api, &articles.types);
+        me.main = AdaptedState::with(&me.raw, articles.default_api(), articles.types());
         me.aux.clear();
-        for api in &articles.custom_apis {
-            let Some(name) = api.name() else {
-                continue;
-            };
-            let state = AdaptedState::with(&me.raw, api, &articles.types);
+        for (name, api) in articles.custom_apis() {
+            let state = AdaptedState::with(&me.raw, api, articles.types());
             me.aux.insert(name.clone(), state);
         }
-        me.recompute(&articles.default_api, &articles.custom_apis);
+        me.recompute(articles.apis());
         me
     }
 
@@ -102,53 +95,32 @@ impl EffectiveState {
     }
 
     /// Re-evaluates computable part of the state
-    pub fn recompute<'a>(&mut self, default_api: &Api, custom_apis: impl IntoIterator<Item = &'a Api>) {
-        self.main.compute(default_api);
+    pub fn recompute<'a>(&mut self, apis: &ApiDescriptor) {
+        self.main.compute(&apis.default);
         self.aux = bmap! {};
-        for api in custom_apis {
-            let mut s = AdaptedState::default();
-            s.compute(api);
-            self.aux
-                .insert(api.name().cloned().expect("unnamed aux API"), s);
+        for (name, api) in &apis.custom {
+            let mut state = AdaptedState::default();
+            state.compute(api);
+            self.aux.insert(name.clone(), state);
         }
     }
 
     #[must_use]
-    pub(crate) fn apply<'a>(
-        &mut self,
-        op: VerifiedOperation,
-        default_api: &Api,
-        custom_apis: impl IntoIterator<Item = &'a Api>,
-        sys: &TypeSystem,
-    ) -> Transition {
-        self.main.apply(&op, default_api, sys);
-        for api in custom_apis {
-            // Skip default API (it is already processed as `main` above)
-            let Some(name) = api.name() else {
-                continue;
-            };
+    pub(crate) fn apply<'a>(&mut self, op: VerifiedOperation, apis: &ApiDescriptor) -> Transition {
+        self.main.apply(&op, &apis.default, &apis.types);
+        for (name, api) in &apis.custom {
             let state = self.aux.entry(name.clone()).or_default();
-            state.apply(&op, api, sys);
+            state.apply(&op, api, &apis.types);
         }
         self.raw.apply(op)
     }
 
-    pub(crate) fn rollback<'a>(
-        &mut self,
-        transition: Transition,
-        default_api: &Api,
-        custom_apis: impl IntoIterator<Item = &'a Api>,
-        sys: &TypeSystem,
-    ) {
-        self.main.rollback(&transition, default_api, sys);
+    pub(crate) fn rollback<'a>(&mut self, transition: Transition, apis: &ApiDescriptor) {
+        self.main.rollback(&transition, &apis.default, &apis.types);
         let mut count = 0usize;
-        for api in custom_apis {
-            // Skip the default API (it is already processed as `main` above)
-            let Some(name) = api.name() else {
-                continue;
-            };
+        for (name, api) in &apis.custom {
             let state = self.aux.get_mut(name).expect("unknown aux API");
-            state.rollback(&transition, api, sys);
+            state.rollback(&transition, api, &apis.types);
             count += 1;
         }
         debug_assert_eq!(count, self.aux.len());
@@ -277,12 +249,12 @@ impl AdaptedState {
     pub(super) fn compute(&mut self, api: &Api) {
         let empty = bmap![];
         self.computed = bmap! {};
-        for reader in api.readers() {
-            let val = api.read(reader, |name| match self.immutable(name) {
+        for (name, reader) in api.readers() {
+            let val = reader.read(|state_name| match self.immutable(state_name) {
                 None => empty.values(),
                 Some(src) => src.values(),
             });
-            self.computed.insert(reader.clone(), val);
+            self.computed.insert(name.clone(), val);
         }
     }
 
@@ -296,7 +268,6 @@ impl AdaptedState {
                     .or_default()
                     .insert(CellAddr::new(opid, no as u16), atom);
             }
-            // TODO: Warn if no state is present
         }
         for input in &op.destructible_in {
             for map in self.owned.values_mut() {
@@ -327,27 +298,6 @@ impl AdaptedState {
             if let Some((name, value)) = api.convert_destructible(cell.data, sys) {
                 self.owned.entry(name).or_default().insert(*addr, value);
             }
-        }
-    }
-}
-
-#[cfg(feature = "std")]
-mod _fs {
-    use std::path::Path;
-
-    use amplify::confinement::U24 as U24MAX;
-    use strict_encoding::{DeserializeError, SerializeError, StrictDeserialize, StrictSerialize};
-
-    use super::RawState;
-
-    // TODO: Use BinFile
-    impl RawState {
-        pub fn load(path: impl AsRef<Path>) -> Result<Self, DeserializeError> {
-            Self::strict_deserialize_from_file::<U24MAX>(path)
-        }
-
-        pub fn save(&self, path: impl AsRef<Path>) -> Result<(), SerializeError> {
-            self.strict_serialize_to_file::<U24MAX>(path)
         }
     }
 }

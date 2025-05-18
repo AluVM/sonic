@@ -25,14 +25,16 @@ commit_verify.workspace = true
 aluvm.workspace = true
 ultrasonic.workspace = true
 sonic-callreq.workspace = true
+binfile = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 chrono.workspace = true
 
 [features]
-default = ["std"]
-all = ["std", "stl", "serde"]
+default = ["std", "binfile"]
+all = ["std", "stl", "serde", "binfile"]
 
 std = ["sonic-callreq/std"]
+binfile = ["dep:binfile", "std"]
 stl = ["commit_verify/stl", "ultrasonic/stl", "strict_types/armor"]
 serde = [
     "dep:serde",

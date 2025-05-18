@@ -23,19 +23,20 @@
 
 use alloc::collections::BTreeSet;
 use core::borrow::Borrow;
+use core::error::Error;
 use std::io;
 
 use amplify::hex::ToHex;
 use indexmap::IndexSet;
 use sonic_callreq::MethodName;
-use sonicapi::{MergeError, NamedState, OpBuilder, SigValidator};
+use sonicapi::{ApiDescriptor, ArticlesError, NamedState, OpBuilder, SigValidator};
 use strict_encoding::{
     DecodeError, ReadRaw, SerializeError, StrictDecode, StrictEncode, StrictReader, StrictWriter, WriteRaw,
 };
-use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Operation, Opid, VerifiedOperation};
+use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Issue, Operation, Opid, VerifiedOperation};
 
 use crate::deed::{CallParams, DeedBuilder};
-use crate::{Articles, EffectiveState, IssueError, LoadError, Stock, StockError, Transition};
+use crate::{Articles, EffectiveState, IssueError, Stock, Transition};
 
 pub const LEDGER_MAGIC_NUMBER: [u8; 8] = *b"DEEDLDGR";
 pub const LEDGER_VERSION: [u8; 2] = [0x00, 0x01];
@@ -45,9 +46,9 @@ pub const LEDGER_VERSION: [u8; 2] = [0x00, 0x01];
 // We need the persistence trait (`Stock`) in order to allow different persistence storage
 // implementations.
 #[derive(Clone, Debug)]
-pub struct Ledger<S: Stock>(S);
+pub struct Ledger<S: Stock>(S, /** Cached value */ ContractId);
 
-impl<S: Stock> Ledger<S> {
+impl<S: Stock + 'static> Ledger<S> {
     /// Instantiates a new contract from the provided articles, creating its persistence with the
     /// provided configuration.
     ///
@@ -58,8 +59,15 @@ impl<S: Stock> Ledger<S> {
     /// # Blocking I/O
     ///
     /// This call MAY perform any I/O operations.
-    pub fn new(articles: Articles, conf: S::Conf) -> Result<Self, IssueError<S::Error>> {
-        S::new(articles, conf).map(Self)
+    pub fn new(articles: Articles, conf: S::Conf) -> Result<Self, IssueError<impl Error>> {
+        let contract_id = articles.contract_id();
+        let state = EffectiveState::with_articles(&articles)
+            .map_err(|e| IssueError::Genesis(articles.issue().meta.name.clone(), e))?;
+        let mut stock = S::new(articles, state, conf).map_err(IssueError::Persistence)?;
+        let genesis_opid = stock.articles().genesis_opid();
+        stock.mark_valid(genesis_opid);
+        stock.commit_transaction();
+        Ok(Self(stock, contract_id))
     }
 
     /// Loads a contract using the provided configuration for persistence.
@@ -71,7 +79,12 @@ impl<S: Stock> Ledger<S> {
     /// # Blocking I/O
     ///
     /// This call MAY perform any I/O operations.
-    pub fn load(conf: S::Conf) -> Result<Self, LoadError<S::Error>> { S::load(conf).map(Self) }
+    pub fn load(conf: S::Conf) -> Result<Self, impl Error> {
+        S::load(conf).map(|stock| {
+            let contract_id = stock.articles().contract_id();
+            Self(stock, contract_id)
+        })
+    }
 
     pub fn config(&self) -> S::Conf { self.0.config() }
 
@@ -79,12 +92,13 @@ impl<S: Stock> Ledger<S> {
 
     /// Provides contract id.
     ///
+    /// The contract id value is cached; thus, calling this operation is inexpensive.
+    ///
     /// # Blocking I/O
     ///
     /// This call MUST NOT perform any I/O operations and MUST BE a non-blocking.
-    // TODO: Cache the id
     #[inline]
-    pub fn contract_id(&self) -> ContractId { self.0.articles().contract_id() }
+    pub fn contract_id(&self) -> ContractId { self.1 }
 
     /// Provides contract [`Articles`], which include contract genesis.
     ///
@@ -212,7 +226,7 @@ impl<S: Stock> Ledger<S> {
         let mut chain = opids.into_iter().collect::<IndexSet<_>>();
         // Get all subsequent operations
         let mut index = 0usize;
-        let genesis_opid = self.articles().issue.genesis_opid();
+        let genesis_opid = self.articles().genesis_opid();
         while let Some(opid) = chain.get_index(index).copied() {
             if opid != genesis_opid {
                 let op = self.0.operation(opid);
@@ -300,7 +314,7 @@ impl<S: Stock> Ledger<S> {
             .map(|terminal| self.0.state().addr(*terminal.borrow()).opid)
             .collect::<BTreeSet<_>>();
         let articles = self.0.articles();
-        let genesis_opid = articles.issue.genesis_opid();
+        let genesis_opid = articles.genesis_opid();
         queue.remove(&genesis_opid);
         let mut opids = queue.clone();
         while let Some(opid) = queue.pop_first() {
@@ -317,7 +331,7 @@ impl<S: Stock> Ledger<S> {
 
         // Write articles
         writer = articles.strict_encode(writer)?;
-        writer = aux(genesis_opid, &articles.issue.genesis.to_operation(contract_id), writer)?;
+        writer = aux(genesis_opid, &articles.genesis().to_operation(contract_id), writer)?;
         // Stream operations
         for (opid, op) in self.0.operations() {
             if !opids.remove(&opid) {
@@ -340,11 +354,11 @@ impl<S: Stock> Ledger<S> {
         Ok(())
     }
 
-    pub fn merge_articles(
+    pub fn merge_articles<V: SigValidator>(
         &mut self,
         new_articles: Articles,
-        sig_validator: impl SigValidator,
-    ) -> Result<(), StockError<MergeError>> {
+        sig_validator: V,
+    ) -> Result<(), impl Error + use<'_, V, S>> {
         self.0.update_articles(|articles| {
             articles.merge(new_articles, sig_validator)?;
             Ok(())
@@ -374,16 +388,15 @@ impl<S: Stock> Ledger<S> {
         }
         let contract_id = ContractId::strict_decode(reader)?;
 
-        let articles = Articles::strict_decode(reader)?;
+        let apis = ApiDescriptor::strict_decode(reader)?;
+        let issue = Issue::strict_decode(reader)?;
+        let articles = Articles::with(apis, issue)?;
         if articles.contract_id() != contract_id {
-            return Err(AcceptError::Articles(MergeError::ContractMismatch));
+            return Err(AcceptError::Articles(ArticlesError::ContractMismatch));
         }
 
         self.merge_articles(articles, sig_validator)
-            .map_err(|e| match e {
-                StockError::Inner(e) => AcceptError::Articles(e),
-                StockError::Serialize(e) => AcceptError::Io(e),
-            })?;
+            .map_err(|e| AcceptError::Persistence(e.to_string()))?;
 
         loop {
             let op = match Operation::strict_decode(reader) {
@@ -413,7 +426,7 @@ impl<S: Stock> Ledger<S> {
                 }
             }
             self.0.update_state(|state, articles| {
-                state.rollback(transition, &articles.default_api, &articles.custom_apis, &articles.types);
+                state.rollback(transition, articles.apis());
             })?;
             self.0.mark_invalid(opid);
         }
@@ -477,7 +490,7 @@ impl<S: Stock> Ledger<S> {
     /// It is required to call [`Self::commit_transaction`] after all calls to this method.
     pub fn apply_verify(&mut self, operation: Operation, force: bool) -> Result<bool, AcceptError> {
         if operation.contract_id != self.contract_id() {
-            return Err(AcceptError::Articles(MergeError::ContractMismatch));
+            return Err(AcceptError::Articles(ArticlesError::ContractMismatch));
         }
 
         let opid = operation.opid();
@@ -486,8 +499,7 @@ impl<S: Stock> Ledger<S> {
         let articles = self.0.articles();
         if !present || force {
             let verified = articles
-                .issue
-                .codex
+                .codex()
                 .verify(self.contract_id(), operation, &self.0.state().raw, articles)?;
             self.apply_internal(opid, verified, present && !force)?;
         }
@@ -531,9 +543,9 @@ impl<S: Stock> Ledger<S> {
             self.0.add_spending(prevout.addr, opid);
         }
 
-        let transition = self.0.update_state(|state, articles| {
-            state.apply(operation, &articles.default_api, &articles.custom_apis, &articles.types)
-        })?;
+        let transition = self
+            .0
+            .update_state(|state, articles| state.apply(operation, articles.apis()))?;
 
         self.0.add_transition(opid, &transition);
         self.0.mark_valid(opid);
@@ -550,7 +562,7 @@ pub enum AcceptError {
     Io(io::Error),
 
     #[from]
-    Articles(MergeError),
+    Articles(ArticlesError),
 
     #[from]
     Verify(CallError),
@@ -560,4 +572,6 @@ pub enum AcceptError {
 
     #[from]
     Serialize(SerializeError),
+
+    Persistence(String),
 }

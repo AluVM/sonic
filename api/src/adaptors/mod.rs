@@ -22,4 +22,6 @@
 // the License.
 
 pub mod embedded;
+// For now, we do not provide AluVM-based API adaptors.
+// In the future versions, when it is supported, move it here from the `future` directory.
 //pub mod alu;

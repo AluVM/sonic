@@ -36,26 +36,26 @@ use sonic_persist_fs::LedgerDir;
 use strict_encoding::StrictSerialize;
 
 pub fn dump_articles(articles: &Articles, dst: &Path) -> anyhow::Result<Opid> {
-    let genesis_opid = articles.issue.genesis_opid();
+    let genesis_opid = articles.genesis_opid();
     let out = File::create_new(dst.join(format!("0000-genesis-{genesis_opid}.yaml")))
         .context("can't create dump files; try to use the `--force` flag")?;
-    serde_yaml::to_writer(&out, &articles.issue.genesis)?;
+    serde_yaml::to_writer(&out, articles.genesis())?;
 
     let out = File::create_new(dst.join("meta.yaml"))?;
-    serde_yaml::to_writer(&out, &articles.issue.meta)?;
+    serde_yaml::to_writer(&out, &articles.issue().meta)?;
 
-    let out = File::create_new(dst.join(format!("codex-{:#}.yaml", articles.issue.codex.codex_id())))?;
-    serde_yaml::to_writer(&out, &articles.issue.codex)?;
+    let out = File::create_new(dst.join(format!("codex-{:#}.yaml", articles.codex_id())))?;
+    serde_yaml::to_writer(&out, articles.codex())?;
 
     let out = File::create_new(dst.join("api-default.yaml"))?;
-    serde_yaml::to_writer(&out, &articles.default_api)?;
+    serde_yaml::to_writer(&out, articles.default_api())?;
 
-    for api in &articles.custom_apis {
-        let out = File::create_new(dst.join(format!("api-{}.yaml", api.name().expect("invalid api"))))?;
+    for (name, api) in articles.custom_apis() {
+        let out = File::create_new(dst.join(format!("api-{name}.yaml")))?;
         serde_yaml::to_writer(&out, &api)?;
     }
 
-    for lib in &articles.libs {
+    for lib in &articles.apis().libs {
         let lib_id = lib.lib_id();
         let name = lib_id.to_baid64_mnemonic();
         lib.strict_serialize_to_file::<U24MAX>(dst.join(format!("{name}.alu")))?;
@@ -64,10 +64,10 @@ pub fn dump_articles(articles: &Articles, dst: &Path) -> anyhow::Result<Opid> {
     }
 
     articles
-        .types
+        .types()
         .strict_serialize_to_file::<U24MAX>(dst.join("types.sts"))?;
     let mut out = File::create_new(dst.join("types.sty"))?;
-    write!(out, "{}", articles.types)?;
+    write!(out, "{}", articles.types())?;
 
     Ok(genesis_opid)
 }

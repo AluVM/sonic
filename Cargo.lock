@@ -329,7 +329,7 @@ checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 [[package]]
 name = "commit_encoding_derive"
 version = "0.12.0-beta.6"
-source = "git+https://github.com/LNP-BP/client_side_validation?branch=revision#fdac8792343a6f0b01a2d649bd127ace3a011ba1"
+source = "git+https://github.com/LNP-BP/client_side_validation?branch=revision#568d00688175c24c0cd1747534135cd09476079c"
 dependencies = [
  "amplify",
  "amplify_syn",
@@ -341,7 +341,7 @@ dependencies = [
 [[package]]
 name = "commit_verify"
 version = "0.12.0-beta.6"
-source = "git+https://github.com/LNP-BP/client_side_validation?branch=revision#fdac8792343a6f0b01a2d649bd127ace3a011ba1"
+source = "git+https://github.com/LNP-BP/client_side_validation?branch=revision#568d00688175c24c0cd1747534135cd09476079c"
 dependencies = [
  "amplify",
  "commit_encoding_derive",
@@ -827,6 +827,7 @@ dependencies = [
  "aluvm",
  "amplify",
  "baid64",
+ "binfile",
  "chrono",
  "commit_verify",
  "getrandom 0.2.16",
@@ -868,8 +869,11 @@ version = "0.12.0-beta.6"
 dependencies = [
  "amplify",
  "aora",
+ "binfile",
  "hypersonic",
+ "serde_yaml",
  "strict_encoding",
+ "toml",
 ]
 
 [[package]]
@@ -1040,7 +1044,7 @@ checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 [[package]]
 name = "ultrasonic"
 version = "0.12.0-beta.6"
-source = "git+https://github.com/AluVM/ultrasonic?branch=revision#bb0d047b5cc868d641334e884c4d03f51b3e3c06"
+source = "git+https://github.com/AluVM/ultrasonic?branch=revision#b006b44c189809204505d112f10e2dd1b04b6707"
 dependencies = [
  "amplify",
  "baid64",

@@ -14,10 +14,13 @@ rust-version.workspace = true
 exclude = [".github"]
 
 [dependencies]
-amplify.workspace = true
-strict_encoding.workspace = true
-hypersonic.workspace = true
+amplify = { workspace = true, features = ["serde"] }
+strict_encoding = { workspace = true, features = ["serde"] }
+hypersonic = { workspace = true, features = ["serde", "binfile"] }
 aora.workspace = true
+binfile.workspace = true
+serde_yaml.workspace = true
+toml.workspace = true
 
 [features]
 

@@ -24,7 +24,7 @@
 use aluvm::stl::aluvm_stl;
 use commit_verify::stl::commit_verify_stl;
 use sonic_callreq::LIB_NAME_SONIC;
-use sonicapi::Articles;
+use sonicapi::{Articles, ArticlesCommitment, ArticlesId};
 use strict_types::stl::{std_stl, strict_types_stl};
 use strict_types::typelib::LibBuilder;
 use strict_types::{CompileError, TypeLib};
@@ -34,7 +34,7 @@ pub use ultrasonic::stl::usonic_stl;
 use crate::Transition;
 
 /// Strict types id for the library providing data types for RGB consensus.
-pub const LIB_ID_SONIC: &str = "stl:i9uVYEh3-Kqx0g90-6p~7pRf-3GNTpCy-f0ySFyr-k~dYJpI#east-editor-year";
+pub const LIB_ID_SONIC: &str = "stl:9RYZVmfP-VagYo3W-EcqiSzz-sos38kk-F_hcrPJ-NQPfwxI#isotope-million-western";
 
 #[allow(clippy::result_large_err)]
 fn _sonic_stl() -> Result<TypeLib, CompileError> {
@@ -46,7 +46,9 @@ fn _sonic_stl() -> Result<TypeLib, CompileError> {
         finite_field_stl().to_dependency_types(),
         usonic_stl().to_dependency_types(),
     ])
+    .transpile::<ArticlesId>()
     .transpile::<Articles>()
+    .transpile::<ArticlesCommitment>()
     .transpile::<Transition>()
     .compile()
 }

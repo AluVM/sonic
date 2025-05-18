@@ -57,250 +57,44 @@ pub(super) const TOTAL_BYTES: usize = USED_FIEL_BYTES * 3;
 /// all necessary data. Basically, one may think of API as a compiled interface hierarchy applied to
 /// a specific codex.
 ///
-/// API doesn't commit to an interface ID, since it can match multiple interfaces in the interface
+/// API does not commit to an interface, since it can match multiple interfaces in the interface
 /// hierarchy.
-#[derive(Clone, Debug, From)]
-#[derive(CommitEncode)]
-#[commit_encode(strategy = strict, id = ApiId)]
-#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONIC, tags = custom, dumb = Self::Embedded(strict_dumb!()))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
-#[non_exhaustive]
-pub enum Api {
-    #[from]
-    #[strict_type(tag = 1)]
-    Embedded(ApiInner<EmbeddedProc>),
-    /*
-    #[from]
-    #[strict_type(tag = 2)]
-    Alu(ApiInner<aluvm::Vm>),*/
-}
+pub type Api = ApiInner<EmbeddedProc>;
 
-impl PartialEq for Api {
-    fn eq(&self, other: &Self) -> bool { self.cmp(other) == Ordering::Equal }
-}
-impl Eq for Api {}
-impl PartialOrd for Api {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
-}
-impl Ord for Api {
-    fn cmp(&self, other: &Self) -> Ordering {
-        if self.api_id() == other.api_id() {
-            Ordering::Equal
-        } else {
-            self.timestamp().cmp(&other.timestamp())
-        }
-    }
-}
-impl Hash for Api {
-    fn hash<H: Hasher>(&self, state: &mut H) { self.api_id().hash(state); }
-}
-
-impl Api {
-    pub fn api_id(&self) -> ApiId { self.commit_id() }
-
-    pub fn vm_type(&self) -> VmType {
-        match self {
-            Api::Embedded(_) => VmType::Embedded,
-            //Api::Alu(_) => VmType::AluVM,
-        }
-    }
-
-    pub fn codex_id(&self) -> CodexId {
-        match self {
-            Api::Embedded(api) => api.codex_id,
-            //Api::Alu(api) => api.codex_id,
-        }
-    }
-
-    pub fn timestamp(&self) -> i64 {
-        match self {
-            Api::Embedded(api) => api.timestamp,
-            //Api::Alu(api) => api.timestamp,
-        }
-    }
-
-    pub fn name(&self) -> Option<&TypeName> {
-        match self {
-            Api::Embedded(api) => api.name.as_ref(),
-            //Api::Alu(api) => api.name.as_ref(),
-        }
-    }
-
-    pub fn conforms(&self) -> Option<&TypeName> {
-        match self {
-            Api::Embedded(api) => api.conforms.as_ref(),
-            //Api::Alu(api) => api.conforms.as_ref(),
-        }
-    }
-
-    pub fn developer(&self) -> &Identity {
-        match self {
-            Api::Embedded(api) => &api.developer,
-            //Api::Alu(api) => &api.developer,
-        }
-    }
-
-    pub fn default_call(&self) -> Option<&CallState> {
-        match self {
-            Api::Embedded(api) => api.default_call.as_ref(),
-            //Api::Alu(api) => api.default_call.as_ref(),
-        }
-    }
-
-    pub fn verifier(&self, method: impl Into<MethodName>) -> Option<CallId> {
-        let method = method.into();
-        match self {
-            Api::Embedded(api) => api.verifiers.get(&method),
-            //Api::Alu(api) => api.verifiers.get(&method),
-        }
-        .copied()
-    }
-
-    pub fn readers(&self) -> Box<dyn Iterator<Item = &MethodName> + '_> {
-        match self {
-            Api::Embedded(api) => Box::new(api.readers.keys()),
-            //Api::Alu(api) => Box::new(api.readers.keys()),
-        }
-    }
-
-    pub fn read<'s, I: IntoIterator<Item = &'s StateAtom>>(
-        &self,
-        name: &StateName,
-        state: impl Fn(&StateName) -> I,
-    ) -> StrictVal {
-        match self {
-            Api::Embedded(api) => api
-                .readers
-                .get(name)
-                .expect("state name is unknown for the API")
-                .read(state),
-            /*Api::Alu(api) => api
-            .readers
-            .get(name)
-            .expect("state name is unknown for the API")
-            .read(state),*/
-        }
-    }
-
-    pub fn convert_immutable(&self, data: &StateData, sys: &TypeSystem) -> Option<(StateName, StateAtom)> {
-        match self {
-            Api::Embedded(api) => {
-                for (name, adaptor) in &api.append_only {
-                    if let Some(atom) = adaptor.convert(data, sys) {
-                        return Some((name.clone(), atom));
-                    }
-                }
-                None
-            } /*Api::Alu(api) => {
-                  for (name, adaptor) in &api.append_only {
-                      if let Some(atom) = adaptor.convert(data, sys) {
-                          return Some((name.clone(), atom));
-                      }
-                  }
-                  None
-              }*/
-        }
-    }
-
-    pub fn convert_destructible(&self, value: StateValue, sys: &TypeSystem) -> Option<(StateName, StrictVal)> {
-        // Here we do not yet known which state we are using, since it is encoded inside the field element
-        // of `StateValue`. Thus, we are trying all available convertors until they succeed, since the
-        // convertors check the state type. Then, we use the state name associated with the succeeded
-        // convertor.
-        match self {
-            Api::Embedded(api) => {
-                for (name, adaptor) in &api.destructible {
-                    if let Some(atom) = adaptor.convert(value, sys) {
-                        return Some((name.clone(), atom));
-                    }
-                }
-                None
-            } /*Api::Alu(api) => {
-                  for (name, adaptor) in &api.destructible {
-                      if let Some(atom) = adaptor.convert(value, sys) {
-                          return Some((name.clone(), atom));
-                      }
-                  }
-                  None
-              }*/
-        }
-    }
-
-    pub fn build_immutable(
-        &self,
-        name: impl Into<StateName>,
-        data: StrictVal,
-        raw: Option<StrictVal>,
-        sys: &TypeSystem,
-    ) -> StateData {
-        let name = name.into();
-        match self {
-            Api::Embedded(api) => api
-                .append_only
-                .get(&name)
-                .expect("state name is unknown for the API")
-                .build(data, raw, sys),
-            /*Api::Alu(api) => api
-            .append_only
-            .get(&name)
-            .expect("state name is unknown for the API")
-            .build(data, raw, sys),*/
-        }
-    }
-
-    pub fn build_destructible(&self, name: impl Into<StateName>, data: StrictVal, sys: &TypeSystem) -> StateValue {
-        let name = name.into();
-        match self {
-            Api::Embedded(api) => api
-                .destructible
-                .get(&name)
-                .expect("state name is unknown for the API")
-                .build(data, sys),
-            /*Api::Alu(api) => api
-            .destructible
-            .get(&name)
-            .expect("state name is unknown for the API")
-            .build(data, sys),*/
-        }
-    }
-
-    pub fn calculate(&self, name: impl Into<StateName>) -> Box<dyn StateCalc> {
-        let name = name.into();
-        match self {
-            Api::Embedded(api) => api
-                .destructible
-                .get(&name)
-                .expect("state name is unknown for the API")
-                .arithmetics
-                .calculator(),
-            /*#[allow(clippy::let_unit_value)]
-            Api::Alu(api) => api
-                .destructible
-                .get(&name)
-                .expect("state name is unknown for the API")
-                .arithmetics
-                .calculator(),*/
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
+/// The inner details of API implementation, generic over the used VM for the adaptors.
+///
+/// # Nota bene
+///
+/// Currently, only a single adaptor VM is supported: embedded procedures. This support is
+/// guaranteed through the fact that the only implementation for the API commitment id
+/// ([`ApiInner::api_id`]) is made for the `ApiInner<EmbeddedProc>` variant.
+/// There are two reasons for that:
+/// 1. It is impossible to construct a contract articles object, since the constructor verifies the
+///    API id.
+/// 2. It is impossible to use API without having API id, singe no valid signature over the contract
+///    articles using that API cannot be produced by a developer.
+#[derive(Clone, Getters, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_SONIC)]
+#[derive(CommitEncode)]
+#[commit_encode(strategy = strict, id = ApiId)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase", bound = ""))]
 pub struct ApiInner<Vm: ApiVm> {
     /// Version of the API structure.
-    pub version: ReservedBytes<2>,
+    #[getter(as_copy)]
+    pub version: ReservedBytes<1>,
+
+    /// A commitment to a specific VM used.
+    #[getter(as_copy)]
+    pub adaptor: ReservedBytes<1>,
 
     /// Commitment to the codex under which the API is valid.
+    #[getter(as_copy)]
     pub codex_id: CodexId,
 
     /// Timestamp, which is used for versioning (later APIs have priority over new ones).
+    #[getter(as_copy)]
     pub timestamp: i64,
-
-    /// API name. Each codex must have a default API with no name.
-    pub name: Option<TypeName>,
 
     /// Developer identity string.
     pub developer: Identity,
@@ -312,6 +106,7 @@ pub struct ApiInner<Vm: ApiVm> {
     pub default_call: Option<CallState>,
 
     /// Reserved for future use.
+    #[getter(skip)]
     pub reserved: ReservedBytes<8>,
 
     /// State API defines how a structured contract state is constructed out of (and converted into)
@@ -338,6 +133,87 @@ pub struct ApiInner<Vm: ApiVm> {
     /// Maps error type reported by a contract verifier via `EA` value to an error description taken
     /// from the interfaces.
     pub errors: TinyOrdMap<u256, TinyString>,
+}
+
+impl PartialEq for Api {
+    fn eq(&self, other: &Self) -> bool { self.cmp(other) == Ordering::Equal }
+}
+impl Eq for Api {}
+impl PartialOrd for Api {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
+}
+impl Ord for Api {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.api_id() == other.api_id() {
+            Ordering::Equal
+        } else {
+            self.timestamp().cmp(&other.timestamp())
+        }
+    }
+}
+impl Hash for Api {
+    fn hash<H: Hasher>(&self, state: &mut H) { self.api_id().hash(state); }
+}
+
+impl Api {
+    pub fn api_id(&self) -> ApiId { self.commit_id() }
+
+    pub fn verifier(&self, method: impl Into<MethodName>) -> Option<CallId> {
+        self.verifiers.get(&method.into()).copied()
+    }
+
+    pub fn convert_immutable(&self, data: &StateData, sys: &TypeSystem) -> Option<(StateName, StateAtom)> {
+        for (name, adaptor) in &self.append_only {
+            if let Some(atom) = adaptor.convert(data, sys) {
+                return Some((name.clone(), atom));
+            }
+        }
+        None
+    }
+
+    pub fn convert_destructible(&self, value: StateValue, sys: &TypeSystem) -> Option<(StateName, StrictVal)> {
+        // Here we do not yet known which state we are using, since it is encoded inside the field element
+        // of `StateValue`. Thus, we are trying all available convertors until they succeed, since the
+        // convertors check the state type. Then, we use the state name associated with the succeeded
+        // convertor.
+        for (name, adaptor) in &self.destructible {
+            if let Some(atom) = adaptor.convert(value, sys) {
+                return Some((name.clone(), atom));
+            }
+        }
+        None
+    }
+
+    pub fn build_immutable(
+        &self,
+        name: impl Into<StateName>,
+        data: StrictVal,
+        raw: Option<StrictVal>,
+        sys: &TypeSystem,
+    ) -> StateData {
+        let name = name.into();
+        self.append_only
+            .get(&name)
+            .expect("state name is unknown for the API")
+            .build(data, raw, sys)
+    }
+
+    pub fn build_destructible(&self, name: impl Into<StateName>, data: StrictVal, sys: &TypeSystem) -> StateValue {
+        let name = name.into();
+        self.destructible
+            .get(&name)
+            .expect("state name is unknown for the API")
+            .build(data, sys)
+    }
+
+    pub fn calculate(&self, name: impl Into<StateName>) -> Box<dyn StateCalc> {
+        let name = name.into();
+        self.destructible
+            .get(&name)
+            .expect("state name is unknown for the API")
+            .arithmetics
+            .calculator()
+    }
 }
 
 #[derive(Wrapper, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, From)]
@@ -384,10 +260,10 @@ mod _baid4 {
     impl CommitmentId for ApiId {
         const TAG: &'static str = "urn:ubideco:sonic:api#2024-11-20";
     }
-}
 
-#[cfg(feature = "serde")]
-ultrasonic::impl_serde_str_bin_wrapper!(ApiId, Bytes32);
+    #[cfg(feature = "serde")]
+    ultrasonic::impl_serde_str_bin_wrapper!(ApiId, Bytes32);
+}
 
 /// API for append-only state.
 ///
