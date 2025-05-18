@@ -62,7 +62,7 @@ mod builders;
 
 pub use adaptors::{/* alu, */ embedded};
 pub use api::{
-    Api, ApiId, ApiInner, ApiVm, AppendApi, DestructibleApi, StateAdaptor, StateArithm, StateCalc, StateCalcError,
+    Api, ApiId, ApiInner, ApiVm, DestructibleApi, ImmutableApi, StateAdaptor, StateArithm, StateCalc, StateCalcError,
     StateReader,
 };
 pub use articles::{

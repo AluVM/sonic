@@ -111,7 +111,7 @@ pub struct ApiInner<Vm: ApiVm> {
 
     /// State API defines how a structured contract state is constructed out of (and converted into)
     /// UltraSONIC immutable memory cells.
-    pub append_only: TinyOrdMap<StateName, AppendApi<Vm>>,
+    pub immutable: TinyOrdMap<StateName, ImmutableApi<Vm>>,
 
     /// State API defines how a structured contract state is constructed out of (and converted into)
     /// UltraSONIC destructible memory cells.
@@ -163,7 +163,7 @@ impl Api {
     }
 
     pub fn convert_immutable(&self, data: &StateData, sys: &TypeSystem) -> Option<(StateName, StateAtom)> {
-        for (name, adaptor) in &self.append_only {
+        for (name, adaptor) in &self.immutable {
             if let Some(atom) = adaptor.convert(data, sys) {
                 return Some((name.clone(), atom));
             }
@@ -172,9 +172,9 @@ impl Api {
     }
 
     pub fn convert_destructible(&self, value: StateValue, sys: &TypeSystem) -> Option<(StateName, StrictVal)> {
-        // Here we do not yet known which state we are using, since it is encoded inside the field element
+        // Here we do not yet know which state we are using, since it is encoded inside the field element
         // of `StateValue`. Thus, we are trying all available convertors until they succeed, since the
-        // convertors check the state type. Then, we use the state name associated with the succeeded
+        // convertors check the state type. Then, we use the state name associated with the succeeding
         // convertor.
         for (name, adaptor) in &self.destructible {
             if let Some(atom) = adaptor.convert(value, sys) {
@@ -192,7 +192,7 @@ impl Api {
         sys: &TypeSystem,
     ) -> StateData {
         let name = name.into();
-        self.append_only
+        self.immutable
             .get(&name)
             .expect("state name is unknown for the API")
             .build(data, raw, sys)
@@ -275,19 +275,19 @@ mod _baid4 {
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_SONIC)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
-pub struct AppendApi<Vm: ApiVm> {
+pub struct ImmutableApi<Vm: ApiVm> {
     /// Semantic type id for verifiable part of the state.
     pub sem_id: SemId,
     /// Semantic type id for non-verifiable part of the state.
     pub raw_sem_id: SemId,
-
+    /// Whether the state is a published state.
     pub published: bool,
     /// Procedures which convert a state made of finite field elements [`StateData`] into a
     /// structured type [`StructData`] and vice verse.
     pub adaptor: Vm::Adaptor,
 }
 
-impl<Vm: ApiVm> AppendApi<Vm> {
+impl<Vm: ApiVm> ImmutableApi<Vm> {
     pub fn convert(&self, data: &StateData, sys: &TypeSystem) -> Option<StateAtom> {
         self.adaptor
             .convert_immutable(self.sem_id, self.raw_sem_id, data, sys)
@@ -323,15 +323,19 @@ pub struct DestructibleApi<Vm: ApiVm> {
     pub arithmetics: Vm::Arithm,
 
     /// Procedures which convert a state made of finite field elements [`StateData`] into a
-    /// structured type [`StructData`] and vice verse.
+    /// structured type [`StrictVal`] and vice verse.
     pub adaptor: Vm::Adaptor,
 }
 
 impl<Vm: ApiVm> DestructibleApi<Vm> {
     pub fn convert(&self, value: StateValue, sys: &TypeSystem) -> Option<StrictVal> {
-        self.adaptor.convert_destructible(self.sem_id, value, sys)
+        self.adaptor
+            .convert_destructible(self.sem_id, value, sys)
     }
     pub fn build(&self, value: StrictVal, sys: &TypeSystem) -> StateValue {
+        self.adaptor.build_state(self.sem_id, value, sys)
+    }
+    pub fn build_witness(&self, value: StrictVal, sys: &TypeSystem) -> StateValue {
         self.adaptor.build_state(self.sem_id, value, sys)
     }
     pub fn arithmetics(&self) -> &Vm::Arithm { &self.arithmetics }
@@ -372,10 +376,10 @@ pub trait StateAdaptor: Clone + Ord + Debug + StrictDumb + StrictEncode + Strict
         data: &StateData,
         sys: &TypeSystem,
     ) -> Option<StateAtom>;
+
     fn convert_destructible(&self, sem_id: SemId, value: StateValue, sys: &TypeSystem) -> Option<StrictVal>;
 
-    fn build_immutable(&self, value: ConfinedBlob<0, TOTAL_BYTES>) -> StateValue;
-    fn build_destructible(&self, value: ConfinedBlob<0, TOTAL_BYTES>) -> StateValue;
+    fn build_inner(&self, value: ConfinedBlob<0, TOTAL_BYTES>) -> StateValue;
 
     fn build_state(&self, sem_id: SemId, value: StrictVal, sys: &TypeSystem) -> StateValue {
         let typed = sys
@@ -384,7 +388,7 @@ pub trait StateAdaptor: Clone + Ord + Debug + StrictDumb + StrictEncode + Strict
         let ser = sys
             .strict_serialize_value::<TOTAL_BYTES>(&typed)
             .expect("strict value is too large");
-        self.build_immutable(ser)
+        self.build_inner(ser)
     }
 }
 

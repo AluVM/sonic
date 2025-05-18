@@ -37,7 +37,7 @@ use aluvm::{CoreConfig, LibSite};
 use amplify::num::u256;
 use commit_verify::{Digest, Sha256};
 use hypersonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedReaders};
-use hypersonic::{Api, AppendApi, DestructibleApi};
+use hypersonic::{Api, DestructibleApi, ImmutableApi};
 use sonic_persist_fs::LedgerDir;
 use sonicapi::Issuer;
 use strict_types::{SemId, StrictVal};
@@ -76,20 +76,20 @@ fn api() -> Api {
         developer: Identity::default(),
         conforms: None,
         default_call: None,
-        append_only: tiny_bmap! {
-            vname!("_parties") => AppendApi {
+        immutable: tiny_bmap! {
+            vname!("_parties") => ImmutableApi {
                 sem_id: types.get("DAO.PartyId"),
                 raw_sem_id: types.get("DAO.Party"),
                 published: true,
                 adaptor: EmbeddedImmutable(u256::ZERO),
             },
-            vname!("_votings") => AppendApi {
+            vname!("_votings") => ImmutableApi {
                 sem_id: types.get("DAO.VoteId"),
                 raw_sem_id: types.get("DAO.Voting"),
                 published: true,
                 adaptor: EmbeddedImmutable(u256::ONE),
             },
-            vname!("_votes") => AppendApi {
+            vname!("_votes") => ImmutableApi {
                 sem_id: types.get("DAO.CastVote"),
                 raw_sem_id: SemId::unit(),
                 published: true,

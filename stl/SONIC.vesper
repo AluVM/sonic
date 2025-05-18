@@ -35,9 +35,9 @@ rec Articles
           ascii method, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
             ascii some, option, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 1
       bytes reserved, len 8, aka ReservedBytes8
-      map appendOnly, len 0..MAX8
+      map immutable, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-        rec value, AppendApiEmbeddedProc
+        rec value, ImmutableApiEmbeddedProc
           bytes semId, len 32, aka SemId
           bytes rawSemId, len 32, aka SemId
           enum published, Bool, false 0, true 1
@@ -75,9 +75,9 @@ rec Articles
             ascii method, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
               ascii some, option, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 1
         bytes reserved, len 8, aka ReservedBytes8
-        map appendOnly, len 0..MAX8
+        map immutable, len 0..MAX8
           ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-          rec value, AppendApiEmbeddedProc
+          rec value, ImmutableApiEmbeddedProc
             bytes semId, len 32, aka SemId
             bytes rawSemId, len 32, aka SemId
             enum published, Bool, false 0, true 1

@@ -148,7 +148,7 @@ fn api() -> Api {
         developer: Identity::default(),
         conforms: None,
         default_call: None,
-        append_only: none!(),
+        immutable: none!(),
         destructible: tiny_bmap! {
             vname!("amount") => DestructibleApi {
                 sem_id: types.get("Fungible.Amount"),

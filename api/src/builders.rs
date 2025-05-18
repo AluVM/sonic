@@ -339,11 +339,10 @@ impl OpBuilder {
     }
 
     pub fn destroy(mut self, addr: CellAddr, _witness: StrictVal) -> Self {
-        // TODO: Convert witness
         let input = Input { addr, witness: StateValue::None };
         self.destructible_in
             .push(input)
-            .expect("number of inputs exceeds 64k limit");
+            .expect("the number of inputs exceeds the 64k limit");
         self
     }
 

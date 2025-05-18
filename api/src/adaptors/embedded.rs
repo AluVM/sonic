@@ -208,9 +208,7 @@ impl StateAdaptor for EmbeddedImmutable {
         self.convert_value(sem_id, value, sys)
     }
 
-    fn build_immutable(&self, value: ConfinedBlob<0, TOTAL_BYTES>) -> StateValue { self.build_value(value) }
-
-    fn build_destructible(&self, value: ConfinedBlob<0, TOTAL_BYTES>) -> StateValue { self.build_value(value) }
+    fn build_inner(&self, value: ConfinedBlob<0, TOTAL_BYTES>) -> StateValue { self.build_value(value) }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
