@@ -171,6 +171,7 @@ impl Api {
         Ok(None)
     }
 
+    #[allow(clippy::result_large_err)]
     pub fn build_immutable(
         &self,
         name: impl Into<StateName>,
@@ -188,6 +189,7 @@ impl Api {
         Ok(StateData { value, raw })
     }
 
+    #[allow(clippy::result_large_err)]
     pub fn build_destructible(
         &self,
         name: impl Into<StateName>,
@@ -203,6 +205,7 @@ impl Api {
         api.builder.build(api.sem_id, data, sys)
     }
 
+    #[allow(clippy::result_large_err)]
     pub fn build_witness(
         &self,
         name: impl Into<StateName>,

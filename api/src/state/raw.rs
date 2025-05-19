@@ -65,6 +65,7 @@ pub enum RawBuilder {
 }
 
 impl RawBuilder {
+    #[allow(clippy::result_large_err)]
     pub fn build(&self, val: StrictVal, sys: &TypeSystem) -> Result<RawData, StateBuildError> {
         match self {
             Self::StrictEncode(sem_id) => strict_build(*sem_id, val, sys),
@@ -93,6 +94,7 @@ fn strict_convert(sem_id: SemId, raw: &RawData, sys: &TypeSystem) -> Result<Stri
     Ok(val)
 }
 
+#[allow(clippy::result_large_err)]
 fn strict_build(sem_id: SemId, val: StrictVal, sys: &TypeSystem) -> Result<RawData, StateBuildError> {
     let mut data = SmallBlob::new();
 

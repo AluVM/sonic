@@ -95,7 +95,7 @@ impl EffectiveState {
     }
 
     /// Re-evaluates computable part of the state
-    pub fn recompute<'a>(&mut self, apis: &ApiDescriptor) {
+    pub fn recompute(&mut self, apis: &ApiDescriptor) {
         self.main.aggregate(&apis.default);
         self.aux = bmap! {};
         for (name, api) in &apis.custom {
@@ -106,7 +106,7 @@ impl EffectiveState {
     }
 
     #[must_use]
-    pub(crate) fn apply<'a>(&mut self, op: VerifiedOperation, apis: &ApiDescriptor) -> Transition {
+    pub(crate) fn apply(&mut self, op: VerifiedOperation, apis: &ApiDescriptor) -> Transition {
         self.main.apply(&op, &apis.default, &apis.types);
         for (name, api) in &apis.custom {
             let state = self.aux.entry(name.clone()).or_default();
@@ -115,7 +115,7 @@ impl EffectiveState {
         self.raw.apply(op)
     }
 
-    pub(crate) fn rollback<'a>(&mut self, transition: Transition, apis: &ApiDescriptor) {
+    pub(crate) fn rollback(&mut self, transition: Transition, apis: &ApiDescriptor) {
         self.main.rollback(&transition, &apis.default, &apis.types);
         let mut count = 0usize;
         for (name, api) in &apis.custom {
@@ -315,7 +315,7 @@ impl ProcessedState {
                     .insert(addr, atom);
             }
             Err(_) => {
-                self.invalid_destructible.insert(addr, state.data.clone());
+                self.invalid_destructible.insert(addr, state.data);
             }
         }
     }

@@ -75,6 +75,7 @@ pub enum StateBuilder {
 }
 
 impl StateBuilder {
+    #[allow(clippy::result_large_err)]
     pub fn build(&self, sem_id: SemId, value: StrictVal, sys: &TypeSystem) -> Result<StateValue, StateBuildError> {
         let typed = sys.typify(value, sem_id)?;
         let ser = sys.strict_serialize_value::<TOTAL_BYTES>(&typed)?;
