@@ -342,9 +342,26 @@ impl OpBuilder {
         self
     }
 
-    pub fn destroy(mut self, addr: CellAddr, _witness: StrictVal) -> Self {
-        // TODO: Use witness
+    pub fn destroy(mut self, addr: CellAddr) -> Self {
         let input = Input { addr, witness: StateValue::None };
+        self.destructible_in
+            .push(input)
+            .expect("the number of inputs exceeds the 64k limit");
+        self
+    }
+
+    pub fn destroy_satisfy(
+        mut self,
+        addr: CellAddr,
+        name: impl Into<StateName>,
+        witness: StrictVal,
+        api: &Api,
+        sys: &TypeSystem,
+    ) -> Self {
+        let witness = api
+            .build_witness(name, witness, sys)
+            .expect("invalid witness data");
+        let input = Input { addr, witness };
         self.destructible_in
             .push(input)
             .expect("the number of inputs exceeds the 64k limit");
@@ -403,8 +420,20 @@ impl<'c> OpBuilderRef<'c> {
         self
     }
 
-    pub fn destroy(mut self, addr: CellAddr, witness: StrictVal) -> Self {
-        self.inner = self.inner.destroy(addr, witness);
+    pub fn destroy(mut self, addr: CellAddr) -> Self {
+        self.inner = self.inner.destroy(addr);
+        self
+    }
+
+    pub fn destroy_satisfy(
+        mut self,
+        addr: CellAddr,
+        name: impl Into<StateName>,
+        witness: StrictVal,
+        api: &Api,
+        sys: &TypeSystem,
+    ) -> Self {
+        self.inner = self.inner.destroy_satisfy(addr, name, witness, api, sys);
         self
     }
 

@@ -46,6 +46,7 @@ use rand::seq::SliceRandom;
 use sonic_persist_fs::LedgerDir;
 use sonicapi::{IssueParams, Issuer, StateArithm, StateBuilder, StateConvertor};
 use sonix::dump_ledger;
+use strict_types::SemId;
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
 use ultrasonic::{AuthToken, CellAddr, Codex, Consensus, Identity, Operation};
 
@@ -152,6 +153,7 @@ fn api() -> Api {
                 arithmetics: StateArithm::Fungible,
                 convertor: StateConvertor::TypedEncoder(u256::ZERO),
                 builder: StateBuilder::TypedEncoder(u256::ZERO),
+                witness_sem_id: SemId::unit(),
                 witness_builder: StateBuilder::TypedEncoder(u256::ZERO),
             }
         },
@@ -216,8 +218,8 @@ fn setup(name: &str) -> LedgerDir {
         while let Some((first, second)) = iter.next().zip(iter.next()) {
             let opid = ledger
                 .start_deed("transfer")
-                .using(first, svnum!(0u64))
-                .using(second, svnum!(0u64))
+                .using(first)
+                .using(second)
                 .assign("amount", next_auth(), svnum!(100u64 - round as u64), None)
                 .assign("amount", next_auth(), svnum!(100u64 - round as u64), None)
                 .commit()

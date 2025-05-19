@@ -468,8 +468,12 @@ impl<S: Stock + 'static> Ledger<S> {
         for addr in params.reading {
             builder = builder.reading(addr);
         }
-        for (addr, witness) in params.using {
-            builder = builder.using(addr, witness);
+        for (addr, satisfaction) in params.using {
+            if let Some(satisfaction) = satisfaction {
+                builder = builder.satisfying(addr, satisfaction.name, satisfaction.witness);
+            } else {
+                builder = builder.using(addr);
+            }
         }
 
         builder.commit()

@@ -203,6 +203,21 @@ impl Api {
         api.builder.build(api.sem_id, data, sys)
     }
 
+    pub fn build_witness(
+        &self,
+        name: impl Into<StateName>,
+        data: StrictVal,
+        sys: &TypeSystem,
+    ) -> Result<StateValue, StateBuildError> {
+        let name = name.into();
+        let api = self
+            .destructible
+            .get(&name)
+            .ok_or(StateBuildError::UnknownStateName(name))?;
+
+        api.witness_builder.build(api.witness_sem_id, data, sys)
+    }
+
     pub fn calculate(&self, name: impl Into<StateName>) -> Result<StateCalc, StateUnknown> {
         let name = name.into();
         let api = self.destructible.get(&name).ok_or(StateUnknown(name))?;
@@ -319,7 +334,10 @@ pub struct DestructibleApi {
     /// structured type [`StrictVal`].
     pub builder: StateBuilder,
 
-    /// Procedure which converts a structured data in form of [`StrictVal`] into a witness made of
+    /// Semantic type id for the witness data.
+    pub witness_sem_id: SemId,
+
+    /// Procedure which converts structured data in the form of [`StrictVal`] into a witness made of
     /// finite field elements in the form of [`StateValue`] for the destroyed previous state (an
     /// input of an operation).
     pub witness_builder: StateBuilder,

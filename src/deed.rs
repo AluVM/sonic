@@ -33,10 +33,17 @@ use crate::{AcceptError, Ledger, Stock};
 
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct Satisfaction {
+    pub name: StateName,
+    pub witness: StrictVal,
+}
+
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct CallParams {
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub core: CoreParams,
-    pub using: BTreeMap<CellAddr, StrictVal>,
+    pub using: BTreeMap<CellAddr, Option<Satisfaction>>,
     pub reading: Vec<CellAddr>,
 }
 
@@ -51,8 +58,17 @@ impl<S: Stock + 'static> DeedBuilder<'_, S> {
         self
     }
 
-    pub fn using(mut self, addr: CellAddr, witness: StrictVal) -> Self {
-        self.builder = self.builder.destroy(addr, witness);
+    pub fn using(mut self, addr: CellAddr) -> Self {
+        self.builder = self.builder.destroy(addr);
+        self
+    }
+
+    pub fn satisfying(mut self, addr: CellAddr, name: impl Into<StateName>, witness: StrictVal) -> Self {
+        let api = &self.ledger.articles().default_api();
+        let types = &self.ledger.articles().types();
+        self.builder = self
+            .builder
+            .destroy_satisfy(addr, name, witness, api, types);
         self
     }
 

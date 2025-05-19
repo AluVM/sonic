@@ -54,6 +54,7 @@ rec Articles
             is typedEncoder, U256, wrapped, tag 0
           union builder, StateBuilder
             is typedEncoder, U256, wrapped, tag 0
+          bytes witnessSemId, len 32, aka SemId
           union witnessBuilder, StateBuilder
             is typedEncoder, U256, wrapped, tag 0
       map aggregators, len 0..MAX8
@@ -103,6 +104,7 @@ rec Articles
               is typedEncoder, U256, wrapped, tag 0
             union builder, StateBuilder
               is typedEncoder, U256, wrapped, tag 0
+            bytes witnessSemId, len 32, aka SemId
             union witnessBuilder, StateBuilder
               is typedEncoder, U256, wrapped, tag 0
         map aggregators, len 0..MAX8

@@ -103,6 +103,7 @@ fn api() -> Api {
                 arithmetics: StateArithm::NonFungible,
                 convertor: StateConvertor::TypedEncoder(u256::ZERO),
                 builder: StateBuilder::TypedEncoder(u256::ZERO),
+                witness_sem_id: SemId::unit(),
                 witness_builder: StateBuilder::TypedEncoder(u256::ZERO),
             }
         },
@@ -188,7 +189,7 @@ fn main() {
     // Alice vote against her being on duty today
     ledger
         .start_deed("castVote")
-        .using(CellAddr::new(opid, 0), svnum!(0u64))
+        .using(CellAddr::new(opid, 0))
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(0u8), partyId 0u64), None)
         .assign("signers", alice_auth2, svnum!(0u64), None)
@@ -198,7 +199,7 @@ fn main() {
     // Bob and Carol vote for Alice being on duty today
     ledger
         .start_deed("castVote")
-        .using(CellAddr::new(opid, 1), svnum!(1u64))
+        .using(CellAddr::new(opid, 1))
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 1u64), None)
         .assign("signers", bob_auth2, svnum!(1u64), None)
@@ -206,7 +207,7 @@ fn main() {
         .unwrap();
     ledger
         .start_deed("castVote")
-        .using(CellAddr::new(opid, 2), svnum!(2u64))
+        .using(CellAddr::new(opid, 2))
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 2u64), None)
         .assign("signers", carol_auth2, svnum!(2u64), None)
