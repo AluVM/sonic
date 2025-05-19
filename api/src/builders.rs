@@ -212,7 +212,9 @@ impl Builder {
         api: &Api,
         sys: &TypeSystem,
     ) -> Self {
-        let data = api.build_immutable(name, data, raw, sys);
+        let data = api
+            .build_immutable(name, data, raw, sys)
+            .expect("invalid immutable state");
         self.immutable_out
             .push(data)
             .expect("too many state elements");
@@ -228,7 +230,9 @@ impl Builder {
         api: &Api,
         sys: &TypeSystem,
     ) -> Self {
-        let data = api.build_destructible(name, data, sys);
+        let data = api
+            .build_destructible(name, data, sys)
+            .expect("invalid destructible state");
         let cell = StateCell { data, auth, lock };
         self.destructible_out
             .push(cell)
@@ -339,6 +343,7 @@ impl OpBuilder {
     }
 
     pub fn destroy(mut self, addr: CellAddr, _witness: StrictVal) -> Self {
+        // TODO: Use witness
         let input = Input { addr, witness: StateValue::None };
         self.destructible_in
             .push(input)

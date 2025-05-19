@@ -64,5 +64,5 @@ pub mod stl;
 
 pub use deed::{CallParams, DeedBuilder};
 pub use ledger::{AcceptError, Ledger, LEDGER_MAGIC_NUMBER, LEDGER_VERSION};
-pub use state::{AdaptedState, EffectiveState, RawState, Transition};
+pub use state::{EffectiveState, ProcessedState, RawState, Transition};
 pub use stock::{IssueError, Stock};

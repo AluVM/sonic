@@ -76,7 +76,7 @@ impl ApiDescriptor {
 /// - all the API codex matches the codex under which the contract was issued;
 /// - all the API ids are unique;
 /// - the only type of API adapter VM which can be used is [`crate::embedded::EmbeddedProc`] (see
-///   [`crate::ApiInner`] for more details).
+///   [`crate::Api`] for more details).
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode)]
 #[strict_type(lib = LIB_NAME_SONIC)]

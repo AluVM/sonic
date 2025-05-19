@@ -25,7 +25,7 @@ use alloc::collections::BTreeMap;
 use std::mem;
 
 use amplify::confinement::{LargeOrdMap, SmallOrdMap};
-use sonicapi::{Api, ApiDescriptor, Articles, StateAtom, StateName, StateReader};
+use sonicapi::{Api, ApiDescriptor, Articles, StateAtom, StateName};
 use strict_encoding::{StrictDeserialize, StrictSerialize, TypeName};
 use strict_types::{StrictVal, TypeSystem};
 use ultrasonic::{AuthToken, CallError, CellAddr, Memory, Opid, StateCell, StateData, StateValue, VerifiedOperation};
@@ -50,8 +50,8 @@ impl Transition {
 #[derive(Clone, Debug, Default)]
 pub struct EffectiveState {
     pub raw: RawState,
-    pub main: AdaptedState,
-    pub aux: BTreeMap<TypeName, AdaptedState>,
+    pub main: ProcessedState,
+    pub aux: BTreeMap<TypeName, ProcessedState>,
 }
 
 impl EffectiveState {
@@ -73,10 +73,10 @@ impl EffectiveState {
 
     pub fn with_raw_state(raw: RawState, articles: &Articles) -> Self {
         let mut me = Self { raw, main: none!(), aux: none!() };
-        me.main = AdaptedState::with(&me.raw, articles.default_api(), articles.types());
+        me.main = ProcessedState::with(&me.raw, articles.default_api(), articles.types());
         me.aux.clear();
         for (name, api) in articles.custom_apis() {
-            let state = AdaptedState::with(&me.raw, api, articles.types());
+            let state = ProcessedState::with(&me.raw, api, articles.types());
             me.aux.insert(name.clone(), state);
         }
         me.recompute(articles.apis());
@@ -89,18 +89,18 @@ impl EffectiveState {
     pub fn read(&self, name: impl Into<StateName>) -> &StrictVal {
         let name = name.into();
         self.main
-            .computed
+            .aggregated
             .get(&name)
             .unwrap_or_else(|| panic!("Computed state {name} is not known"))
     }
 
     /// Re-evaluates computable part of the state
     pub fn recompute<'a>(&mut self, apis: &ApiDescriptor) {
-        self.main.compute(&apis.default);
+        self.main.aggregate(&apis.default);
         self.aux = bmap! {};
         for (name, api) in &apis.custom {
-            let mut state = AdaptedState::default();
-            state.compute(api);
+            let mut state = ProcessedState::default();
+            state.aggregate(api);
             self.aux.insert(name.clone(), state);
         }
     }
@@ -220,41 +220,41 @@ impl RawState {
 
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
-pub struct AdaptedState {
+pub struct ProcessedState {
     pub immutable: BTreeMap<StateName, BTreeMap<CellAddr, StateAtom>>,
-    pub owned: BTreeMap<StateName, BTreeMap<CellAddr, StrictVal>>,
-    pub computed: BTreeMap<StateName, StrictVal>,
+    pub destructible: BTreeMap<StateName, BTreeMap<CellAddr, StrictVal>>,
+    pub aggregated: BTreeMap<StateName, StrictVal>,
+    pub invalid_immutable: BTreeMap<CellAddr, StateData>,
+    pub invalid_destructible: BTreeMap<CellAddr, StateValue>,
 }
 
-impl AdaptedState {
+impl ProcessedState {
     pub fn with(raw: &RawState, api: &Api, sys: &TypeSystem) -> Self {
-        let mut me = AdaptedState::default();
+        let mut me = ProcessedState::default();
         for (addr, state) in &raw.global {
-            if let Some((name, atom)) = api.convert_immutable(state, sys) {
-                me.immutable.entry(name).or_default().insert(*addr, atom);
-            }
+            me.process_immutable(*addr, state, api, sys);
         }
         for (addr, state) in &raw.owned {
-            if let Some((name, atom)) = api.convert_destructible(state.data, sys) {
-                me.owned.entry(name).or_default().insert(*addr, atom);
-            }
+            me.process_destructible(*addr, state, api, sys);
         }
         me
     }
 
     pub fn immutable(&self, name: &StateName) -> Option<&BTreeMap<CellAddr, StateAtom>> { self.immutable.get(name) }
 
-    pub fn owned(&self, name: &StateName) -> Option<&BTreeMap<CellAddr, StrictVal>> { self.owned.get(name) }
+    pub fn destructible(&self, name: &StateName) -> Option<&BTreeMap<CellAddr, StrictVal>> {
+        self.destructible.get(name)
+    }
 
-    pub(super) fn compute(&mut self, api: &Api) {
+    pub(super) fn aggregate(&mut self, api: &Api) {
         let empty = bmap![];
-        self.computed = bmap! {};
-        for (name, reader) in api.readers() {
-            let val = reader.read(|state_name| match self.immutable(state_name) {
+        self.aggregated = bmap! {};
+        for (name, aggregator) in api.aggregators() {
+            let val = aggregator.read(|state_name| match self.immutable(state_name) {
                 None => empty.values(),
                 Some(src) => src.values(),
             });
-            self.computed.insert(name.clone(), val);
+            self.aggregated.insert(name.clone(), val);
         }
     }
 
@@ -262,25 +262,17 @@ impl AdaptedState {
         let opid = op.opid();
         let op = op.as_operation();
         for (no, state) in op.immutable_out.iter().enumerate() {
-            if let Some((name, atom)) = api.convert_immutable(state, sys) {
-                self.immutable
-                    .entry(name)
-                    .or_default()
-                    .insert(CellAddr::new(opid, no as u16), atom);
-            }
+            let addr = CellAddr::new(opid, no as u16);
+            self.process_immutable(addr, state, api, sys);
         }
         for input in &op.destructible_in {
-            for map in self.owned.values_mut() {
+            for map in self.destructible.values_mut() {
                 map.remove(&input.addr);
             }
         }
         for (no, state) in op.destructible_out.iter().enumerate() {
-            if let Some((name, atom)) = api.convert_destructible(state.data, sys) {
-                self.owned
-                    .entry(name)
-                    .or_default()
-                    .insert(CellAddr::new(opid, no as u16), atom);
-            }
+            let addr = CellAddr::new(opid, no as u16);
+            self.process_destructible(addr, state, api, sys);
         }
     }
 
@@ -290,13 +282,40 @@ impl AdaptedState {
         self.immutable
             .values_mut()
             .for_each(|state| state.retain(|addr, _| addr.opid != opid));
-        self.owned
+        self.destructible
             .values_mut()
             .for_each(|state| state.retain(|addr, _| addr.opid != opid));
 
         for (addr, cell) in &transition.destroyed {
-            if let Some((name, value)) = api.convert_destructible(cell.data, sys) {
-                self.owned.entry(name).or_default().insert(*addr, value);
+            self.process_destructible(*addr, cell, api, sys);
+        }
+    }
+
+    fn process_immutable(&mut self, addr: CellAddr, state: &StateData, api: &Api, sys: &TypeSystem) {
+        match api.convert_immutable(state, sys) {
+            // This means this state is unrelated to this API
+            Ok(None) => {}
+            Ok(Some((name, atom))) => {
+                self.immutable.entry(name).or_default().insert(addr, atom);
+            }
+            Err(_) => {
+                self.invalid_immutable.insert(addr, state.clone());
+            }
+        }
+    }
+
+    fn process_destructible(&mut self, addr: CellAddr, state: &StateCell, api: &Api, sys: &TypeSystem) {
+        match api.convert_destructible(state.data, sys) {
+            // This means this state is unrelated to this API
+            Ok(None) => {}
+            Ok(Some((name, atom))) => {
+                self.destructible
+                    .entry(name)
+                    .or_default()
+                    .insert(addr, atom);
+            }
+            Err(_) => {
+                self.invalid_destructible.insert(addr, state.data.clone());
             }
         }
     }

@@ -34,10 +34,9 @@ use std::path::Path;
 use aluvm::{CoreConfig, LibSite};
 use amplify::num::u256;
 use commit_verify::{Digest, Sha256};
-use hypersonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedReaders};
 use hypersonic::{Api, DestructibleApi, ImmutableApi};
 use sonic_persist_fs::LedgerDir;
-use sonicapi::Issuer;
+use sonicapi::{Issuer, RawBuilder, RawConvertor, StateAggregator, StateArithm, StateBuilder, StateConvertor};
 use strict_types::{SemId, StrictVal};
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
 use ultrasonic::{AuthToken, CellAddr, Codex, Consensus, Identity};
@@ -68,44 +67,50 @@ fn api() -> Api {
 
     Api {
         version: default!(),
-        adaptor: default!(),
         codex_id: codex.codex_id(),
-        timestamp: 1732529307,
         developer: Identity::default(),
         conforms: None,
         default_call: None,
         immutable: tiny_bmap! {
             vname!("_parties") => ImmutableApi {
-                sem_id: types.get("DAO.PartyId"),
-                raw_sem_id: types.get("DAO.Party"),
                 published: true,
-                adaptor: EmbeddedImmutable(u256::ZERO),
+                sem_id: types.get("DAO.PartyId"),
+                convertor: StateConvertor::TypedEncoder(u256::ZERO),
+                builder: StateBuilder::TypedEncoder(u256::ZERO),
+                raw_convertor: RawConvertor::StrictDecode(types.get("DAO.Party")),
+                raw_builder: RawBuilder::StrictEncode(types.get("DAO.Party")),
             },
             vname!("_votings") => ImmutableApi {
-                sem_id: types.get("DAO.VoteId"),
-                raw_sem_id: types.get("DAO.Voting"),
                 published: true,
-                adaptor: EmbeddedImmutable(u256::ONE),
+                sem_id: types.get("DAO.VoteId"),
+                convertor: StateConvertor::TypedEncoder(u256::ONE),
+                builder: StateBuilder::TypedEncoder(u256::ONE),
+                raw_convertor: RawConvertor::StrictDecode(types.get("DAO.Voting")),
+                raw_builder: RawBuilder::StrictEncode(types.get("DAO.Voting")),
             },
             vname!("_votes") => ImmutableApi {
-                sem_id: types.get("DAO.CastVote"),
-                raw_sem_id: SemId::unit(),
                 published: true,
-                adaptor: EmbeddedImmutable(u256::from(2u8)),
+                sem_id: types.get("DAO.CastVote"),
+                convertor: StateConvertor::TypedEncoder(u256::from(2u8)),
+                builder: StateBuilder::TypedEncoder(u256::from(2u8)),
+                raw_convertor: RawConvertor::StrictDecode(SemId::unit()),
+                raw_builder: RawBuilder::StrictEncode(SemId::unit()),
             },
         },
         destructible: tiny_bmap! {
             vname!("signers") => DestructibleApi {
                 sem_id: types.get("DAO.PartyId"),
-                arithmetics: EmbeddedArithm::NonFungible,
-                adaptor: EmbeddedImmutable(u256::ZERO),
+                arithmetics: StateArithm::NonFungible,
+                convertor: StateConvertor::TypedEncoder(u256::ZERO),
+                builder: StateBuilder::TypedEncoder(u256::ZERO),
+                witness_builder: StateBuilder::TypedEncoder(u256::ZERO),
             }
         },
-        readers: tiny_bmap! {
-            vname!("parties") => EmbeddedReaders::MapV2U(vname!("_parties")),
-            vname!("votings") => EmbeddedReaders::MapV2U(vname!("_votings")),
-            vname!("votes") => EmbeddedReaders::SetV(vname!("_votes")),
-            vname!("votingCount") => EmbeddedReaders::Count(vname!("_votings")),
+        aggregators: tiny_bmap! {
+            vname!("parties") => StateAggregator::MapV2U(vname!("_parties")),
+            vname!("votings") => StateAggregator::MapV2U(vname!("_votings")),
+            vname!("votes") => StateAggregator::SetV(vname!("_votes")),
+            vname!("votingCount") => StateAggregator::Count(vname!("_votings")),
         },
         verifiers: tiny_bmap! {
             vname!("setup") => 0,

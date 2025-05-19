@@ -45,20 +45,12 @@ impl StateAtom {
     }
 
     #[inline]
-    pub fn new(verified: impl Into<StrictVal>, unverified: impl Into<StrictVal>) -> Self {
+    pub fn with(verified: impl Into<StrictVal>, unverified: impl Into<StrictVal>) -> Self {
         Self {
             verified: verified.into(),
             unverified: Some(unverified.into()),
         }
     }
-}
-
-#[derive(Clone, Eq, PartialEq, Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
-pub struct StructData {
-    pub ty: StateTy,
-    /// Transformed and typefied value extracted from [`ultrasonic::StatData`] by an ApiAdaptor.
-    pub value: StrictVal,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]

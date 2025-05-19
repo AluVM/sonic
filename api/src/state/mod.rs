@@ -21,7 +21,14 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-pub mod embedded;
-// For now, we do not provide AluVM-based API adaptors.
-// In the future versions, when it is supported, move it here from the `future` directory.
-//pub mod alu;
+mod adaptors;
+mod aggregators;
+mod arithmetics;
+mod data;
+mod raw;
+
+pub use adaptors::{StateBuildError, StateBuilder, StateConvertError, StateConvertor};
+pub use aggregators::StateAggregator;
+pub use arithmetics::{StateArithm, StateCalc, StateCalcError};
+pub use data::{DataCell, StateAtom, StateTy};
+pub use raw::{RawBuilder, RawConvertor, TOTAL_RAW_BYTES};

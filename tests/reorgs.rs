@@ -35,7 +35,6 @@ use std::path::PathBuf;
 use aluvm::{CoreConfig, LibSite};
 use amplify::num::u256;
 use commit_verify::{Digest, Sha256};
-use hypersonic::embedded::{EmbeddedArithm, EmbeddedImmutable};
 use hypersonic::{Api, DestructibleApi};
 use indexmap::{indexset, IndexSet};
 use petgraph::dot::{Config, Dot};
@@ -45,7 +44,7 @@ use petgraph::Graph;
 use rand::rng;
 use rand::seq::SliceRandom;
 use sonic_persist_fs::LedgerDir;
-use sonicapi::{IssueParams, Issuer};
+use sonicapi::{IssueParams, Issuer, StateArithm, StateBuilder, StateConvertor};
 use sonix::dump_ledger;
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
 use ultrasonic::{AuthToken, CellAddr, Codex, Consensus, Identity, Operation};
@@ -142,9 +141,7 @@ fn api() -> Api {
 
     Api {
         version: default!(),
-        adaptor: default!(),
         codex_id: codex.codex_id(),
-        timestamp: 1732529307,
         developer: Identity::default(),
         conforms: None,
         default_call: None,
@@ -152,11 +149,13 @@ fn api() -> Api {
         destructible: tiny_bmap! {
             vname!("amount") => DestructibleApi {
                 sem_id: types.get("Fungible.Amount"),
-                arithmetics: EmbeddedArithm::Fungible,
-                adaptor: EmbeddedImmutable(u256::ZERO),
+                arithmetics: StateArithm::Fungible,
+                convertor: StateConvertor::TypedEncoder(u256::ZERO),
+                builder: StateBuilder::TypedEncoder(u256::ZERO),
+                witness_builder: StateBuilder::TypedEncoder(u256::ZERO),
             }
         },
-        readers: none!(),
+        aggregators: none!(),
         verifiers: tiny_bmap! {
             vname!("issue") => 0,
             vname!("transfer") => 1,
@@ -197,7 +196,7 @@ fn setup(name: &str) -> LedgerDir {
     fs::create_dir_all(&contract_path).expect("Unable to create a contract folder");
     let mut ledger = LedgerDir::new(articles, contract_path).expect("Can't issue a contract");
 
-    let owned = &ledger.state().main.owned;
+    let owned = &ledger.state().main.destructible;
     assert_eq!(owned.len(), 1);
     let owned = owned.get("amount").unwrap();
     assert_eq!(owned.len(), 20);
@@ -229,7 +228,7 @@ fn setup(name: &str) -> LedgerDir {
         prev = new_prev;
     }
 
-    let owned = &ledger.state().main.owned;
+    let owned = &ledger.state().main.destructible;
     assert_eq!(owned.len(), 1);
     assert_eq!(prev.len(), 20);
     let owned = owned.get("amount").unwrap();
@@ -319,7 +318,7 @@ fn check_rollback(ledger: LedgerDir, mut removed: IndexSet<Operation>) -> IndexS
     }
 
     // Now we check that no outputs of the rolled-back ops participate in the valid state
-    let state = ledger.state().main.owned.get("amount").unwrap();
+    let state = ledger.state().main.destructible.get("amount").unwrap();
     eprintln!("Not rolled back outputs:");
     for addr in state.keys() {
         assert!(!removed_opids.contains(&addr.opid));

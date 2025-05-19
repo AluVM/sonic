@@ -24,33 +24,41 @@ rec ArticlesCommitment
 
 rec Articles
   rec apis, ApiDescriptor
-    rec default, ApiInnerEmbeddedProc
+    rec default, Api
       bytes version, len 1, aka ReservedBytes1
-      bytes adaptor, len 1, aka ReservedBytes1
       bytes codexId, len 32, aka CodexId
-      is timestamp, I64
       ascii developer, aka Identity, first AsciiPrintable, rest AsciiPrintable, len 1..4096
         ascii some, option, wrapped, aka TypeName, first AlphaCapsLodash, rest AlphaNumLodash, len 1..100, tag 1
         rec some, CallState, option, wrapped, tag 1
           ascii method, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
             ascii some, option, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 1
-      bytes reserved, len 8, aka ReservedBytes8
       map immutable, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-        rec value, ImmutableApiEmbeddedProc
+        rec value, ImmutableApi
           bytes semId, len 32, aka SemId
-          bytes rawSemId, len 32, aka SemId
           enum published, Bool, false 0, true 1
-          is adaptor, U256, aka EmbeddedImmutable
+          union convertor, StateConvertor
+            is typedEncoder, U256, wrapped, tag 0
+          union builder, StateBuilder
+            is typedEncoder, U256, wrapped, tag 0
+          union rawConvertor, RawConvertor
+            bytes strictDecode, len 32, wrapped, aka SemId, tag 0
+          union rawBuilder, RawBuilder
+            bytes strictEncode, len 32, wrapped, aka SemId, tag 0
       map destructible, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-        rec value, DestructibleApiEmbeddedProc
+        rec value, DestructibleApi
           bytes semId, len 32, aka SemId
-          enum arithmetics, EmbeddedArithm, nonFungible 0, fungible 1
-          is adaptor, U256, aka EmbeddedImmutable
-      map readers, len 0..MAX8
+          enum arithmetics, StateArithm, fungible 0, nonFungible 1
+          union convertor, StateConvertor
+            is typedEncoder, U256, wrapped, tag 0
+          union builder, StateBuilder
+            is typedEncoder, U256, wrapped, tag 0
+          union witnessBuilder, StateBuilder
+            is typedEncoder, U256, wrapped, tag 0
+      map aggregators, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-        union value, EmbeddedReaders
+        union value, StateAggregator
           ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 0
           ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 1
           ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 2
@@ -62,35 +70,44 @@ rec Articles
       map errors, len 0..MAX8
         is key, U256
         str value, len 0..MAX8
+      bytes reserved, len 8, aka ReservedBytes8
     map custom, len 0..MAX16
       ascii key, aka TypeName, first AlphaCapsLodash, rest AlphaNumLodash, len 1..100
-      rec value, ApiInnerEmbeddedProc
+      rec value, Api
         bytes version, len 1, aka ReservedBytes1
-        bytes adaptor, len 1, aka ReservedBytes1
         bytes codexId, len 32, aka CodexId
-        is timestamp, I64
         ascii developer, aka Identity, first AsciiPrintable, rest AsciiPrintable, len 1..4096
           ascii some, option, wrapped, aka TypeName, first AlphaCapsLodash, rest AlphaNumLodash, len 1..100, tag 1
           rec some, CallState, option, wrapped, tag 1
             ascii method, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
               ascii some, option, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 1
-        bytes reserved, len 8, aka ReservedBytes8
         map immutable, len 0..MAX8
           ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-          rec value, ImmutableApiEmbeddedProc
+          rec value, ImmutableApi
             bytes semId, len 32, aka SemId
-            bytes rawSemId, len 32, aka SemId
             enum published, Bool, false 0, true 1
-            is adaptor, U256, aka EmbeddedImmutable
+            union convertor, StateConvertor
+              is typedEncoder, U256, wrapped, tag 0
+            union builder, StateBuilder
+              is typedEncoder, U256, wrapped, tag 0
+            union rawConvertor, RawConvertor
+              bytes strictDecode, len 32, wrapped, aka SemId, tag 0
+            union rawBuilder, RawBuilder
+              bytes strictEncode, len 32, wrapped, aka SemId, tag 0
         map destructible, len 0..MAX8
           ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-          rec value, DestructibleApiEmbeddedProc
+          rec value, DestructibleApi
             bytes semId, len 32, aka SemId
-            enum arithmetics, EmbeddedArithm, nonFungible 0, fungible 1
-            is adaptor, U256, aka EmbeddedImmutable
-        map readers, len 0..MAX8
+            enum arithmetics, StateArithm, fungible 0, nonFungible 1
+            union convertor, StateConvertor
+              is typedEncoder, U256, wrapped, tag 0
+            union builder, StateBuilder
+              is typedEncoder, U256, wrapped, tag 0
+            union witnessBuilder, StateBuilder
+              is typedEncoder, U256, wrapped, tag 0
+        map aggregators, len 0..MAX8
           ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-          union value, EmbeddedReaders
+          union value, StateAggregator
             ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 0
             ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 1
             ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 2
@@ -102,6 +119,7 @@ rec Articles
         map errors, len 0..MAX8
           is key, U256
           str value, len 0..MAX8
+        bytes reserved, len 8, aka ReservedBytes8
     set libs, len 0..MAX16
       rec Lib
         set isae, len 0..MAX8
