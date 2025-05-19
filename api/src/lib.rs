@@ -69,12 +69,3 @@ pub use issuer::{Issuer, ISSUER_MAGIC_NUMBER, ISSUER_VERSION};
 pub use sonic_callreq::*;
 pub use state::*;
 pub use ultrasonic::*;
-
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
-#[repr(u8)]
-pub enum VmType {
-    #[display("Built-in")]
-    Embedded = 1,
-    #[display("AluVM")]
-    AluVM = 2,
-}

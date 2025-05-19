@@ -22,7 +22,6 @@
 // the License.
 
 use std::borrow::Borrow;
-use std::error::Error;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -32,11 +31,11 @@ use aora::file::{FileAoraIndex, FileAoraMap, FileAuraMap};
 use aora::{AoraIndex, AoraMap, AuraMap, TransactionalMap};
 use binfile::BinFile;
 use hypersonic::{
-    AcceptError, ApiDescriptor, Articles, ArticlesError, AuthToken, CellAddr, EffectiveState, Genesis, Issue,
-    IssueError, Ledger, Operation, Opid, RawState, SigValidator, Stock, Transition,
+    AcceptError, ApiDescriptor, Articles, ArticlesError, AuthToken, CellAddr, EffectiveState, EitherError, Genesis,
+    Issue, IssueError, Ledger, Operation, Opid, RawState, SigValidator, Stock, Transition,
 };
 use strict_encoding::{
-    DecodeError, SerializeError, StreamReader, StreamWriter, StrictDecode, StrictEncode, StrictReader, StrictWriter,
+    DecodeError, StreamReader, StreamWriter, StrictDecode, StrictEncode, StrictReader, StrictWriter,
 };
 
 #[derive(Wrapper, WrapperMut, Debug, From)]
@@ -111,8 +110,9 @@ impl StockFs {
 
 impl Stock for StockFs {
     type Conf = PathBuf;
+    type Error = FsError;
 
-    fn new(articles: Articles, state: EffectiveState, path: PathBuf) -> Result<Self, impl Error> {
+    fn new(articles: Articles, state: EffectiveState, path: PathBuf) -> Result<Self, FsError> {
         let stash = FileAoraMap::create_new(&path, "stash")?;
         let trace = FileAoraMap::create_new(&path, "trace")?;
         let spent = FileAuraMap::create_new(&path, "spent")?;
@@ -138,10 +138,10 @@ impl Stock for StockFs {
         let writer = StreamWriter::new::<{ usize::MAX }>(file);
         state.raw.strict_write(writer)?;
 
-        Result::<_, FsStoreError>::Ok(Self { path, stash, trace, spent, read, articles, state, valid })
+        Ok(Self { path, stash, trace, spent, read, articles, state, valid })
     }
 
-    fn load(path: PathBuf) -> Result<Self, impl Error> {
+    fn load(path: PathBuf) -> Result<Self, FsError> {
         let path = path.to_path_buf();
 
         let stash = FileAoraMap::open(&path, "stash")?;
@@ -173,7 +173,7 @@ impl Stock for StockFs {
 
         let state = EffectiveState::with_raw_state(raw, &articles);
 
-        Result::<_, FsLoadError>::Ok(Self { path, stash, trace, spent, read, articles, state, valid })
+        Ok(Self { path, stash, trace, spent, read, articles, state, valid })
     }
 
     fn config(&self) -> Self::Conf { self.path.clone() }
@@ -208,17 +208,21 @@ impl Stock for StockFs {
     fn update_articles(
         &mut self,
         f: impl FnOnce(&mut Articles) -> Result<(), ArticlesError>,
-    ) -> Result<(), impl Error> {
-        f(&mut self.articles)?;
+    ) -> Result<(), EitherError<ArticlesError, FsError>> {
+        f(&mut self.articles).map_err(EitherError::A)?;
 
-        let file = BinFile::<APIS_MAGIC, VERSION_0>::create(self.path.join(Self::FILENAME_APIS))?;
+        let file = BinFile::<APIS_MAGIC, VERSION_0>::create(self.path.join(Self::FILENAME_APIS))
+            .map_err(EitherError::from_b)?;
         let writer = StreamWriter::new::<{ usize::MAX }>(file);
-        self.articles.apis().strict_write(writer)?;
+        self.articles
+            .apis()
+            .strict_write(writer)
+            .map_err(EitherError::from_b)?;
 
-        Result::<_, FsArticlesError>::Ok(())
+        Ok(())
     }
 
-    fn update_state<R>(&mut self, f: impl FnOnce(&mut EffectiveState, &Articles) -> R) -> Result<R, SerializeError> {
+    fn update_state<R>(&mut self, f: impl FnOnce(&mut EffectiveState, &Articles) -> R) -> Result<R, FsError> {
         let res = f(&mut self.state, &self.articles);
 
         let file = BinFile::<STATE_MAGIC, VERSION_0>::create(self.path.join(Self::FILENAME_STATE_RAW))?;
@@ -246,11 +250,11 @@ impl Stock for StockFs {
 }
 
 impl LedgerDir {
-    pub fn new(articles: Articles, conf: PathBuf) -> Result<Self, IssueError<impl Error>> {
+    pub fn new(articles: Articles, conf: PathBuf) -> Result<Self, EitherError<IssueError, FsError>> {
         Ledger::new(articles, conf).map(Self)
     }
 
-    pub fn load(conf: PathBuf) -> Result<Self, impl Error> { Ledger::load(conf).map(Self) }
+    pub fn load(conf: PathBuf) -> Result<Self, FsError> { Ledger::load(conf).map(Self) }
 
     pub fn backup_to_file(&mut self, output: impl AsRef<Path>) -> io::Result<()> {
         let file = File::create_new(output)?;
@@ -272,8 +276,8 @@ impl LedgerDir {
         &mut self,
         input: impl AsRef<Path>,
         sig_validator: impl SigValidator,
-    ) -> Result<(), AcceptError> {
-        let file = File::open(input)?;
+    ) -> Result<(), EitherError<AcceptError, FsError>> {
+        let file = File::open(input).map_err(EitherError::from_b)?;
         let mut reader = StrictReader::with(StreamReader::new::<{ usize::MAX }>(file));
         self.accept(&mut reader, sig_validator)
     }
@@ -283,7 +287,7 @@ impl LedgerDir {
 
 #[derive(Debug, Display, Error, From)]
 #[display(inner)]
-pub enum FsLoadError {
+pub enum FsError {
     #[from]
     Io(io::Error),
 
@@ -297,28 +301,8 @@ pub enum FsLoadError {
     Yaml(serde_yaml::Error),
 
     #[from]
-    Toml(toml::de::Error),
-}
-
-#[derive(Debug, Display, Error, From)]
-#[display(inner)]
-pub enum FsStoreError {
-    #[from]
-    Io(io::Error),
+    TomlDecode(toml::de::Error),
 
     #[from]
-    Yaml(serde_yaml::Error),
-
-    #[from]
-    Toml(toml::ser::Error),
-}
-
-#[derive(Debug, Display, Error, From)]
-#[display(inner)]
-pub enum FsArticlesError {
-    #[from]
-    Io(io::Error),
-
-    #[from]
-    Articles(ArticlesError),
+    TomlEncode(toml::ser::Error),
 }

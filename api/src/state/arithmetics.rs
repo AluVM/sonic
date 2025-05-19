@@ -55,7 +55,7 @@ pub enum StateCalcError {
     /// integer overflow during state computation.
     Overflow,
 
-    /// state can't be computed.
+    /// state cannot be computed.
     UncountableState,
 }
 

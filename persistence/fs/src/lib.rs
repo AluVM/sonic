@@ -26,4 +26,4 @@ extern crate amplify;
 
 mod fs;
 
-pub use fs::{FsArticlesError, FsLoadError, FsStoreError, LedgerDir, StockFs};
+pub use fs::{FsError, LedgerDir, StockFs};

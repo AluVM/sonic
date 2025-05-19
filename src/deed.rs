@@ -29,7 +29,7 @@ use sonicapi::{CoreParams, OpBuilder};
 use strict_types::StrictVal;
 use ultrasonic::{AuthToken, CellAddr, Opid};
 
-use crate::{AcceptError, Ledger, Stock};
+use crate::{AcceptError, EitherError, Ledger, Stock};
 
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -52,7 +52,7 @@ pub struct DeedBuilder<'c, S: Stock> {
     pub(super) ledger: &'c mut Ledger<S>,
 }
 
-impl<S: Stock + 'static> DeedBuilder<'_, S> {
+impl<S: Stock> DeedBuilder<'_, S> {
     pub fn reading(mut self, addr: CellAddr) -> Self {
         self.builder = self.builder.access(addr);
         self
@@ -94,7 +94,7 @@ impl<S: Stock + 'static> DeedBuilder<'_, S> {
         self
     }
 
-    pub fn commit<'a>(self) -> Result<Opid, AcceptError>
+    pub fn commit<'a>(self) -> Result<Opid, EitherError<AcceptError, S::Error>>
     where Self: 'a {
         let deed = self.builder.finalize();
         let opid = deed.opid();

@@ -66,3 +66,30 @@ pub use deed::{CallParams, DeedBuilder, Satisfaction};
 pub use ledger::{AcceptError, Ledger, LEDGER_MAGIC_NUMBER, LEDGER_VERSION};
 pub use state::{EffectiveState, ProcessedState, RawState, Transition};
 pub use stock::{IssueError, Stock};
+
+// TODO: Move to amplify crate
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Display, Error)]
+#[display(inner)]
+pub enum EitherError<A: core::error::Error, B: core::error::Error> {
+    A(A),
+    B(B),
+}
+
+impl<A: core::error::Error, B: core::error::Error> EitherError<A, B> {
+    pub fn from_a(a: impl Into<A>) -> Self { Self::A(a.into()) }
+    pub fn from_b(a: impl Into<B>) -> Self { Self::B(a.into()) }
+
+    pub fn from_other_a<A2: core::error::Error + Into<A>>(e: EitherError<A2, B>) -> Self {
+        match e {
+            EitherError::A(a) => Self::A(a.into()),
+            EitherError::B(b) => Self::B(b),
+        }
+    }
+
+    pub fn from_other_b<B2: core::error::Error + Into<B>>(e: EitherError<A, B2>) -> Self {
+        match e {
+            EitherError::A(a) => Self::A(a),
+            EitherError::B(b) => Self::B(b.into()),
+        }
+    }
+}

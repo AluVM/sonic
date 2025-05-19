@@ -24,10 +24,9 @@
 use core::error::Error;
 
 use sonicapi::ArticlesError;
-use strict_encoding::SerializeError;
 use ultrasonic::{CallError, CellAddr, ContractName, Operation, Opid};
 
-use crate::{Articles, EffectiveState, Transition};
+use crate::{Articles, EffectiveState, EitherError, Transition};
 
 /// Stock is a persistence API for keeping and accessing contract data.
 ///
@@ -44,6 +43,8 @@ use crate::{Articles, EffectiveState, Transition};
 pub trait Stock {
     /// Persistence configuration type.
     type Conf;
+    /// Error type for persistence errors.
+    type Error: Error;
 
     /// Creates a new contract from the provided articles, creating its persistence using a given
     /// implementation-specific configuration.
@@ -55,7 +56,7 @@ pub trait Stock {
     /// # Blocking I/O
     ///
     /// This call MAY perform any I/O operations.
-    fn new(articles: Articles, state: EffectiveState, conf: Self::Conf) -> Result<Self, impl Error>
+    fn new(articles: Articles, state: EffectiveState, conf: Self::Conf) -> Result<Self, Self::Error>
     where Self: Sized;
 
     /// Loads a contract from persistence using the provided configuration.
@@ -67,7 +68,7 @@ pub trait Stock {
     /// # Blocking I/O
     ///
     /// This call MAY perform any I/O operations.
-    fn load(conf: Self::Conf) -> Result<Self, impl Error>
+    fn load(conf: Self::Conf) -> Result<Self, Self::Error>
     where Self: Sized;
 
     /// Returns a copy of the config object used during the stock construction.
@@ -103,7 +104,7 @@ pub trait Stock {
     ///
     /// Does not include genesis operation id.
     ///
-    /// Positive response doesn't indicate that the operation participates in the current contract
+    /// Positive response does not indicate that the operation participates in the current contract
     /// state or in a current valid contract history, which may be exported.
     ///
     /// Operations may be excluded from the history due to rollbacks (see [`Contract::rollback`]),
@@ -122,8 +123,9 @@ pub trait Stock {
     ///
     /// Does not include genesis operation.
     ///
-    /// If the method returns an operation, this doesn't indicate that the operation participates in
-    /// the current contract state or in a current valid contract history, which/ may be exported.
+    /// If the method returns an operation, this does not indicate that the operation participates
+    /// in the current contract state or in a current valid contract history, which/ may be
+    /// exported.
     ///
     /// Operations may be excluded from the history due to rollbacks (see [`Contract::rollback`]),
     /// as well as re-included later with forwards (see [`Contract::forward`]). In both cases
@@ -205,7 +207,7 @@ pub trait Stock {
     /// matching the provided `opid`.
     fn transition(&self, opid: Opid) -> Transition;
 
-    /// Returns an iterator over all state transitions known to the contract (i.e. the complete
+    /// Returns an iterator over all state transitions known to the contract (i.e., the complete
     /// contract trace).
     ///
     /// # Nota bene
@@ -281,8 +283,10 @@ pub trait Stock {
     ///
     /// Specific persistence providers implementing this method MUST guarantee to always persist an
     /// updated state after calling the callback `f` method.
-    fn update_articles(&mut self, f: impl FnOnce(&mut Articles) -> Result<(), ArticlesError>)
-        -> Result<(), impl Error>;
+    fn update_articles(
+        &mut self,
+        f: impl FnOnce(&mut Articles) -> Result<(), ArticlesError>,
+    ) -> Result<(), EitherError<ArticlesError, Self::Error>>;
 
     /// Updates contract effective state inside a callback method.
     ///
@@ -294,7 +298,7 @@ pub trait Stock {
     ///
     /// Specific persistence providers implementing this method MUST guarantee to always persist an
     /// updated state after calling the callback `f` method.
-    fn update_state<R>(&mut self, f: impl FnOnce(&mut EffectiveState, &Articles) -> R) -> Result<R, SerializeError>;
+    fn update_state<R>(&mut self, f: impl FnOnce(&mut EffectiveState, &Articles) -> R) -> Result<R, Self::Error>;
 
     /// Adds operation to the contract data.
     ///
@@ -306,7 +310,7 @@ pub trait Stock {
     ///
     /// Specific persistence providers implementing this method MUST:
     /// - immediately store the operation data;
-    /// - panic, if the operation with the same `opid` is already known, but differs from the
+    /// - panic, if the operation with the same `opid` is already known but differs from the
     ///   provided operation.
     ///
     /// They SHOULD:
@@ -326,7 +330,7 @@ pub trait Stock {
     ///
     /// Specific persistence providers implementing this method MUST:
     /// - immediately store the transition data;
-    /// - panic, if a transition for the same `opid` is already known, but differs from the provided
+    /// - panic, if a transition for the same `opid` is already known but differs from the provided
     ///   transition.
     ///
     /// They SHOULD:
@@ -357,7 +361,7 @@ pub trait Stock {
     /// # Implementation instructions
     ///
     /// Specific persistence providers implementing this method MUST:
-    /// - silently update `spender` if the provided `spent` cell address were previously spent by a
+    /// - silently update `spender` if the provided `spent` cell address was previously spent by a
     ///   different operation.
     fn add_spending(&mut self, spent: CellAddr, spender: Opid);
 
@@ -369,12 +373,9 @@ pub trait Stock {
     fn commit_transaction(&mut self);
 }
 
-#[derive(Debug, Display, Error, From)]
+#[derive(Clone, PartialEq, Eq, Debug, Display, Error)]
 #[display(doc_comments)]
-pub enum IssueError<E: Error> {
+pub enum IssueError {
     /// unable to issue a new contract '{0}' due to invalid genesis data. Specifically, {1}
     Genesis(ContractName, CallError),
-
-    #[display(inner)]
-    Persistence(E),
 }
