@@ -29,14 +29,14 @@ use std::io;
 use amplify::hex::ToHex;
 use indexmap::IndexSet;
 use sonic_callreq::MethodName;
-use sonicapi::{ApiDescriptor, ArticlesError, NamedState, OpBuilder, SigValidator};
+use sonicapi::{Api, ApiDescriptor, ArticlesError, NamedState, OpBuilder, SigValidator};
 use strict_encoding::{
     DecodeError, ReadRaw, SerializeError, StrictDecode, StrictEncode, StrictReader, StrictWriter, WriteRaw,
 };
 use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Issue, Operation, Opid, VerifiedOperation};
 
 use crate::deed::{CallParams, DeedBuilder};
-use crate::{Articles, EffectiveState, IssueError, Stock, Transition};
+use crate::{Articles, EffectiveState, IssueError, ProcessedState, Stock, Transition};
 
 pub const LEDGER_MAGIC_NUMBER: [u8; 8] = *b"DEEDLDGR";
 pub const LEDGER_VERSION: [u8; 2] = [0x00, 0x01];
@@ -313,7 +313,7 @@ impl<S: Stock + 'static> Ledger<S> {
             .into_iter()
             .map(|terminal| self.0.state().addr(*terminal.borrow()).opid)
             .collect::<BTreeSet<_>>();
-        let articles = self.0.articles();
+        let articles = self.articles();
         let genesis_opid = articles.genesis_opid();
         queue.remove(&genesis_opid);
         let mut opids = queue.clone();
@@ -327,7 +327,26 @@ impl<S: Stock + 'static> Ledger<S> {
             }
         }
 
-        // TODO: Include all operations defining published state
+        // Include all operations defining published state
+        let state = self.state();
+        let mut collect = |api: &Api, state: &ProcessedState| {
+            for (state_name, immutable) in &api.immutable {
+                if immutable.published {
+                    let Some(cells) = state.immutable.get(state_name) else {
+                        continue;
+                    };
+                    opids.extend(cells.keys().map(|addr| addr.opid));
+                }
+            }
+        };
+        collect(&articles.apis().default, &state.main);
+        for (api_name, api) in &articles.apis().custom {
+            let Some(state) = state.aux.get(api_name) else {
+                continue;
+            };
+            collect(api, state);
+        }
+        opids.remove(&genesis_opid);
 
         // Write articles
         writer = articles.strict_encode(writer)?;

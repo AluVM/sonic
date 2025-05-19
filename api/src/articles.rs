@@ -65,7 +65,7 @@ pub struct ApiDescriptor {
 }
 
 impl ApiDescriptor {
-    pub fn apis(&self) -> impl Iterator<Item = &Api> { [&self.default].into_iter().chain(self.custom.values()) }
+    pub fn all(&self) -> impl Iterator<Item = &Api> { [&self.default].into_iter().chain(self.custom.values()) }
 }
 
 /// Articles contain the contract and all related codex and API information for interacting with it.
@@ -116,7 +116,7 @@ impl Articles {
 
     pub fn with(apis: ApiDescriptor, issue: Issue) -> Result<Self, ArticlesError> {
         let mut ids = bset![];
-        for api in apis.apis() {
+        for api in apis.all() {
             if api.codex_id != issue.codex_id() {
                 return Err(ArticlesError::CodexMismatch);
             }
