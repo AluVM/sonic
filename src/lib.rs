@@ -62,7 +62,7 @@ mod ledger;
 #[cfg(feature = "stl")]
 pub mod stl;
 
-pub use deed::{CallParams, DeedBuilder};
+pub use deed::{CallParams, DeedBuilder, Satisfaction};
 pub use ledger::{AcceptError, Ledger, LEDGER_MAGIC_NUMBER, LEDGER_VERSION};
 pub use state::{EffectiveState, ProcessedState, RawState, Transition};
 pub use stock::{IssueError, Stock};
