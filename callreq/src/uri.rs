@@ -33,6 +33,7 @@ use baid64::base64::{DecodeError, Engine};
 use baid64::BAID64_ALPHABET;
 use chrono::{DateTime, Utc};
 use fluent_uri::Uri;
+use indexmap::map::Entry;
 use indexmap::IndexMap;
 use percent_encoding::{percent_decode, utf8_percent_encode, AsciiSet, CONTROLS};
 use strict_types::{InvalidRString, StrictVal};
@@ -56,7 +57,9 @@ const QUERY_ENCODE: &AsciiSet = &CONTROLS
     .add(b'=');
 
 impl<T, A> CallRequest<T, A> {
-    pub fn has_query(&self) -> bool { !self.unknown_query.is_empty() || self.expiry.is_some() || self.lock.is_some() }
+    pub fn has_query(&self) -> bool {
+        !self.unknown_query.is_empty() || self.expiry.is_some() || self.lock.is_some() || !self.endpoints.is_empty()
+    }
 }
 
 impl<T, A> Display for CallRequest<T, A>
@@ -94,24 +97,23 @@ where
             write!(f, "{EXPIRY}={}", expiry.to_rfc3339())?;
         }
         if !self.endpoints.is_empty() {
-            write!(f, "{ENDPOINTS}")?;
-            let mut iter = self.endpoints.iter();
+            write!(f, "{ENDPOINTS}=")?;
+            let mut iter = self.endpoints.iter().peekable();
             while let Some(endpoint) = iter.next() {
                 write!(f, "{}", utf8_percent_encode(&endpoint.to_string(), QUERY_ENCODE))?;
-                if iter.by_ref().peekable().peek().is_some() {
+                if iter.peek().is_some() {
                     write!(f, "{ENDPOINT_SEP}")?;
                 }
             }
         }
 
-        let mut iter = self.unknown_query.iter();
+        let mut iter = self.unknown_query.iter().peekable();
         while let Some((key, value)) = iter.next() {
             write!(f, "{}={}", utf8_percent_encode(key, QUERY_ENCODE), utf8_percent_encode(value, QUERY_ENCODE))?;
-            if iter.by_ref().peekable().peek().is_some() {
+            if iter.peek().is_some() {
                 f.write_str("&")?;
             }
         }
-        // TODO: Compute checksum and add as a fragment
         Ok(())
     }
 }
@@ -192,7 +194,14 @@ where
                     let value = percent_decode(v.as_str().as_bytes())
                         .decode_utf8_lossy()
                         .to_string();
-                    query_params.insert(key, value);
+                    match query_params.entry(key) {
+                        Entry::Occupied(mut prev) => {
+                            prev.insert(format!("{},{value}", prev.get()));
+                        }
+                        Entry::Vacant(entry) => {
+                            entry.insert(value);
+                        }
+                    }
                 } else {
                     return Err(ParseError::QueryParamInvalid(p.to_string()));
                 }
@@ -225,6 +234,7 @@ where
             .split(ENDPOINT_SEP)
             .map(Endpoint::from_str)
             .map(Result::unwrap)
+            .filter(|endpoint| endpoint != &Endpoint::UnspecifiedMeans(s!("")))
             .take(10)
             .collect::<Vec<_>>();
         let endpoints = ConfinedVec::from_checked(endpoints);
@@ -304,22 +314,228 @@ pub enum ParseError<E1: Error, E2: Error> {
 #[cfg(test)]
 mod test {
     #![cfg_attr(coverage_nightly, coverage(off))]
+
+    use amplify::confinement::Confined;
+    use chrono::TimeZone;
+    use indexmap::indexmap;
     use ultrasonic::{AuthToken, ContractId};
 
     use super::*;
 
     #[test]
-    fn parse() {
-        let req = CallRequest::<ContractId, AuthToken>::from_str(
-            "contract:tb@qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw/10@at:\
-             5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA/",
-        )
-        .unwrap();
+    fn short() {
+        let s = "contract:tb@qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw/10@at:\
+                 5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA/";
+        let req = CallRequest::<ContractId, AuthToken>::from_str(s).unwrap();
+        assert_eq!(s, req.to_string());
+
         assert_eq!(
             req.scope,
             ContractId::from_str("contract:qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw").unwrap()
         );
         assert_eq!(req.data, Some(StrictVal::num(10u64)));
         assert_eq!(req.auth, AuthToken::from_str("at:5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA").unwrap());
+        assert_eq!(req.api, None);
+        assert_eq!(req.call, None);
+        assert_eq!(req.lock, None);
+        assert_eq!(req.expiry, None);
+        assert_eq!(req.endpoints, none!());
+        assert!(req.unknown_query.is_empty());
+    }
+
+    #[test]
+    fn api() {
+        let s = "contract:tb@qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw/RGB20/10@at:\
+                 5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA/";
+        let req = CallRequest::<ContractId, AuthToken>::from_str(s).unwrap();
+        assert_eq!(s, req.to_string());
+
+        assert_eq!(
+            req.scope,
+            ContractId::from_str("contract:qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw").unwrap()
+        );
+        assert_eq!(req.data, Some(StrictVal::num(10u64)));
+        assert_eq!(req.auth, AuthToken::from_str("at:5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA").unwrap());
+        assert_eq!(req.api, Some(tn!("RGB20")));
+        assert_eq!(req.call, None);
+        assert_eq!(req.lock, None);
+        assert_eq!(req.expiry, None);
+        assert_eq!(req.endpoints, none!());
+        assert!(req.unknown_query.is_empty());
+    }
+
+    #[test]
+    fn method() {
+        let s = "contract:tb@qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw/RGB20/transfer/10@at:\
+                 5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA/";
+        let req = CallRequest::<ContractId, AuthToken>::from_str(s).unwrap();
+        assert_eq!(s, req.to_string());
+
+        assert_eq!(
+            req.scope,
+            ContractId::from_str("contract:qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw").unwrap()
+        );
+        assert_eq!(req.data, Some(StrictVal::num(10u64)));
+        assert_eq!(req.auth, AuthToken::from_str("at:5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA").unwrap());
+        assert_eq!(req.api, Some(tn!("RGB20")));
+        assert_eq!(req.call, Some(CallState::new("transfer")));
+        assert_eq!(req.lock, None);
+        assert_eq!(req.expiry, None);
+        assert_eq!(req.endpoints, none!());
+        assert!(req.unknown_query.is_empty());
+    }
+
+    #[test]
+    fn state() {
+        let s = "contract:tb@qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw/RGB20/transfer/amount/10@at:\
+                 5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA/";
+        let req = CallRequest::<ContractId, AuthToken>::from_str(s).unwrap();
+        assert_eq!(s, req.to_string());
+
+        assert_eq!(
+            req.scope,
+            ContractId::from_str("contract:qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw").unwrap()
+        );
+        assert_eq!(req.data, Some(StrictVal::num(10u64)));
+        assert_eq!(req.auth, AuthToken::from_str("at:5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA").unwrap());
+        assert_eq!(req.api, Some(tn!("RGB20")));
+        assert_eq!(req.call, Some(CallState::with("transfer", "amount")));
+        assert_eq!(req.lock, None);
+        assert_eq!(req.expiry, None);
+        assert_eq!(req.endpoints, none!());
+        assert!(req.unknown_query.is_empty());
+    }
+
+    #[test]
+    fn lock() {
+        let s = "contract:tb@qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw/RGB20/transfer/amount/10@at:\
+                 5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA/?lock=A64CDrfmG483";
+        let req = CallRequest::<ContractId, AuthToken>::from_str(s).unwrap();
+        assert_eq!(s, req.to_string());
+
+        assert_eq!(
+            req.scope,
+            ContractId::from_str("contract:qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw").unwrap()
+        );
+        assert_eq!(req.data, Some(StrictVal::num(10u64)));
+        assert_eq!(req.auth, AuthToken::from_str("at:5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA").unwrap());
+        assert_eq!(req.api, Some(tn!("RGB20")));
+        assert_eq!(req.call, Some(CallState::with("transfer", "amount")));
+        assert_eq!(req.lock, Some(TinyBlob::from_checked(vec![3, 174, 2, 14, 183, 230, 27, 143, 55])));
+        assert_eq!(req.expiry, None);
+        assert_eq!(req.endpoints, none!());
+        assert!(req.unknown_query.is_empty());
+    }
+
+    #[test]
+    fn expiry() {
+        let s = "contract:tb@qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw/RGB20/transfer/amount/10@at:\
+                 5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA/?expiry=2021-05-20T08:32:48+00:00";
+        let req = CallRequest::<ContractId, AuthToken>::from_str(s).unwrap();
+        assert_eq!(s, req.to_string());
+
+        assert_eq!(
+            req.scope,
+            ContractId::from_str("contract:qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw").unwrap()
+        );
+        assert_eq!(req.data, Some(StrictVal::num(10u64)));
+        assert_eq!(req.auth, AuthToken::from_str("at:5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA").unwrap());
+        assert_eq!(req.api, Some(tn!("RGB20")));
+        assert_eq!(req.call, Some(CallState::with("transfer", "amount")));
+        assert_eq!(req.lock, None);
+        assert_eq!(req.expiry, Some(Utc.with_ymd_and_hms(2021, 5, 20, 8, 32, 48).unwrap()));
+        assert_eq!(req.endpoints, none!());
+        assert!(req.unknown_query.is_empty());
+    }
+
+    #[test]
+    fn endpoints() {
+        let s = "contract:tb@qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw/RGB20/transfer/amount/10@at:\
+             5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA/?\
+             endpoints=http://127.0.0.1:8080,\
+             https+json-rpc://127.0.0.1:8081,\
+             wss://127.0.0.1:8081,\
+             storm://127.0.0.1:8082,some_bullshit";
+        let req = CallRequest::<ContractId, AuthToken>::from_str(s).unwrap();
+        assert_eq!(s, req.to_string());
+
+        assert_eq!(
+            req.scope,
+            ContractId::from_str("contract:qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw").unwrap()
+        );
+        assert_eq!(req.data, Some(StrictVal::num(10u64)));
+        assert_eq!(req.auth, AuthToken::from_str("at:5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA").unwrap());
+        assert_eq!(req.api, Some(tn!("RGB20")));
+        assert_eq!(req.call, Some(CallState::with("transfer", "amount")));
+        assert_eq!(req.lock, None);
+        assert_eq!(req.expiry, None);
+        assert_eq!(
+            req.endpoints,
+            Confined::from_iter_checked([
+                Endpoint::RestHttp("http://127.0.0.1:8080".to_owned()),
+                Endpoint::JsonRpc("https+json-rpc://127.0.0.1:8081".to_owned()),
+                Endpoint::WebSockets("wss://127.0.0.1:8081".to_owned()),
+                Endpoint::Storm("storm://127.0.0.1:8082".to_owned()),
+                Endpoint::UnspecifiedMeans("some_bullshit".to_owned())
+            ])
+        );
+        assert!(req.unknown_query.is_empty());
+
+        let req = CallRequest::<ContractId, AuthToken>::from_str(
+            "contract:tb@qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw/RGB20/transfer/amount/10@at:\
+             5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA/?\
+             endpoints=http://127.0.0.1:8080,\
+             https+json-rpc://127.0.0.1:8081&\
+             endpoints=wss://127.0.0.1:8081,\
+             storm://127.0.0.1:8082&endpoints=some_bullshit",
+        )
+            .unwrap();
+        assert_eq!(s, req.to_string());
+
+        assert_eq!(
+            req.scope,
+            ContractId::from_str("contract:qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw").unwrap()
+        );
+        assert_eq!(req.data, Some(StrictVal::num(10u64)));
+        assert_eq!(req.auth, AuthToken::from_str("at:5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA").unwrap());
+        assert_eq!(req.api, Some(tn!("RGB20")));
+        assert_eq!(req.call, Some(CallState::with("transfer", "amount")));
+        assert_eq!(req.lock, None);
+        assert_eq!(req.expiry, None);
+        assert_eq!(
+            req.endpoints,
+            Confined::from_iter_checked([
+                Endpoint::RestHttp("http://127.0.0.1:8080".to_owned()),
+                Endpoint::JsonRpc("https+json-rpc://127.0.0.1:8081".to_owned()),
+                Endpoint::WebSockets("wss://127.0.0.1:8081".to_owned()),
+                Endpoint::Storm("storm://127.0.0.1:8082".to_owned()),
+                Endpoint::UnspecifiedMeans("some_bullshit".to_owned())
+            ])
+        );
+        assert!(req.unknown_query.is_empty());
+    }
+
+    #[test]
+    fn unknown_query() {
+        let s = "contract:tb@qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw/RGB20/transfer/amount/10@at:\
+                 5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA/?sats=40&bull=shit&other=x";
+        let req = CallRequest::<ContractId, AuthToken>::from_str(s).unwrap();
+        assert_eq!(s, req.to_string());
+
+        assert_eq!(
+            req.scope,
+            ContractId::from_str("contract:qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw").unwrap()
+        );
+        assert_eq!(req.data, Some(StrictVal::num(10u64)));
+        assert_eq!(req.auth, AuthToken::from_str("at:5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA").unwrap());
+        assert_eq!(req.api, Some(tn!("RGB20")));
+        assert_eq!(req.call, Some(CallState::with("transfer", "amount")));
+        assert_eq!(req.lock, None);
+        assert_eq!(req.expiry, None);
+        assert_eq!(req.endpoints, none!());
+        assert_eq!(
+            req.unknown_query,
+            indexmap! { s!("sats") => s!("40"), s!("bull") => s!("shit"), s!("other") => s!("x") }
+        );
     }
 }

@@ -263,7 +263,7 @@ impl FromStr for Endpoint {
         if s.starts_with("http://") || s.starts_with("https://") {
             Ok(Endpoint::RestHttp(s))
         } else if s.starts_with("http+json-rpc://") || s.starts_with("https+json-rpc://") {
-            Ok(Endpoint::RestHttp(s))
+            Ok(Endpoint::JsonRpc(s))
         } else if s.starts_with("ws://") || s.starts_with("wss://") {
             Ok(Endpoint::WebSockets(s))
         } else if s.starts_with("storm://") {
