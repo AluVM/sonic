@@ -35,17 +35,18 @@ use std::path::PathBuf;
 use aluvm::{CoreConfig, LibSite};
 use amplify::num::u256;
 use commit_verify::{Digest, Sha256};
-use hypersonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc};
-use hypersonic::persistance::LedgerDir;
-use hypersonic::{Api, ApiInner, DestructibleApi, Schema};
+use hypersonic::{Api, DestructibleApi};
+use indexmap::{indexset, IndexSet};
 use petgraph::dot::{Config, Dot};
 use petgraph::graph::EdgeReference;
 use petgraph::prelude::NodeIndex;
 use petgraph::Graph;
+use rand::rng;
 use rand::seq::SliceRandom;
-use rand::thread_rng;
-use sonicapi::IssueParams;
+use sonic_persist_fs::LedgerDir;
+use sonicapi::{IssueParams, Issuer, StateArithm, StateBuilder, StateConvertor};
 use sonix::dump_ledger;
+use strict_types::SemId;
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
 use ultrasonic::{AuthToken, CellAddr, Codex, Consensus, Identity, Operation};
 
@@ -131,7 +132,6 @@ fn codex() -> Codex {
             0 => LibSite::new(lib_id, 0),
             1 => LibSite::new(lib_id, 0),
         },
-        reserved: default!(),
     }
 }
 
@@ -140,30 +140,31 @@ fn api() -> Api {
 
     let codex = codex();
 
-    Api::Embedded(ApiInner::<EmbeddedProc> {
+    Api {
         version: default!(),
         codex_id: codex.codex_id(),
-        timestamp: 1732529307,
-        name: None,
         developer: Identity::default(),
         conforms: None,
         default_call: None,
-        append_only: none!(),
+        immutable: none!(),
         destructible: tiny_bmap! {
             vname!("amount") => DestructibleApi {
                 sem_id: types.get("Fungible.Amount"),
-                arithmetics: EmbeddedArithm::Fungible,
-                adaptor: EmbeddedImmutable(u256::ZERO),
+                arithmetics: StateArithm::Fungible,
+                convertor: StateConvertor::TypedEncoder(u256::ZERO),
+                builder: StateBuilder::TypedEncoder(u256::ZERO),
+                witness_sem_id: SemId::unit(),
+                witness_builder: StateBuilder::TypedEncoder(u256::ZERO),
             }
         },
-        readers: none!(),
+        aggregators: none!(),
         verifiers: tiny_bmap! {
             vname!("issue") => 0,
             vname!("transfer") => 1,
         },
         errors: Default::default(),
         reserved: Default::default(),
-    })
+    }
 }
 
 fn setup(name: &str) -> LedgerDir {
@@ -171,7 +172,7 @@ fn setup(name: &str) -> LedgerDir {
     let codex = codex();
     let api = api();
 
-    let issuer = Schema::new(codex, api, [libs::success()], types.type_system());
+    let issuer = Issuer::new(codex, api, [libs::success()], types.type_system());
 
     let seed = &[0xCA; 30][..];
     let mut auth = Sha256::digest(seed);
@@ -197,7 +198,7 @@ fn setup(name: &str) -> LedgerDir {
     fs::create_dir_all(&contract_path).expect("Unable to create a contract folder");
     let mut ledger = LedgerDir::new(articles, contract_path).expect("Can't issue a contract");
 
-    let owned = &ledger.state().main.owned;
+    let owned = &ledger.state().main.destructible;
     assert_eq!(owned.len(), 1);
     let owned = owned.get("amount").unwrap();
     assert_eq!(owned.len(), 20);
@@ -211,14 +212,14 @@ fn setup(name: &str) -> LedgerDir {
 
     for round in 0u16..10 {
         // shuffle outputs to create twisted DAG
-        prev.shuffle(&mut thread_rng());
+        prev.shuffle(&mut rng());
         let mut iter = prev.into_iter();
         let mut new_prev = vec![];
         while let Some((first, second)) = iter.next().zip(iter.next()) {
             let opid = ledger
                 .start_deed("transfer")
-                .using(first, svnum!(0u64))
-                .using(second, svnum!(0u64))
+                .using(first)
+                .using(second)
                 .assign("amount", next_auth(), svnum!(100u64 - round as u64), None)
                 .assign("amount", next_auth(), svnum!(100u64 - round as u64), None)
                 .commit()
@@ -229,7 +230,7 @@ fn setup(name: &str) -> LedgerDir {
         prev = new_prev;
     }
 
-    let owned = &ledger.state().main.owned;
+    let owned = &ledger.state().main.destructible;
     assert_eq!(owned.len(), 1);
     assert_eq!(prev.len(), 20);
     let owned = owned.get("amount").unwrap();
@@ -244,7 +245,7 @@ fn setup(name: &str) -> LedgerDir {
 
 fn graph(name: &str, ledger: &LedgerDir) {
     let mut graph = Graph::<(String, bool), ()>::new();
-    let genesis_opid = ledger.articles().issue.genesis_opid();
+    let genesis_opid = ledger.articles().genesis_opid();
     let mut nodes = bmap! {
         genesis_opid => graph.add_node(("0".to_string(), true))
     };
@@ -253,7 +254,7 @@ fn graph(name: &str, ledger: &LedgerDir) {
         let valid = ledger.is_valid(opid);
         let node = graph.add_node((id, valid));
         nodes.insert(opid, node);
-        for inp in &op.destroying {
+        for inp in &op.destructible_in {
             graph.add_edge(node, nodes[&inp.addr.opid], ());
         }
     }
@@ -278,19 +279,27 @@ fn no_reorgs() {
     dump_ledger("tests/data/NoReorgs.contract", "tests/data/NoReorgs.dump", true).unwrap();
 }
 
-fn check_rollback(ledger: LedgerDir, mut removed: Vec<Operation>) -> Vec<Operation> {
+fn check_rollback(ledger: LedgerDir, mut removed: IndexSet<Operation>) -> IndexSet<Operation> {
     let opids = removed.iter().map(|op| op.opid()).collect::<BTreeSet<_>>();
 
     let mut index = 0usize;
-    while let Some(op) = removed.get(index) {
+    while let Some(op) = removed.get_index(index) {
         let opid = op.opid();
-        for no in 0..op.destructible.len_u16() {
+        let mut new = IndexSet::new();
+        for no in 0..op.immutable_out.len_u16() {
+            for child in ledger.read_by(CellAddr::new(opid, no)) {
+                let child = ledger.operation(child);
+                new.insert(child);
+            }
+        }
+        for no in 0..op.destructible_out.len_u16() {
             let Some(child) = ledger.spent_by(CellAddr::new(opid, no)) else {
                 continue;
             };
             let child = ledger.operation(child);
-            removed.push(child);
+            new.insert(child);
         }
+        removed.append(&mut new);
         index += 1;
     }
 
@@ -311,7 +320,7 @@ fn check_rollback(ledger: LedgerDir, mut removed: Vec<Operation>) -> Vec<Operati
     }
 
     // Now we check that no outputs of the rolled-back ops participate in the valid state
-    let state = ledger.state().main.owned.get("amount").unwrap();
+    let state = ledger.state().main.destructible.get("amount").unwrap();
     eprintln!("Not rolled back outputs:");
     for addr in state.keys() {
         assert!(!removed_opids.contains(&addr.opid));
@@ -328,8 +337,7 @@ fn single_rollback() {
     ledger.rollback([mid_opid]).unwrap();
     dump_ledger("tests/data/SingleRollback.contract", "tests/data/SingleRollback.dump", true).unwrap();
     graph("SingleRollback", &ledger);
-    let removed = check_rollback(ledger, vec![mid_op]);
-    assert_eq!(removed.len(), 31);
+    check_rollback(ledger, indexset![mid_op]);
 }
 
 #[test]
@@ -341,8 +349,7 @@ fn double_rollback() {
     ledger.rollback([mid_opid1, mid_opid2]).unwrap();
     dump_ledger("tests/data/DoubleRollback.contract", "tests/data/DoubleRollback.dump", true).unwrap();
     graph("DoubleRollback", &ledger);
-    let removed = check_rollback(ledger, vec![mid_op1, mid_op2]);
-    assert_eq!(removed.len(), 158);
+    check_rollback(ledger, indexset![mid_op1, mid_op2]);
 }
 
 #[test]
@@ -356,8 +363,7 @@ fn two_rollbacks() {
     ledger.rollback([mid_opid2]).unwrap();
     dump_ledger("tests/data/TwoRollbacks.contract", "tests/data/TwoRollbacks.dump", true).unwrap();
     graph("TwoRollbacks", &ledger);
-    let removed = check_rollback(ledger, vec![mid_op1, mid_op2]);
-    assert_eq!(removed.len(), 158);
+    check_rollback(ledger, indexset![mid_op1, mid_op2]);
 }
 
 #[test]

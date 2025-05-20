@@ -25,14 +25,16 @@ commit_verify.workspace = true
 aluvm.workspace = true
 ultrasonic.workspace = true
 sonic-callreq.workspace = true
+binfile = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 chrono.workspace = true
 
 [features]
-default = ["std"]
-all = ["std", "stl", "serde"]
+default = ["std", "binfile"]
+all = ["std", "stl", "serde", "binfile"]
 
 std = ["sonic-callreq/std"]
+binfile = ["dep:binfile", "std"]
 stl = ["commit_verify/stl", "ultrasonic/stl", "strict_types/armor"]
 serde = [
     "dep:serde",
@@ -48,11 +50,15 @@ serde = [
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2"
-rand = { version = "0.8.4", optional = true }
-getrandom = { version = "0.2", features = ["js"] }
+rand = { version = "0.9.1", optional = true }
+getrandom = { version = "0.3", features = ["wasm_js"] }
+getrandom2 = { package = "getrandom", version = "0.2", features = ["js"] }
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 wasm-bindgen-test = "0.3"
 
 [package.metadata.docs.rs]
 features = ["all"]
+
+[lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(coverage_nightly)'] }

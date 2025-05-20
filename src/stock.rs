@@ -21,14 +21,12 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use core::error::Error as StdError;
-use std::io;
+use core::error::Error;
 
-use sonicapi::{MergeError, Schema};
-use strict_encoding::{DeserializeError, SerializeError};
+use sonicapi::ArticlesError;
 use ultrasonic::{CallError, CellAddr, ContractName, Operation, Opid};
 
-use crate::{Articles, EffectiveState, Transition};
+use crate::{Articles, EffectiveState, EitherError, Transition};
 
 /// Stock is a persistence API for keeping and accessing contract data.
 ///
@@ -45,10 +43,8 @@ use crate::{Articles, EffectiveState, Transition};
 pub trait Stock {
     /// Persistence configuration type.
     type Conf;
-
-    /// Error type specific to a persistence implementation, which may happen during the
-    /// construction.
-    type Error: StdError;
+    /// Error type for persistence errors.
+    type Error: Error;
 
     /// Creates a new contract from the provided articles, creating its persistence using a given
     /// implementation-specific configuration.
@@ -60,7 +56,7 @@ pub trait Stock {
     /// # Blocking I/O
     ///
     /// This call MAY perform any I/O operations.
-    fn new(articles: Articles, conf: Self::Conf) -> Result<Self, IssueError<Self::Error>>
+    fn new(articles: Articles, state: EffectiveState, conf: Self::Conf) -> Result<Self, Self::Error>
     where Self: Sized;
 
     /// Loads a contract from persistence using the provided configuration.
@@ -72,7 +68,7 @@ pub trait Stock {
     /// # Blocking I/O
     ///
     /// This call MAY perform any I/O operations.
-    fn load(conf: Self::Conf) -> Result<Self, LoadError<Self::Error>>
+    fn load(conf: Self::Conf) -> Result<Self, Self::Error>
     where Self: Sized;
 
     /// Returns a copy of the config object used during the stock construction.
@@ -108,7 +104,7 @@ pub trait Stock {
     ///
     /// Does not include genesis operation id.
     ///
-    /// Positive response doesn't indicate that the operation participates in the current contract
+    /// Positive response does not indicate that the operation participates in the current contract
     /// state or in a current valid contract history, which may be exported.
     ///
     /// Operations may be excluded from the history due to rollbacks (see [`Contract::rollback`]),
@@ -127,8 +123,9 @@ pub trait Stock {
     ///
     /// Does not include genesis operation.
     ///
-    /// If the method returns an operation, this doesn't indicate that the operation participates in
-    /// the current contract state or in a current valid contract history, which/ may be exported.
+    /// If the method returns an operation, this does not indicate that the operation participates
+    /// in the current contract state or in a current valid contract history, which/ may be
+    /// exported.
     ///
     /// Operations may be excluded from the history due to rollbacks (see [`Contract::rollback`]),
     /// as well as re-included later with forwards (see [`Contract::forward`]). In both cases
@@ -210,7 +207,7 @@ pub trait Stock {
     /// matching the provided `opid`.
     fn transition(&self, opid: Opid) -> Transition;
 
-    /// Returns an iterator over all state transitions known to the contract (i.e. the complete
+    /// Returns an iterator over all state transitions known to the contract (i.e., the complete
     /// contract trace).
     ///
     /// # Nota bene
@@ -238,13 +235,32 @@ pub trait Stock {
     /// transitions that were ever provided via [`Self::add_transition`].
     fn trace(&self) -> impl Iterator<Item = (Opid, Transition)>;
 
+    /// Returns an id of an operation reading a provided address (operation immutable state
+    /// output).
+    ///
+    /// # Nota bene
+    ///
+    /// This method is internally used in computing operation descendants and must not be accessed
+    /// from outside.
+    ///
+    /// # Blocking I/O
+    ///
+    /// This call MAY BE blocking.
+    ///
+    /// # Implementation instructions
+    ///
+    /// Specific persistence providers implementing this method MUST guarantee to always return a
+    /// non-empty iterator for all `addr` which were at least once provided via
+    /// [`Self::add_reading`] as an `addr` argument.
+    fn read_by(&self, addr: CellAddr) -> impl Iterator<Item = Opid>;
+
     /// Returns an id of an operation spending a provided address (operation destructible state
     /// output).
     ///
     /// # Nota bene
     ///
-    /// This method is internally used in the rollback procedure and must not be accessed from
-    /// outside.
+    /// This method is internally used in computing operation descendants and must not be accessed
+    /// from outside.
     ///
     /// # Blocking I/O
     ///
@@ -269,8 +285,8 @@ pub trait Stock {
     /// updated state after calling the callback `f` method.
     fn update_articles(
         &mut self,
-        f: impl FnOnce(&mut Articles) -> Result<(), MergeError>,
-    ) -> Result<(), StockError<MergeError>>;
+        f: impl FnOnce(&mut Articles) -> Result<(), ArticlesError>,
+    ) -> Result<(), EitherError<ArticlesError, Self::Error>>;
 
     /// Updates contract effective state inside a callback method.
     ///
@@ -282,7 +298,7 @@ pub trait Stock {
     ///
     /// Specific persistence providers implementing this method MUST guarantee to always persist an
     /// updated state after calling the callback `f` method.
-    fn update_state<R>(&mut self, f: impl FnOnce(&mut EffectiveState, &Schema) -> R) -> Result<R, SerializeError>;
+    fn update_state<R>(&mut self, f: impl FnOnce(&mut EffectiveState, &Articles) -> R) -> Result<R, Self::Error>;
 
     /// Adds operation to the contract data.
     ///
@@ -294,7 +310,7 @@ pub trait Stock {
     ///
     /// Specific persistence providers implementing this method MUST:
     /// - immediately store the operation data;
-    /// - panic, if the operation with the same `opid` is already known, but differs from the
+    /// - panic, if the operation with the same `opid` is already known but differs from the
     ///   provided operation.
     ///
     /// They SHOULD:
@@ -314,7 +330,7 @@ pub trait Stock {
     ///
     /// Specific persistence providers implementing this method MUST:
     /// - immediately store the transition data;
-    /// - panic, if a transition for the same `opid` is already known, but differs from the provided
+    /// - panic, if a transition for the same `opid` is already known but differs from the provided
     ///   transition.
     ///
     /// They SHOULD:
@@ -322,8 +338,8 @@ pub trait Stock {
     ///   the `transition` itself matches the known data for it.
     fn add_transition(&mut self, opid: Opid, transition: &Transition);
 
-    /// Registers given operation output (`spent`) to be spent (used as an input) in operation
-    /// `spender`.
+    /// Registers a given operation immutable output (`addr`) to be read (used as an input) in
+    /// operation `reader`.
     ///
     /// # Blocking I/O
     ///
@@ -332,8 +348,20 @@ pub trait Stock {
     /// # Implementation instructions
     ///
     /// Specific persistence providers implementing this method MUST:
-    /// - immediately store the new spending information;
-    /// - silently update `spender` if the provided `spent` cell address were previously spent by a
+    /// - add the `reader` to the list of readers who had accessed the address.
+    fn add_reading(&mut self, addr: CellAddr, reader: Opid);
+
+    /// Registers a given operation destructible output (`spent`) to be spent (used as an input) in
+    /// operation `spender`.
+    ///
+    /// # Blocking I/O
+    ///
+    /// This call MAY BE blocking.
+    ///
+    /// # Implementation instructions
+    ///
+    /// Specific persistence providers implementing this method MUST:
+    /// - silently update `spender` if the provided `spent` cell address was previously spent by a
     ///   different operation.
     fn add_spending(&mut self, spent: CellAddr, spender: Opid);
 
@@ -345,40 +373,9 @@ pub trait Stock {
     fn commit_transaction(&mut self);
 }
 
-#[derive(Debug, Display, Error, From)]
-#[display(inner)]
-pub enum StockError<E: StdError> {
-    Inner(E),
-
-    #[from]
-    Serialize(io::Error),
-}
-
-#[derive(Debug, Display, Error, From)]
+#[derive(Clone, PartialEq, Eq, Debug, Display, Error)]
 #[display(doc_comments)]
-pub enum IssueError<E: StdError> {
+pub enum IssueError {
     /// unable to issue a new contract '{0}' due to invalid genesis data. Specifically, {1}
     Genesis(ContractName, CallError),
-
-    /// unable to save contract articles - {0}
-    ArticlesPersistence(io::Error),
-
-    /// unable to save contract state data - {0}
-    StatePersistence(SerializeError),
-
-    #[display(inner)]
-    OtherPersistence(E),
-}
-
-#[derive(Debug, Display, Error, From)]
-#[display(doc_comments)]
-pub enum LoadError<E: StdError> {
-    /// unable to load contract articles - {0}
-    ArticlesPersistence(DeserializeError),
-
-    /// unable to load contract state data - {0}
-    StatePersistence(DeserializeError),
-
-    #[display(inner)]
-    OtherPersistence(E),
 }

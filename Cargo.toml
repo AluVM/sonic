@@ -1,6 +1,6 @@
 [workspace]
-members = [".", "api", "cli", "callreq"]
-default-members = [".", "api", "callreq"]
+members = [".", "api", "cli", "callreq", "persistence/fs"]
+default-members = [".", "api", "callreq", "persistence/fs"]
 resolver = "2"
 
 [workspace.package]
@@ -23,12 +23,15 @@ aluvm = "=0.12.0-beta.6"
 ultrasonic = "=0.12.0-beta.6"
 sonic-api = { version = "=0.12.0-beta.6", path = "api" }
 sonic-callreq = { version = "=0.12.0-beta.6", path = "callreq" }
+sonic-persist-fs = { version = "=0.12.0-beta.6", path = "persistence/fs" }
 hypersonic = { version = "=0.12.0-beta.6", path = "." }
 aora = ">=0.6.3"
+binfile = "0.2.0"
 baid64 = "0.4.1"
 indexmap = "2.9.0"
 chrono = "0.4.38"
 serde = { version = "1", features = ["derive"] }
+toml = "0.8.22"
 serde_yaml = "0.9.34"
 
 [package]
@@ -48,22 +51,19 @@ exclude = [".github"]
 
 [[bin]]
 name = "sonic-stl"
-required-features = ["stl"]
+required-features = ["stl", "vesper"]
 
 [lib]
 name = "hypersonic"
 
 [[example]]
 name = "dao"
-required-features = ["persist-file"]
 
 [[test]]
 name = "dao"
-required-features = ["persist-file"]
 
 [[test]]
 name = "reorgs"
-required-features = ["persist-file"]
 
 [dependencies]
 amplify = { workspace = true }
@@ -75,22 +75,23 @@ ultrasonic.workspace = true
 sonic-api.workspace = true
 sonic-callreq.workspace = true
 indexmap.workspace = true
-aora = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 
 [dev-dependencies]
 sonix = { path = "./cli" }
-rand = "0.8.4"
+sonic-persist-fs.workspace = true
+rand = "0.9.1"
 petgraph = "0.8.1"
 
 [features]
 default = ["std"]
-all = ["stl", "std", "serde", "persist-file"]
+all = ["stl", "vesper", "binfile", "std", "serde"]
 
+binfile = ["sonic-api/binfile"]
 std = ["sonic-api/std", "sonic-callreq/std"]
+vesper = ["ultrasonic/vesper"]
 stl = ["commit_verify/stl", "ultrasonic/stl", "strict_types/armor"]
 
-persist-file = ["std", "aora"]
 serde = [
     "dep:serde",
     "amplify/serde",
@@ -103,8 +104,9 @@ serde = [
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2"
-rand = { version = "0.8.4", optional = true }
-getrandom = { version = "0.2", features = ["js"] }
+rand = { version = "0.9.1", optional = true }
+getrandom = { version = "0.3", features = ["wasm_js"] }
+getrandom2 = { package = "getrandom", version = "0.2", features = ["js"] }
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 wasm-bindgen-test = "0.3"
@@ -112,5 +114,11 @@ wasm-bindgen-test = "0.3"
 [package.metadata.docs.rs]
 features = ["all"]
 
+[lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(coverage_nightly)'] }
+
 [patch.crates-io]
-commit_verify = { git = "https://github.com/LNP-BP/client_side_validation", branch = "v0.12" }
+commit_verify = { git = "https://github.com/LNP-BP/client_side_validation", branch = "revision" }
+aluvm = { git = "https://github.com/AluVM/aluvm", branch = "revision" }
+zk-aluvm = { git = "https://github.com/AluVM/zk-aluvm", branch = "revision" }
+ultrasonic = { git = "https://github.com/AluVM/ultrasonic", branch = "revision" }

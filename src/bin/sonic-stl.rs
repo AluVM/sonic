@@ -21,6 +21,8 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+#![cfg_attr(coverage_nightly, feature(coverage_attribute), coverage(off))]
+
 use std::fs;
 use std::io::Write;
 
@@ -29,10 +31,10 @@ use commit_verify::stl::commit_verify_stl;
 use commit_verify::CommitmentLayout;
 use hypersonic::aluvm::zkstl::finite_field_stl;
 use hypersonic::stl::sonic_stl;
+use sonicapi::ArticlesCommitment;
 use strict_types::stl::{std_stl, strict_types_stl};
 use strict_types::{parse_args, SystemBuilder};
 use ultrasonic::stl::usonic_stl;
-use ultrasonic::Codex;
 
 fn main() {
     let (format, dir) = parse_args();
@@ -78,7 +80,7 @@ fn main() {
         .import(lib)
         .unwrap()
         .finalize()
-        .expect("Not all libraries present");
+        .expect("Not all libraries are present");
 
     let mut file = fs::File::create(format!("{dir}/SONIC.vesper")).unwrap();
     writeln!(
@@ -98,8 +100,10 @@ fn main() {
     .unwrap();
 
     writeln!(file, "\n-- Contract Articles\n").unwrap();
-    let layout = Codex::commitment_layout();
+    let layout = ArticlesCommitment::commitment_layout();
     writeln!(file, "{layout}").unwrap();
+    let tt = sys.type_tree("SONIC.ArticlesCommitment").unwrap();
+    writeln!(file, "{tt}").unwrap();
     let tt = sys.type_tree("SONIC.Articles").unwrap();
     writeln!(file, "{tt}").unwrap();
 }

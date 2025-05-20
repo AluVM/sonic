@@ -21,7 +21,7 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use core::fmt::Display;
+use core::fmt::{self, Display, Formatter};
 use core::str::FromStr;
 use std::convert::Infallible;
 
@@ -30,7 +30,7 @@ use baid64::Baid64ParseError;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use strict_types::{StrictType, StrictVal, TypeName, VariantName};
-use ultrasonic::{AuthToken, ContractId};
+use ultrasonic::{AuthToken, Consensus, ContractId};
 
 use crate::LIB_NAME_SONIC;
 
@@ -112,6 +112,7 @@ impl CallState {
 )]
 pub struct CallRequest<T = CallScope, A = AuthToken> {
     pub scope: T,
+    pub layer1: Layer1,
     pub api: Option<TypeName>,
     pub call: Option<CallState>,
     pub auth: A,
@@ -133,6 +134,7 @@ impl<Q: Display + FromStr, A> CallRequest<CallScope<Q>, A> {
         };
         Ok(CallRequest {
             scope: id,
+            layer1: self.layer1,
             api: self.api,
             call: self.call,
             auth: self.auth,
@@ -144,6 +146,56 @@ impl<Q: Display + FromStr, A> CallRequest<CallScope<Q>, A> {
         })
     }
 }
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct Layer1 {
+    pub consensus: Consensus,
+    pub testnet: bool,
+}
+
+impl Layer1 {
+    pub fn new(consensus: Consensus, testnet: bool) -> Self { Self { consensus, testnet } }
+}
+
+impl Display for Layer1 {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let s = match (self.consensus, self.testnet) {
+            (Consensus::None, false) => "~",
+            (Consensus::None, true) => "test",
+            (Consensus::Bitcoin, false) => "bc",
+            (Consensus::Bitcoin, true) => "tb",
+            (Consensus::Liquid, false) => "lq",
+            (Consensus::Liquid, true) => "tl",
+            (Consensus::Prime, false) => "pr",
+            (Consensus::Prime, true) => "tp",
+        };
+        f.write_str(s)
+    }
+}
+
+impl FromStr for Layer1 {
+    type Err = ParseLayer1Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.to_lowercase();
+        Ok(match s.as_str() {
+            "~" => Layer1::new(Consensus::None, false),
+            "test" => Layer1::new(Consensus::None, true),
+            "bc" => Layer1::new(Consensus::Bitcoin, false),
+            "tb" => Layer1::new(Consensus::Bitcoin, true),
+            "lq" => Layer1::new(Consensus::Liquid, false),
+            "tl" => Layer1::new(Consensus::Liquid, true),
+            "pr" => Layer1::new(Consensus::Prime, false),
+            "tp" => Layer1::new(Consensus::Prime, true),
+            _ => return Err(ParseLayer1Error),
+        })
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Display, Error)]
+#[display("invalid layer 1 name")]
+pub struct ParseLayer1Error;
 
 #[derive(Clone, Eq, PartialEq, Debug, Display)]
 #[cfg_attr(

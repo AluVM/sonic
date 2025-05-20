@@ -34,7 +34,7 @@ use ultrasonic::{
     Input, Issue, Operation, StateCell, StateData, StateValue,
 };
 
-use crate::{Api, Articles, DataCell, MethodName, Schema, StateAtom, StateName};
+use crate::{Api, ApiDescriptor, Articles, DataCell, Issuer, MethodName, StateAtom, StateName};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -115,10 +115,10 @@ impl IssueParams {
     pub fn set_timestamp_now(&mut self) { self.timestamp = Some(Utc::now()); }
 }
 
-impl Schema {
+impl Issuer {
     pub fn start_issue(self, method: impl Into<MethodName>, consensus: Consensus, testnet: bool) -> IssueBuilder {
         let builder = Builder::new(self.call_id(method));
-        IssueBuilder { builder, schema: self, testnet, consensus }
+        IssueBuilder { builder, issuer: self, testnet, consensus }
     }
 
     pub fn start_issue_mainnet(self, method: impl Into<MethodName>, consensus: Consensus) -> IssueBuilder {
@@ -146,7 +146,7 @@ impl Schema {
 #[derive(Clone, Debug)]
 pub struct IssueBuilder {
     builder: Builder,
-    schema: Schema,
+    issuer: Issuer,
     testnet: bool,
     consensus: Consensus,
 }
@@ -155,7 +155,7 @@ impl IssueBuilder {
     pub fn append(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
         self.builder = self
             .builder
-            .add_immutable(name, data, raw, &self.schema.default_api, &self.schema.types);
+            .add_immutable(name, data, raw, &self.issuer.api, &self.issuer.types);
         self
     }
 
@@ -166,9 +166,9 @@ impl IssueBuilder {
         data: StrictVal,
         lock: Option<LibSite>,
     ) -> Self {
-        self.builder =
-            self.builder
-                .add_destructible(name, auth, data, lock, &self.schema.default_api, &self.schema.types);
+        self.builder = self
+            .builder
+            .add_destructible(name, auth, data, lock, &self.issuer.api, &self.issuer.types);
         self
     }
 
@@ -181,26 +181,28 @@ impl IssueBuilder {
             name: ContractName::Named(name.into()),
             issuer: Identity::default(),
         };
-        let genesis = self.builder.issue_genesis(self.schema.codex.codex_id());
-        let issue = Issue {
-            version: default!(),
-            meta,
-            codex: self.schema.codex.clone(),
-            genesis,
+        let genesis = self.builder.issue_genesis(self.issuer.codex.codex_id());
+        let issue = Issue { version: default!(), meta, codex: self.issuer.codex, genesis };
+        let apis = ApiDescriptor {
+            default: self.issuer.api,
+            custom: none!(),
+            libs: self.issuer.libs,
+            types: self.issuer.types,
+            sig: None,
         };
-        Articles { issue, contract_sigs: none!(), schema: self.schema }
+        Articles::with(apis, issue).expect("broken issue builder")
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct Builder {
     call_id: CallId,
-    destructible: SmallVec<StateCell>,
-    immutable: SmallVec<StateData>,
+    destructible_out: SmallVec<StateCell>,
+    immutable_out: SmallVec<StateData>,
 }
 
 impl Builder {
-    pub fn new(call_id: CallId) -> Self { Builder { call_id, destructible: none!(), immutable: none!() } }
+    pub fn new(call_id: CallId) -> Self { Builder { call_id, destructible_out: none!(), immutable_out: none!() } }
 
     pub fn add_immutable(
         mut self,
@@ -210,8 +212,12 @@ impl Builder {
         api: &Api,
         sys: &TypeSystem,
     ) -> Self {
-        let data = api.build_immutable(name, data, raw, sys);
-        self.immutable.push(data).expect("too many state elements");
+        let data = api
+            .build_immutable(name, data, raw, sys)
+            .expect("invalid immutable state");
+        self.immutable_out
+            .push(data)
+            .expect("too many state elements");
         self
     }
 
@@ -224,9 +230,11 @@ impl Builder {
         api: &Api,
         sys: &TypeSystem,
     ) -> Self {
-        let data = api.build_destructible(name, data, sys);
+        let data = api
+            .build_destructible(name, data, sys)
+            .expect("invalid destructible state");
         let cell = StateCell { data, auth, lock };
-        self.destructible
+        self.destructible_out
             .push(cell)
             .expect("too many state elements");
         self
@@ -234,14 +242,14 @@ impl Builder {
 
     pub fn issue_genesis(self, codex_id: CodexId) -> Genesis {
         Genesis {
+            version: default!(),
             codex_id,
             call_id: self.call_id,
             nonce: fe256::from(u256::ZERO),
             blank1: zero!(),
             blank2: zero!(),
-            destructible: self.destructible,
-            immutable: self.immutable,
-            reserved: zero!(),
+            destructible_out: self.destructible_out,
+            immutable_out: self.immutable_out,
         }
     }
 }
@@ -284,15 +292,20 @@ impl<'c> BuilderRef<'c> {
 #[derive(Clone, Debug)]
 pub struct OpBuilder {
     contract_id: ContractId,
-    destroying: SmallVec<Input>,
-    reading: SmallVec<CellAddr>,
+    destructible_in: SmallVec<Input>,
+    immutable_in: SmallVec<CellAddr>,
     inner: Builder,
 }
 
 impl OpBuilder {
     pub fn new(contract_id: ContractId, call_id: CallId) -> Self {
         let inner = Builder::new(call_id);
-        Self { contract_id, destroying: none!(), reading: none!(), inner }
+        Self {
+            contract_id,
+            destructible_in: none!(),
+            immutable_in: none!(),
+            inner,
+        }
     }
 
     pub fn add_immutable(
@@ -323,31 +336,48 @@ impl OpBuilder {
     }
 
     pub fn access(mut self, addr: CellAddr) -> Self {
-        self.reading
+        self.immutable_in
             .push(addr)
             .expect("number of read memory cells exceeds 64k limit");
         self
     }
 
-    pub fn destroy(mut self, addr: CellAddr, _witness: StrictVal) -> Self {
-        // TODO: Convert witness
+    pub fn destroy(mut self, addr: CellAddr) -> Self {
         let input = Input { addr, witness: StateValue::None };
-        self.destroying
+        self.destructible_in
             .push(input)
-            .expect("number of inputs exceeds 64k limit");
+            .expect("the number of inputs exceeds the 64k limit");
+        self
+    }
+
+    pub fn destroy_satisfy(
+        mut self,
+        addr: CellAddr,
+        name: impl Into<StateName>,
+        witness: StrictVal,
+        api: &Api,
+        sys: &TypeSystem,
+    ) -> Self {
+        let witness = api
+            .build_witness(name, witness, sys)
+            .expect("invalid witness data");
+        let input = Input { addr, witness };
+        self.destructible_in
+            .push(input)
+            .expect("the number of inputs exceeds the 64k limit");
         self
     }
 
     pub fn finalize(self) -> Operation {
         Operation {
+            version: default!(),
             contract_id: self.contract_id,
             call_id: self.inner.call_id,
             nonce: fe256::from(u256::ZERO),
-            destroying: self.destroying,
-            reading: self.reading,
-            destructible: self.inner.destructible,
-            immutable: self.inner.immutable,
-            reserved: zero!(),
+            destructible_in: self.destructible_in,
+            immutable_in: self.immutable_in,
+            destructible_out: self.inner.destructible_out,
+            immutable_out: self.inner.immutable_out,
         }
     }
 }
@@ -390,8 +420,20 @@ impl<'c> OpBuilderRef<'c> {
         self
     }
 
-    pub fn destroy(mut self, addr: CellAddr, witness: StrictVal) -> Self {
-        self.inner = self.inner.destroy(addr, witness);
+    pub fn destroy(mut self, addr: CellAddr) -> Self {
+        self.inner = self.inner.destroy(addr);
+        self
+    }
+
+    pub fn destroy_satisfy(
+        mut self,
+        addr: CellAddr,
+        name: impl Into<StateName>,
+        witness: StrictVal,
+        api: &Api,
+        sys: &TypeSystem,
+    ) -> Self {
+        self.inner = self.inner.destroy_satisfy(addr, name, witness, api, sys);
         self
     }
 

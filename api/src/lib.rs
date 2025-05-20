@@ -21,10 +21,22 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
-
 // TODO: Activate once StrictEncoding will be no_std
 // #![cfg_attr(not(feature = "std"), no_std)]
+#![deny(
+    unsafe_code,
+    dead_code,
+    // TODO: Complete documentation
+    // missing_docs,
+    unused_variables,
+    unused_mut,
+    unused_imports,
+    non_upper_case_globals,
+    non_camel_case_types,
+    non_snake_case
+)]
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 #[macro_use]
 extern crate core;
@@ -41,32 +53,19 @@ extern crate commit_verify;
 #[macro_use]
 extern crate serde;
 
-mod state;
 mod api;
-mod adaptors;
-mod schema;
+mod issuer;
 mod articles;
 mod builders;
-mod util;
+mod state;
 
-pub use adaptors::{alu, embedded};
-pub use api::{
-    Api, ApiId, ApiInner, ApiVm, AppendApi, DestructibleApi, StateAdaptor, StateArithm, StateCalc, StateCalcError,
-    StateReader,
+pub use api::{Api, ApiId, DestructibleApi, ImmutableApi, StateUnknown};
+pub use articles::{
+    ApiDescriptor, Articles, ArticlesCommitment, ArticlesError, ArticlesId, SigBlob, SigValidator,
+    ARTICLES_MAGIC_NUMBER, ARTICLES_VERSION,
 };
-pub use articles::{Articles, MergeError, ARTICLES_MAGIC_NUMBER, ARTICLES_VERSION};
 pub use builders::{Builder, BuilderRef, CoreParams, IssueParams, NamedState, OpBuilder, OpBuilderRef};
-pub use schema::{Schema, SCHEMA_MAGIC_NUMBER, SCHEMA_VERSION};
+pub use issuer::{Issuer, ISSUER_MAGIC_NUMBER, ISSUER_VERSION};
 pub use sonic_callreq::*;
-pub use state::{DataCell, StateAtom, StateTy, StructData};
+pub use state::*;
 pub use ultrasonic::*;
-pub use util::{sigs, AnnotationName, Annotations};
-
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Display)]
-#[repr(u8)]
-pub enum VmType {
-    #[display("Built-in")]
-    Embedded = 1,
-    #[display("AluVM")]
-    AluVM = 2,
-}

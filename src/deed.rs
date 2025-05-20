@@ -29,14 +29,21 @@ use sonicapi::{CoreParams, OpBuilder};
 use strict_types::StrictVal;
 use ultrasonic::{AuthToken, CellAddr, Opid};
 
-use crate::{AcceptError, Ledger, Stock};
+use crate::{AcceptError, EitherError, Ledger, Stock};
+
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct Satisfaction {
+    pub name: StateName,
+    pub witness: StrictVal,
+}
 
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct CallParams {
     #[cfg_attr(feature = "serde", serde(flatten))]
     pub core: CoreParams,
-    pub using: BTreeMap<CellAddr, StrictVal>,
+    pub using: BTreeMap<CellAddr, Option<Satisfaction>>,
     pub reading: Vec<CellAddr>,
 }
 
@@ -51,14 +58,23 @@ impl<S: Stock> DeedBuilder<'_, S> {
         self
     }
 
-    pub fn using(mut self, addr: CellAddr, witness: StrictVal) -> Self {
-        self.builder = self.builder.destroy(addr, witness);
+    pub fn using(mut self, addr: CellAddr) -> Self {
+        self.builder = self.builder.destroy(addr);
+        self
+    }
+
+    pub fn satisfying(mut self, addr: CellAddr, name: impl Into<StateName>, witness: StrictVal) -> Self {
+        let api = &self.ledger.articles().default_api();
+        let types = &self.ledger.articles().types();
+        self.builder = self
+            .builder
+            .destroy_satisfy(addr, name, witness, api, types);
         self
     }
 
     pub fn append(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
-        let api = &self.ledger.schema().default_api;
-        let types = &self.ledger.schema().types;
+        let api = &self.ledger.articles().default_api();
+        let types = &self.ledger.articles().types();
         self.builder = self.builder.add_immutable(name, data, raw, api, types);
         self
     }
@@ -70,15 +86,15 @@ impl<S: Stock> DeedBuilder<'_, S> {
         data: StrictVal,
         lock: Option<LibSite>,
     ) -> Self {
-        let api = &self.ledger.schema().default_api;
-        let types = &self.ledger.schema().types;
+        let api = &self.ledger.articles().default_api();
+        let types = &self.ledger.articles().types();
         self.builder = self
             .builder
             .add_destructible(name, auth, data, lock, api, types);
         self
     }
 
-    pub fn commit<'a>(self) -> Result<Opid, AcceptError>
+    pub fn commit<'a>(self) -> Result<Opid, EitherError<AcceptError, S::Error>>
     where Self: 'a {
         let deed = self.builder.finalize();
         let opid = deed.opid();

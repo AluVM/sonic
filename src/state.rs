@@ -25,7 +25,7 @@ use alloc::collections::BTreeMap;
 use std::mem;
 
 use amplify::confinement::{LargeOrdMap, SmallOrdMap};
-use sonicapi::{Api, Articles, Schema, StateAtom, StateName};
+use sonicapi::{Api, ApiDescriptor, Articles, StateAtom, StateName};
 use strict_encoding::{StrictDeserialize, StrictSerialize, TypeName};
 use strict_types::{StrictVal, TypeSystem};
 use ultrasonic::{AuthToken, CallError, CellAddr, Memory, Opid, StateCell, StateData, StateValue, VerifiedOperation};
@@ -50,49 +50,36 @@ impl Transition {
 #[derive(Clone, Debug, Default)]
 pub struct EffectiveState {
     pub raw: RawState,
-    pub main: AdaptedState,
-    pub aux: BTreeMap<TypeName, AdaptedState>,
+    pub main: ProcessedState,
+    pub aux: BTreeMap<TypeName, ProcessedState>,
 }
 
 impl EffectiveState {
-    pub fn from_genesis(articles: &Articles) -> Result<Self, CallError> {
+    pub fn with_articles(articles: &Articles) -> Result<Self, CallError> {
         let mut state = EffectiveState::default();
 
-        let genesis = articles
-            .issue
-            .genesis
-            .to_operation(articles.issue.contract_id());
+        let contract_id = articles.contract_id();
+        let genesis = articles.genesis().to_operation(contract_id);
 
-        let verified =
-            articles
-                .schema
-                .codex
-                .verify(articles.issue.contract_id(), genesis, &state.raw, &articles.schema)?;
+        let verified = articles
+            .codex()
+            .verify(contract_id, genesis, &state.raw, articles)?;
 
         // We do not need state transition for genesis.
-        let _ = state.apply(
-            verified,
-            &articles.schema.default_api,
-            articles.schema.custom_apis.keys(),
-            &articles.schema.types,
-        );
+        let _ = state.apply(verified, articles.apis());
 
         Ok(state)
     }
 
-    /// NB: Do not forget to call `recompute state` after.
-    pub fn with(raw: RawState, schema: &Schema) -> Self {
+    pub fn with_raw_state(raw: RawState, articles: &Articles) -> Self {
         let mut me = Self { raw, main: none!(), aux: none!() };
-        me.main = AdaptedState::with(&me.raw, &schema.default_api, &schema.types);
+        me.main = ProcessedState::with(&me.raw, articles.default_api(), articles.types());
         me.aux.clear();
-        for api in schema.custom_apis.keys() {
-            let Some(name) = api.name() else {
-                continue;
-            };
-            let state = AdaptedState::with(&me.raw, api, &schema.types);
+        for (name, api) in articles.custom_apis() {
+            let state = ProcessedState::with(&me.raw, api, articles.types());
             me.aux.insert(name.clone(), state);
         }
-        me.recompute(&schema.default_api, schema.custom_apis.keys());
+        me.recompute(articles.apis());
         me
     }
 
@@ -102,60 +89,38 @@ impl EffectiveState {
     pub fn read(&self, name: impl Into<StateName>) -> &StrictVal {
         let name = name.into();
         self.main
-            .computed
+            .aggregated
             .get(&name)
             .unwrap_or_else(|| panic!("Computed state {name} is not known"))
     }
 
     /// Re-evaluates computable part of the state
-    pub fn recompute<'a>(&mut self, default_api: &Api, custom_apis: impl IntoIterator<Item = &'a Api>) {
-        self.main.compute(default_api);
+    pub fn recompute(&mut self, apis: &ApiDescriptor) {
+        self.main.aggregate(&apis.default);
         self.aux = bmap! {};
-        for api in custom_apis {
-            let mut s = AdaptedState::default();
-            s.compute(api);
-            self.aux
-                .insert(api.name().cloned().expect("unnamed aux API"), s);
+        for (name, api) in &apis.custom {
+            let mut state = ProcessedState::default();
+            state.aggregate(api);
+            self.aux.insert(name.clone(), state);
         }
     }
 
     #[must_use]
-    pub(crate) fn apply<'a>(
-        &mut self,
-        op: VerifiedOperation,
-        default_api: &Api,
-        custom_apis: impl IntoIterator<Item = &'a Api>,
-        sys: &TypeSystem,
-    ) -> Transition {
-        self.main.apply(&op, default_api, sys);
-        for api in custom_apis {
-            // TODO: Remove name from API itself.
-            // Skip default API (it is already processed as `main` above)
-            let Some(name) = api.name() else {
-                continue;
-            };
+    pub(crate) fn apply(&mut self, op: VerifiedOperation, apis: &ApiDescriptor) -> Transition {
+        self.main.apply(&op, &apis.default, &apis.types);
+        for (name, api) in &apis.custom {
             let state = self.aux.entry(name.clone()).or_default();
-            state.apply(&op, api, sys);
+            state.apply(&op, api, &apis.types);
         }
         self.raw.apply(op)
     }
 
-    pub(crate) fn rollback<'a>(
-        &mut self,
-        transition: Transition,
-        default_api: &Api,
-        custom_apis: impl IntoIterator<Item = &'a Api>,
-        sys: &TypeSystem,
-    ) {
-        self.main.rollback(&transition, default_api, sys);
+    pub(crate) fn rollback(&mut self, transition: Transition, apis: &ApiDescriptor) {
+        self.main.rollback(&transition, &apis.default, &apis.types);
         let mut count = 0usize;
-        for api in custom_apis {
-            // Skip the default API (it is already processed as `main` above)
-            let Some(name) = api.name() else {
-                continue;
-            };
+        for (name, api) in &apis.custom {
             let state = self.aux.get_mut(name).expect("unknown aux API");
-            state.rollback(&transition, api, sys);
+            state.rollback(&transition, api, &apis.types);
             count += 1;
         }
         debug_assert_eq!(count, self.aux.len());
@@ -170,7 +135,7 @@ impl EffectiveState {
 pub struct RawState {
     /// Tokens of authority
     pub auth: LargeOrdMap<AuthToken, CellAddr>,
-    pub immutable: LargeOrdMap<CellAddr, StateData>,
+    pub global: LargeOrdMap<CellAddr, StateData>,
     pub owned: LargeOrdMap<CellAddr, StateCell>,
 }
 
@@ -178,8 +143,8 @@ impl StrictSerialize for RawState {}
 impl StrictDeserialize for RawState {}
 
 impl Memory for RawState {
-    fn read_once(&self, addr: CellAddr) -> Option<StateCell> { self.owned.get(&addr).copied() }
-    fn immutable(&self, addr: CellAddr) -> Option<StateValue> { self.immutable.get(&addr).map(|data| data.value) }
+    fn destructible(&self, addr: CellAddr) -> Option<StateCell> { self.owned.get(&addr).copied() }
+    fn immutable(&self, addr: CellAddr) -> Option<StateValue> { self.global.get(&addr).map(|data| data.value) }
 }
 
 impl RawState {
@@ -196,7 +161,7 @@ impl RawState {
         let op = op.into_operation();
         let mut transition = Transition::new(opid);
 
-        for input in op.destroying {
+        for input in op.destructible_in {
             let res = self
                 .owned
                 .remove(&input.addr)
@@ -211,7 +176,7 @@ impl RawState {
             debug_assert!(res.is_none());
         }
 
-        for (no, cell) in op.destructible.into_iter().enumerate() {
+        for (no, cell) in op.destructible_out.into_iter().enumerate() {
             let addr = CellAddr::new(opid, no as u16);
             self.auth
                 .insert(cell.auth, addr)
@@ -219,9 +184,9 @@ impl RawState {
             self.owned.insert(addr, cell).expect("state too large");
         }
 
-        self.immutable
+        self.global
             .extend(
-                op.immutable
+                op.immutable_out
                     .into_iter()
                     .enumerate()
                     .map(|(no, data)| (CellAddr::new(opid, no as u16), data)),
@@ -234,11 +199,11 @@ impl RawState {
     pub(self) fn rollback(&mut self, transition: Transition) {
         let opid = transition.opid;
 
-        let mut immutable = mem::take(&mut self.immutable);
+        let mut immutable = mem::take(&mut self.global);
         let mut owned = mem::take(&mut self.owned);
         immutable = LargeOrdMap::from_iter_checked(immutable.into_iter().filter(|(addr, _)| addr.opid != opid));
         owned = LargeOrdMap::from_iter_checked(owned.into_iter().filter(|(addr, _)| addr.opid != opid));
-        self.immutable = immutable;
+        self.global = immutable;
         self.owned = owned;
 
         // TODO: Use `retain` instead of the above workaround once supported by amplify
@@ -255,68 +220,59 @@ impl RawState {
 
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
-pub struct AdaptedState {
+pub struct ProcessedState {
     pub immutable: BTreeMap<StateName, BTreeMap<CellAddr, StateAtom>>,
-    pub owned: BTreeMap<StateName, BTreeMap<CellAddr, StrictVal>>,
-    pub computed: BTreeMap<StateName, StrictVal>,
+    pub destructible: BTreeMap<StateName, BTreeMap<CellAddr, StrictVal>>,
+    pub aggregated: BTreeMap<StateName, StrictVal>,
+    pub invalid_immutable: BTreeMap<CellAddr, StateData>,
+    pub invalid_destructible: BTreeMap<CellAddr, StateValue>,
 }
 
-impl AdaptedState {
+impl ProcessedState {
     pub fn with(raw: &RawState, api: &Api, sys: &TypeSystem) -> Self {
-        let mut me = AdaptedState::default();
-        for (addr, state) in &raw.immutable {
-            if let Some((name, atom)) = api.convert_immutable(state, sys) {
-                me.immutable.entry(name).or_default().insert(*addr, atom);
-            }
+        let mut me = ProcessedState::default();
+        for (addr, state) in &raw.global {
+            me.process_immutable(*addr, state, api, sys);
         }
         for (addr, state) in &raw.owned {
-            if let Some((name, atom)) = api.convert_destructible(state.data, sys) {
-                me.owned.entry(name).or_default().insert(*addr, atom);
-            }
+            me.process_destructible(*addr, state, api, sys);
         }
         me
     }
 
     pub fn immutable(&self, name: &StateName) -> Option<&BTreeMap<CellAddr, StateAtom>> { self.immutable.get(name) }
 
-    pub fn owned(&self, name: &StateName) -> Option<&BTreeMap<CellAddr, StrictVal>> { self.owned.get(name) }
+    pub fn destructible(&self, name: &StateName) -> Option<&BTreeMap<CellAddr, StrictVal>> {
+        self.destructible.get(name)
+    }
 
-    pub(super) fn compute(&mut self, api: &Api) {
+    pub(super) fn aggregate(&mut self, api: &Api) {
         let empty = bmap![];
-        self.computed = bmap! {};
-        for reader in api.readers() {
-            let val = api.read(reader, |name| match self.immutable(name) {
+        self.aggregated = bmap! {};
+        for (name, aggregator) in api.aggregators() {
+            let val = aggregator.read(|state_name| match self.immutable(state_name) {
                 None => empty.values(),
                 Some(src) => src.values(),
             });
-            self.computed.insert(reader.clone(), val);
+            self.aggregated.insert(name.clone(), val);
         }
     }
 
     pub(self) fn apply(&mut self, op: &VerifiedOperation, api: &Api, sys: &TypeSystem) {
         let opid = op.opid();
         let op = op.as_operation();
-        for (no, state) in op.immutable.iter().enumerate() {
-            if let Some((name, atom)) = api.convert_immutable(state, sys) {
-                self.immutable
-                    .entry(name)
-                    .or_default()
-                    .insert(CellAddr::new(opid, no as u16), atom);
-            }
-            // TODO: Warn if no state is present
+        for (no, state) in op.immutable_out.iter().enumerate() {
+            let addr = CellAddr::new(opid, no as u16);
+            self.process_immutable(addr, state, api, sys);
         }
-        for input in &op.destroying {
-            for map in self.owned.values_mut() {
+        for input in &op.destructible_in {
+            for map in self.destructible.values_mut() {
                 map.remove(&input.addr);
             }
         }
-        for (no, state) in op.destructible.iter().enumerate() {
-            if let Some((name, atom)) = api.convert_destructible(state.data, sys) {
-                self.owned
-                    .entry(name)
-                    .or_default()
-                    .insert(CellAddr::new(opid, no as u16), atom);
-            }
+        for (no, state) in op.destructible_out.iter().enumerate() {
+            let addr = CellAddr::new(opid, no as u16);
+            self.process_destructible(addr, state, api, sys);
         }
     }
 
@@ -326,35 +282,41 @@ impl AdaptedState {
         self.immutable
             .values_mut()
             .for_each(|state| state.retain(|addr, _| addr.opid != opid));
-        self.owned
+        self.destructible
             .values_mut()
             .for_each(|state| state.retain(|addr, _| addr.opid != opid));
 
         for (addr, cell) in &transition.destroyed {
-            if let Some((name, value)) = api.convert_destructible(cell.data, sys) {
-                self.owned.entry(name).or_default().insert(*addr, value);
+            self.process_destructible(*addr, cell, api, sys);
+        }
+    }
+
+    fn process_immutable(&mut self, addr: CellAddr, state: &StateData, api: &Api, sys: &TypeSystem) {
+        match api.convert_immutable(state, sys) {
+            // This means this state is unrelated to this API
+            Ok(None) => {}
+            Ok(Some((name, atom))) => {
+                self.immutable.entry(name).or_default().insert(addr, atom);
+            }
+            Err(_) => {
+                self.invalid_immutable.insert(addr, state.clone());
             }
         }
     }
-}
 
-#[cfg(feature = "std")]
-mod _fs {
-    use std::path::Path;
-
-    use amplify::confinement::U24 as U24MAX;
-    use strict_encoding::{DeserializeError, SerializeError, StrictDeserialize, StrictSerialize};
-
-    use super::RawState;
-
-    // TODO: Use BinFile
-    impl RawState {
-        pub fn load(path: impl AsRef<Path>) -> Result<Self, DeserializeError> {
-            Self::strict_deserialize_from_file::<U24MAX>(path)
-        }
-
-        pub fn save(&self, path: impl AsRef<Path>) -> Result<(), SerializeError> {
-            self.strict_serialize_to_file::<U24MAX>(path)
+    fn process_destructible(&mut self, addr: CellAddr, state: &StateCell, api: &Api, sys: &TypeSystem) {
+        match api.convert_destructible(state.data, sys) {
+            // This means this state is unrelated to this API
+            Ok(None) => {}
+            Ok(Some((name, atom))) => {
+                self.destructible
+                    .entry(name)
+                    .or_default()
+                    .insert(addr, atom);
+            }
+            Err(_) => {
+                self.invalid_destructible.insert(addr, state.data);
+            }
         }
     }
 }

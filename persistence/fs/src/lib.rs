@@ -21,31 +21,9 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use amplify::confinement::{SmallBlob, TinyOrdMap};
-use commit_verify::StrictHash;
-use strict_encoding::stl::{AlphaCaps, AlphaNumDash};
-use strict_encoding::RString;
+#[macro_use]
+extern crate amplify;
 
-use crate::LIB_NAME_SONIC;
+mod fs;
 
-#[derive(Wrapper, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, From, Display)]
-#[wrapper(Deref, FromStr)]
-#[display(inner)]
-#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONIC)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(transparent))]
-pub struct AnnotationName(RString<AlphaCaps, AlphaNumDash>);
-
-impl From<&'static str> for AnnotationName {
-    fn from(s: &'static str) -> Self { Self(RString::from(s)) }
-}
-
-#[derive(Wrapper, WrapperMut, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default, From)]
-#[wrapper(Deref)]
-#[wrapper_mut(DerefMut)]
-#[derive(CommitEncode)]
-#[commit_encode(strategy = strict, id = StrictHash)]
-#[derive(StrictType, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONIC)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct Annotations(TinyOrdMap<AnnotationName, SmallBlob>);
+pub use fs::{FsError, LedgerDir, StockFs};

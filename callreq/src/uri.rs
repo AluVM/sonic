@@ -32,7 +32,6 @@ use baid64::base64::engine::{DecodePaddingMode, GeneralPurpose, GeneralPurposeCo
 use baid64::base64::{DecodeError, Engine};
 use baid64::BAID64_ALPHABET;
 use chrono::{DateTime, Utc};
-use fluent_uri::error::ParseError;
 use fluent_uri::Uri;
 use indexmap::IndexMap;
 use percent_encoding::{percent_decode, utf8_percent_encode, AsciiSet, CONTROLS};
@@ -66,7 +65,7 @@ where
     A: Display,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}/", &self.scope)?;
+        write!(f, "contract:{}@{:-}/", self.layer1, self.scope)?;
         if let Some(api) = &self.api {
             write!(f, "{api}/")?;
         }
@@ -124,7 +123,7 @@ where
     T::Err: Error,
     A::Err: Error,
 {
-    type Err = CallReqParseError<T::Err, A::Err>;
+    type Err = ParseError<T::Err, A::Err>;
 
     /// # Special conditions
     ///
@@ -134,32 +133,27 @@ where
 
         let scheme = uri.scheme();
         if scheme.as_str() != URI_SCHEME {
-            return Err(CallReqParseError::SchemeInvalid(scheme.to_string()));
+            return Err(ParseError::SchemeInvalid(scheme.to_string()));
         }
 
         let path = uri.path();
         if path.is_absolute() || uri.authority().is_some() {
-            return Err(CallReqParseError::Authority);
+            return Err(ParseError::Authority);
         }
 
         let mut path = path.split('/').collect::<VecDeque<_>>();
 
-        let scope = path
-            .pop_front()
-            .ok_or(CallReqParseError::ScopeMissed)?
-            .as_str()
-            .parse()
-            .map_err(CallReqParseError::Scope)?;
+        let scope = path.pop_front().ok_or(ParseError::ScopeMissed)?.as_str();
+        let (layer1, scope) = scope.split_once('@').ok_or(ParseError::NoLayer1)?;
+        let layer1 = layer1.parse().map_err(|_| ParseError::Layer1)?;
+        let scope = scope.parse().map_err(ParseError::Scope)?;
 
-        let empty = path.pop_back().ok_or(CallReqParseError::PathNoAuth)?;
+        let empty = path.pop_back().ok_or(ParseError::PathNoAuth)?;
         if !empty.is_empty() {
-            return Err(CallReqParseError::PathLastNoEmpty);
+            return Err(ParseError::PathLastNoEmpty);
         }
 
-        let value_auth = path
-            .pop_back()
-            .ok_or(CallReqParseError::PathNoAuth)?
-            .as_str();
+        let value_auth = path.pop_back().ok_or(ParseError::PathNoAuth)?.as_str();
         let (data, auth) =
             if let Some((data, auth)) = value_auth.split_once('@') { (Some(data), auth) } else { (None, value_auth) };
         let data = data.map(|data| {
@@ -167,28 +161,20 @@ where
                 .map(StrictVal::num)
                 .unwrap_or_else(|_| StrictVal::str(data))
         });
-        let auth = auth.parse().map_err(CallReqParseError::AuthInvalid)?;
+        let auth = auth.parse().map_err(ParseError::AuthInvalid)?;
 
         let api = path
             .pop_front()
             .map(|s| s.as_str().parse())
             .transpose()
-            .map_err(CallReqParseError::ApiInvalid)?;
+            .map_err(ParseError::ApiInvalid)?;
         let method = path.pop_front();
         let state = path.pop_front();
         let mut call = None;
         if let Some(method) = method {
-            let method = method
-                .as_str()
-                .parse()
-                .map_err(CallReqParseError::MethodInvalid)?;
+            let method = method.as_str().parse().map_err(ParseError::MethodInvalid)?;
             let destructible = if let Some(state) = state {
-                Some(
-                    state
-                        .as_str()
-                        .parse()
-                        .map_err(CallReqParseError::StateInvalid)?,
-                )
+                Some(state.as_str().parse().map_err(ParseError::StateInvalid)?)
             } else {
                 None
             };
@@ -208,7 +194,7 @@ where
                         .to_string();
                     query_params.insert(key, value);
                 } else {
-                    return Err(CallReqParseError::QueryParamInvalid(p.to_string()));
+                    return Err(ParseError::QueryParamInvalid(p.to_string()));
                 }
             }
         }
@@ -223,8 +209,8 @@ where
                 );
                 let lock = engine
                     .decode(lock.as_bytes())
-                    .map_err(CallReqParseError::LockInvalidEncoding)?;
-                TinyBlob::try_from(lock).map_err(|_| CallReqParseError::LockTooLong)
+                    .map_err(ParseError::LockInvalidEncoding)?;
+                TinyBlob::try_from(lock).map_err(|_| ParseError::LockTooLong)
             })
             .transpose()?;
 
@@ -245,6 +231,7 @@ where
 
         Ok(Self {
             scope,
+            layer1,
             api,
             call,
             auth,
@@ -259,10 +246,10 @@ where
 
 #[derive(Debug, Display, Error, From)]
 #[display(doc_comments)]
-pub enum CallReqParseError<E1: Error, E2: Error> {
+pub enum ParseError<E1: Error, E2: Error> {
     #[from]
     #[display(inner)]
-    Uri(ParseError),
+    Uri(fluent_uri::error::ParseError),
 
     /// invalid contract call request URI scheme '{0}'.
     SchemeInvalid(String),
@@ -273,13 +260,19 @@ pub enum CallReqParseError<E1: Error, E2: Error> {
     #[display(inner)]
     Scope(E1),
 
+    /// absent information about layer 1
+    NoLayer1,
+
+    /// unrecognized layer 1 identifier
+    Layer1,
+
     /// contract call request scope (first path component) is missed.
     ScopeMissed,
 
     /// contract call request path must end with `/`
     PathLastNoEmpty,
 
-    /// contract call request URI misses beneficiary authority token.
+    /// contract call request URI misses the beneficiary authority token.
     PathNoAuth,
 
     /// invalid beneficiary authentication token - {0}.
@@ -310,6 +303,7 @@ pub enum CallReqParseError<E1: Error, E2: Error> {
 
 #[cfg(test)]
 mod test {
+    #![cfg_attr(coverage_nightly, coverage(off))]
     use ultrasonic::{AuthToken, ContractId};
 
     use super::*;
@@ -317,7 +311,7 @@ mod test {
     #[test]
     fn parse() {
         let req = CallRequest::<ContractId, AuthToken>::from_str(
-            "contract:qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw/10@at:\
+            "contract:tb@qKpMlzOe-Imn6ysZ-a8JjG2p-WHWvaFm-BWMiPi3-_LvnfRw/10@at:\
              5WIb5EMY-RCLbO3Wq-hGdddRP4-IeCQzP1y-S5H_UKzd-ViYmlA/",
         )
         .unwrap();

@@ -34,9 +34,9 @@ use std::path::Path;
 use aluvm::{CoreConfig, LibSite};
 use amplify::num::u256;
 use commit_verify::{Digest, Sha256};
-use hypersonic::embedded::{EmbeddedArithm, EmbeddedImmutable, EmbeddedProc, EmbeddedReaders};
-use hypersonic::persistance::LedgerDir;
-use hypersonic::{Api, ApiInner, AppendApi, DestructibleApi, Schema};
+use hypersonic::{Api, DestructibleApi, ImmutableApi};
+use sonic_persist_fs::LedgerDir;
+use sonicapi::{Issuer, RawBuilder, RawConvertor, StateAggregator, StateArithm, StateBuilder, StateConvertor};
 use strict_types::{SemId, StrictVal};
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
 use ultrasonic::{AuthToken, CellAddr, Codex, Consensus, Identity};
@@ -57,7 +57,6 @@ fn codex() -> Codex {
             1 => LibSite::new(lib_id, 0),
             2 => LibSite::new(lib_id, 0),
         },
-        reserved: default!(),
     }
 }
 
@@ -66,46 +65,53 @@ fn api() -> Api {
 
     let codex = codex();
 
-    Api::Embedded(ApiInner::<EmbeddedProc> {
+    Api {
         version: default!(),
         codex_id: codex.codex_id(),
-        timestamp: 1732529307,
-        name: None,
         developer: Identity::default(),
         conforms: None,
         default_call: None,
-        append_only: tiny_bmap! {
-            vname!("_parties") => AppendApi {
+        immutable: tiny_bmap! {
+            vname!("_parties") => ImmutableApi {
+                published: true,
                 sem_id: types.get("DAO.PartyId"),
-                raw_sem_id: types.get("DAO.Party"),
-                published: true,
-                adaptor: EmbeddedImmutable(u256::ZERO),
+                convertor: StateConvertor::TypedEncoder(u256::ZERO),
+                builder: StateBuilder::TypedEncoder(u256::ZERO),
+                raw_convertor: RawConvertor::StrictDecode(types.get("DAO.Party")),
+                raw_builder: RawBuilder::StrictEncode(types.get("DAO.Party")),
             },
-            vname!("_votings") => AppendApi {
+            vname!("_votings") => ImmutableApi {
+                published: true,
                 sem_id: types.get("DAO.VoteId"),
-                raw_sem_id: types.get("DAO.Voting"),
-                published: true,
-                adaptor: EmbeddedImmutable(u256::ONE),
+                convertor: StateConvertor::TypedEncoder(u256::ONE),
+                builder: StateBuilder::TypedEncoder(u256::ONE),
+                raw_convertor: RawConvertor::StrictDecode(types.get("DAO.Voting")),
+                raw_builder: RawBuilder::StrictEncode(types.get("DAO.Voting")),
             },
-            vname!("_votes") => AppendApi {
-                sem_id: types.get("DAO.CastVote"),
-                raw_sem_id: SemId::unit(),
+            vname!("_votes") => ImmutableApi {
                 published: true,
-                adaptor: EmbeddedImmutable(u256::from(2u8)),
+                sem_id: types.get("DAO.CastVote"),
+                convertor: StateConvertor::TypedEncoder(u256::from(2u8)),
+                builder: StateBuilder::TypedEncoder(u256::from(2u8)),
+                raw_convertor: RawConvertor::StrictDecode(SemId::unit()),
+                raw_builder: RawBuilder::StrictEncode(SemId::unit()),
             },
         },
         destructible: tiny_bmap! {
             vname!("signers") => DestructibleApi {
                 sem_id: types.get("DAO.PartyId"),
-                arithmetics: EmbeddedArithm::NonFungible,
-                adaptor: EmbeddedImmutable(u256::ZERO),
+                arithmetics: StateArithm::NonFungible,
+                convertor: StateConvertor::TypedEncoder(u256::ZERO),
+                builder: StateBuilder::TypedEncoder(u256::ZERO),
+                witness_sem_id: SemId::unit(),
+                witness_builder: StateBuilder::TypedEncoder(u256::ZERO),
             }
         },
-        readers: tiny_bmap! {
-            vname!("parties") => EmbeddedReaders::MapV2U(vname!("_parties")),
-            vname!("votings") => EmbeddedReaders::MapV2U(vname!("_votings")),
-            vname!("votes") => EmbeddedReaders::SetV(vname!("_votes")),
-            vname!("votingCount") => EmbeddedReaders::Count(vname!("_votings")),
+        aggregators: tiny_bmap! {
+            vname!("parties") => StateAggregator::MapV2U(vname!("_parties")),
+            vname!("votings") => StateAggregator::MapV2U(vname!("_votings")),
+            vname!("votes") => StateAggregator::SetV(vname!("_votes")),
+            vname!("votingCount") => StateAggregator::Count(vname!("_votings")),
         },
         verifiers: tiny_bmap! {
             vname!("setup") => 0,
@@ -114,7 +120,7 @@ fn api() -> Api {
         },
         errors: Default::default(),
         reserved: Default::default(),
-    })
+    }
 }
 
 fn main() {
@@ -123,12 +129,12 @@ fn main() {
     let api = api();
 
     // Creating DAO with three participants
-    let issuer = Schema::new(codex, api, [libs::success()], types.type_system());
+    let issuer = Issuer::new(codex, api, [libs::success()], types.type_system());
     let filename = "examples/dao/data/SimpleDAO.issuer";
     fs::remove_file(filename).ok();
     issuer
         .save(filename)
-        .expect("unable to save issuer to a file");
+        .expect("unable to save an issuer to a file");
 
     let seed = &[0xCA; 30][..];
     let mut auth = Sha256::digest(seed);
@@ -156,7 +162,7 @@ fn main() {
         .assign("signers", carol_auth, svnum!(2u64), None)
 
         .finish("WonderlandDAO", 1732529307);
-    let opid = articles.issue.genesis_opid();
+    let opid = articles.genesis_opid();
 
     let contract_path = Path::new("examples/dao/data/WonderlandDAO.contract");
     if contract_path.exists() {
@@ -183,7 +189,7 @@ fn main() {
     // Alice vote against her being on duty today
     ledger
         .start_deed("castVote")
-        .using(CellAddr::new(opid, 0), svnum!(0u64))
+        .using(CellAddr::new(opid, 0))
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(0u8), partyId 0u64), None)
         .assign("signers", alice_auth2, svnum!(0u64), None)
@@ -193,7 +199,7 @@ fn main() {
     // Bob and Carol vote for Alice being on duty today
     ledger
         .start_deed("castVote")
-        .using(CellAddr::new(opid, 1), svnum!(1u64))
+        .using(CellAddr::new(opid, 1))
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 1u64), None)
         .assign("signers", bob_auth2, svnum!(1u64), None)
@@ -201,7 +207,7 @@ fn main() {
         .unwrap();
     ledger
         .start_deed("castVote")
-        .using(CellAddr::new(opid, 2), svnum!(2u64))
+        .using(CellAddr::new(opid, 2))
         .reading(CellAddr::new(votings, 0))
         .append("_votes", ston!(voteId 100u64, vote svenum!(1u8), partyId 2u64), None)
         .assign("signers", carol_auth2, svnum!(2u64), None)

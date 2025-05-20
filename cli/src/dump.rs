@@ -21,39 +21,62 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::fs::File;
+use std::io::Write;
 use std::path::Path;
 
+use amplify::confinement::U24 as U24MAX;
 use anyhow::Context;
-use hypersonic::persistance::LedgerDir;
-use hypersonic::{Articles, Opid};
+use baid64::DisplayBaid64;
+use hypersonic::{Articles, CellAddr, Instr, Opid};
+use serde::{Deserialize, Serialize};
+use sonic_persist_fs::LedgerDir;
+use strict_encoding::StrictSerialize;
 
 pub fn dump_articles(articles: &Articles, dst: &Path) -> anyhow::Result<Opid> {
-    let genesis_opid = articles.issue.genesis_opid();
+    let genesis_opid = articles.genesis_opid();
     let out = File::create_new(dst.join(format!("0000-genesis-{genesis_opid}.yaml")))
         .context("can't create dump files; try to use the `--force` flag")?;
-    serde_yaml::to_writer(&out, &articles.issue.genesis)?;
+    serde_yaml::to_writer(&out, articles.genesis())?;
 
     let out = File::create_new(dst.join("meta.yaml"))?;
-    serde_yaml::to_writer(&out, &articles.issue.meta)?;
+    serde_yaml::to_writer(&out, &articles.issue().meta)?;
 
-    let out = File::create_new(dst.join(format!("codex-{:#}.yaml", articles.issue.codex.codex_id())))?;
-    serde_yaml::to_writer(&out, &articles.issue.codex)?;
+    let out = File::create_new(dst.join(format!("codex-{:#}.yaml", articles.codex_id())))?;
+    serde_yaml::to_writer(&out, articles.codex())?;
 
-    let out = File::create_new(dst.join("api.default.yaml"))?;
-    serde_yaml::to_writer(&out, &articles.schema.default_api)?;
+    let out = File::create_new(dst.join("api-default.yaml"))?;
+    serde_yaml::to_writer(&out, articles.default_api())?;
 
-    for (api, _) in &articles.schema.custom_apis {
-        let out = File::create_new(dst.join(format!("api.{}.yaml", api.name().expect("invalid api"))))?;
+    for (name, api) in articles.custom_apis() {
+        let out = File::create_new(dst.join(format!("api-{name}.yaml")))?;
         serde_yaml::to_writer(&out, &api)?;
     }
 
-    // TODO: Process all content sigs
-    // TODO: Process type system
-    // TODO: Process AluVM libraries
+    for lib in &articles.apis().libs {
+        let lib_id = lib.lib_id();
+        let name = lib_id.to_baid64_mnemonic();
+        lib.strict_serialize_to_file::<U24MAX>(dst.join(format!("{name}.alu")))?;
+        let out = File::create_new(dst.join(format!("{name}.aluasm")))?;
+        lib.print_disassemble::<Instr<_>>(out)?;
+    }
+
+    articles
+        .types()
+        .strict_serialize_to_file::<U24MAX>(dst.join("types.sts"))?;
+    let mut out = File::create_new(dst.join("types.sty"))?;
+    write!(out, "{}", articles.types())?;
 
     Ok(genesis_opid)
+}
+
+#[derive(Clone, Debug, Default)]
+#[derive(Serialize, Deserialize)]
+pub struct OpLinks {
+    pub readers: BTreeMap<u16, Opid>,
+    pub spenders: BTreeMap<u16, Opid>,
 }
 
 pub fn dump_ledger(src: impl AsRef<Path>, dst: impl AsRef<Path>, force: bool) -> anyhow::Result<()> {
@@ -79,6 +102,22 @@ pub fn dump_ledger(src: impl AsRef<Path>, dst: impl AsRef<Path>, force: bool) ->
     for (no, (opid, op)) in ledger.operations().enumerate() {
         let out = File::create_new(dst.join(format!("{:04}-op-{opid}.yaml", no + 1)))?;
         serde_yaml::to_writer(&out, &op)?;
+        let out = File::create_new(dst.join(format!("{:04}-links-{opid}.yaml", no + 1)))?;
+        let mut links = OpLinks::default();
+        for no in 0..op.immutable_out.len_u16() {
+            links.readers.extend(
+                ledger
+                    .read_by(CellAddr::new(opid, no))
+                    .map(|child| (no, child)),
+            );
+        }
+        for no in 0..op.destructible_out.len_u16() {
+            let Some(child) = ledger.spent_by(CellAddr::new(opid, no)) else {
+                continue;
+            };
+            links.spenders.insert(no, child);
+        }
+        serde_yaml::to_writer(&out, &links)?;
         print!("\rProcessing operations ... {} processed", no + 1);
     }
     println!();

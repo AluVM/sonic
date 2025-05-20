@@ -21,8 +21,21 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![cfg_attr(not(feature = "std"), no_std)]
+#![deny(
+    unsafe_code,
+    dead_code,
+    // TODO: Complete documentation
+    // missing_docs,
+    unused_variables,
+    unused_mut,
+    unused_imports,
+    non_upper_case_globals,
+    non_camel_case_types,
+    non_snake_case
+)]
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 //! _Request_ (or _transaction request_) is a specification on constructing a transaction for a
 //! SONARE contract.
@@ -59,9 +72,9 @@ extern crate core;
 
 mod data;
 #[cfg(feature = "uri")]
-mod uri;
+pub mod uri;
 mod builder;
 
-pub use data::{CallRequest, CallScope, CallState, Endpoint, MethodName, StateName};
+pub use data::{CallRequest, CallScope, CallState, Endpoint, Layer1, MethodName, ParseLayer1Error, StateName};
 
 pub const LIB_NAME_SONIC: &str = "SONIC";

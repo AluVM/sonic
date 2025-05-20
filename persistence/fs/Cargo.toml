@@ -1,0 +1,28 @@
+[package]
+name = "sonic-persist-fs"
+version.workspace = true
+authors.workspace = true
+description = "Filesystem persistence for SONIC smart contracts"
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories = ["algorithms", "cryptography", "science", "no-std"]
+readme.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+exclude = [".github"]
+
+[dependencies]
+amplify = { workspace = true, features = ["serde"] }
+strict_encoding = { workspace = true, features = ["serde"] }
+hypersonic = { workspace = true, features = ["serde", "binfile"] }
+aora.workspace = true
+binfile.workspace = true
+serde_yaml.workspace = true
+toml.workspace = true
+
+[features]
+
+[lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(coverage_nightly)'] }
