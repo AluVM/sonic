@@ -153,7 +153,7 @@ fn export(dir: PathBuf, terminals: impl IntoIterator<Item = AuthToken>, output: 
 }
 
 fn accept(dir: PathBuf, input: PathBuf) -> anyhow::Result<()> {
-    // TODO: Use some real signature validator
+    // TODO: (v0.13) Use some real signature validator
     pub struct DumbValidator;
     impl SigValidator for DumbValidator {
         fn validate_sig(&self, _: impl Into<[u8; 32]>, _: &Identity, _: &SigBlob) -> Result<u64, impl Error> {

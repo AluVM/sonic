@@ -4,7 +4,7 @@ default-members = [".", "api", "callreq", "persistence/fs"]
 resolver = "2"
 
 [workspace.package]
-version = "0.12.0-beta.6"
+version = "0.12.0-rc.1"
 authors = ["Dr Maxim Orlovsky <orlovsky@ubideco.org>"]
 repository = "https://github.com/AluVM/sonare"
 homepage = "https://ubideco.org/SONARE"
@@ -15,16 +15,16 @@ edition = "2021"
 rust-version = "1.82.0" # Due to precise capturing with `use`
 
 [workspace.dependencies]
-amplify = "~4.8.1"
-strict_encoding = "~2.8.2"
-strict_types = "~2.8.3"
-commit_verify = "=0.12.0-beta.6"
-aluvm = "=0.12.0-beta.6"
-ultrasonic = "=0.12.0-beta.6"
-sonic-api = { version = "=0.12.0-beta.6", path = "api" }
-sonic-callreq = { version = "=0.12.0-beta.6", path = "callreq" }
-sonic-persist-fs = { version = "=0.12.0-beta.6", path = "persistence/fs" }
-hypersonic = { version = "=0.12.0-beta.6", path = "." }
+amplify = "~4.9.0"
+strict_encoding = "~2.9.1"
+strict_types = "~2.9.0"
+commit_verify = "0.12.0-rc.1"
+aluvm = "0.12.0-rc.1"
+ultrasonic = "0.12.0-rc.1"
+sonic-api = { version = "0.12.0-rc.1", path = "api" }
+sonic-callreq = { version = "0.12.0-rc.1", path = "callreq" }
+sonic-persist-fs = { version = "0.12.0-rc.1", path = "persistence/fs" }
+hypersonic = { version = "0.12.0-rc.1", path = "." }
 aora = ">=0.6.3"
 binfile = "0.2.0"
 baid64 = "0.4.1"
@@ -116,9 +116,3 @@ features = ["all"]
 
 [lints.rust]
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(coverage_nightly)'] }
-
-[patch.crates-io]
-commit_verify = { git = "https://github.com/LNP-BP/client_side_validation", branch = "revision" }
-aluvm = { git = "https://github.com/AluVM/aluvm", branch = "revision" }
-zk-aluvm = { git = "https://github.com/AluVM/zk-aluvm", branch = "revision" }
-ultrasonic = { git = "https://github.com/AluVM/ultrasonic", branch = "revision" }

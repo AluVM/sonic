@@ -26,6 +26,7 @@ use core::borrow::Borrow;
 use std::io;
 
 use amplify::hex::ToHex;
+use amplify::MultiError;
 use indexmap::IndexSet;
 use sonic_callreq::MethodName;
 use sonicapi::{Api, ApiDescriptor, ArticlesError, NamedState, OpBuilder, SigValidator};
@@ -35,7 +36,7 @@ use strict_encoding::{
 use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Issue, Operation, Opid, VerifiedOperation};
 
 use crate::deed::{CallParams, DeedBuilder};
-use crate::{Articles, EffectiveState, EitherError, IssueError, ProcessedState, Stock, Transition};
+use crate::{Articles, EffectiveState, IssueError, ProcessedState, Stock, Transition};
 
 pub const LEDGER_MAGIC_NUMBER: [u8; 8] = *b"DEEDLDGR";
 pub const LEDGER_VERSION: [u8; 2] = [0x00, 0x01];
@@ -58,12 +59,12 @@ impl<S: Stock> Ledger<S> {
     /// # Blocking I/O
     ///
     /// This call MAY perform any I/O operations.
-    pub fn new(articles: Articles, conf: S::Conf) -> Result<Self, EitherError<IssueError, S::Error>> {
+    pub fn new(articles: Articles, conf: S::Conf) -> Result<Self, MultiError<IssueError, S::Error>> {
         let contract_id = articles.contract_id();
         let state = EffectiveState::with_articles(&articles)
             .map_err(|e| IssueError::Genesis(articles.issue().meta.name.clone(), e))
-            .map_err(EitherError::A)?;
-        let mut stock = S::new(articles, state, conf).map_err(EitherError::B)?;
+            .map_err(MultiError::A)?;
+        let mut stock = S::new(articles, state, conf).map_err(MultiError::B)?;
         let genesis_opid = stock.articles().genesis_opid();
         stock.mark_valid(genesis_opid);
         stock.commit_transaction();
@@ -165,7 +166,7 @@ impl<S: Stock> Ledger<S> {
     #[inline]
     pub fn operation(&self, opid: Opid) -> Operation { self.0.operation(opid) }
 
-    /// Returns an iterator over all operations known to the contract (i.e. the complete contract
+    /// Returns an iterator over all operations known to the contract (i.e., the complete contract
     /// stash).
     ///
     /// # Nota bene
@@ -300,7 +301,7 @@ impl<S: Stock> Ledger<S> {
         self.export_aux(terminals, writer, |_, _, w| Ok(w))
     }
 
-    // TODO: Return statistics
+    // TODO: (v0.13) Return statistics
     pub fn export_aux<W: WriteRaw>(
         &self,
         terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
@@ -377,7 +378,7 @@ impl<S: Stock> Ledger<S> {
         &mut self,
         new_articles: Articles,
         sig_validator: V,
-    ) -> Result<(), EitherError<ArticlesError, S::Error>> {
+    ) -> Result<(), MultiError<ArticlesError, S::Error>> {
         self.0.update_articles(|articles| {
             articles.merge(new_articles, sig_validator)?;
             Ok(())
@@ -388,7 +389,7 @@ impl<S: Stock> Ledger<S> {
         &mut self,
         reader: &mut StrictReader<impl ReadRaw>,
         sig_validator: impl SigValidator,
-    ) -> Result<(), EitherError<AcceptError, S::Error>> {
+    ) -> Result<(), MultiError<AcceptError, S::Error>> {
         // We need this closure to avoid multiple `map_err`.
         (|| -> Result<(), AcceptError> {
             let magic_bytes = <[u8; 8]>::strict_decode(reader)?;
@@ -420,13 +421,13 @@ impl<S: Stock> Ledger<S> {
                 .map_err(|e| AcceptError::Persistence(e.to_string()))?;
             Ok(())
         })()
-        .map_err(EitherError::A)?;
+        .map_err(MultiError::A)?;
 
         loop {
             let op = match Operation::strict_decode(reader) {
                 Ok(operation) => operation,
                 Err(DecodeError::Io(e)) if e.kind() == io::ErrorKind::UnexpectedEof => break,
-                Err(e) => return Err(EitherError::A(e.into())),
+                Err(e) => return Err(MultiError::A(e.into())),
             };
             self.apply_verify(op, false)?;
         }
@@ -458,7 +459,7 @@ impl<S: Stock> Ledger<S> {
         Ok(())
     }
 
-    pub fn forward(&mut self, opids: impl IntoIterator<Item = Opid>) -> Result<(), EitherError<AcceptError, S::Error>> {
+    pub fn forward(&mut self, opids: impl IntoIterator<Item = Opid>) -> Result<(), MultiError<AcceptError, S::Error>> {
         for opid in self.descendants(opids) {
             debug_assert!(!self.is_valid(opid));
             if self
@@ -480,7 +481,7 @@ impl<S: Stock> Ledger<S> {
         DeedBuilder { builder, ledger: self }
     }
 
-    pub fn call(&mut self, params: CallParams) -> Result<Opid, EitherError<AcceptError, S::Error>> {
+    pub fn call(&mut self, params: CallParams) -> Result<Opid, MultiError<AcceptError, S::Error>> {
         let mut builder = self.start_deed(params.core.method);
 
         for NamedState { name, state } in params.core.global {
@@ -520,9 +521,9 @@ impl<S: Stock> Ledger<S> {
         &mut self,
         operation: Operation,
         force: bool,
-    ) -> Result<bool, EitherError<AcceptError, S::Error>> {
+    ) -> Result<bool, MultiError<AcceptError, S::Error>> {
         if operation.contract_id != self.contract_id() {
-            return Err(EitherError::A(AcceptError::Articles(ArticlesError::ContractMismatch)));
+            return Err(MultiError::A(AcceptError::Articles(ArticlesError::ContractMismatch)));
         }
 
         let opid = operation.opid();
@@ -534,9 +535,9 @@ impl<S: Stock> Ledger<S> {
                 .codex()
                 .verify(self.contract_id(), operation, &self.0.state().raw, articles)
                 .map_err(AcceptError::from)
-                .map_err(EitherError::A)?;
+                .map_err(MultiError::A)?;
             self.apply_internal(opid, verified, present && !force)
-                .map_err(EitherError::B)?;
+                .map_err(MultiError::B)?;
         }
 
         Ok(present)

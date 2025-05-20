@@ -10,8 +10,9 @@ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
 name = "aluvm"
-version = "0.12.0-beta.6"
-source = "git+https://github.com/AluVM/aluvm?branch=revision#2996dfeb8e38fd3d396b1d04e4c894c90db02bdf"
+version = "0.12.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e764e11d517cade9c1bf8e0648bd7a075aa8115e03b3ddb16db1ed74e268502d"
 dependencies = [
  "amplify",
  "ascii-armor",
@@ -28,14 +29,16 @@ dependencies = [
 
 [[package]]
 name = "amplify"
-version = "4.8.1"
+version = "4.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a9d7cb29f1d4c6ec8650abbee35948b8bdefb7f0750a26445ff593eb9bf7fcf"
+checksum = "3f7fb4ac7c881e54a8e7015e399b6112a2a5bc958b6c89ac510840ff20273b31"
 dependencies = [
  "amplify_derive",
  "amplify_num",
  "amplify_syn",
  "ascii",
+ "getrandom 0.2.16",
+ "getrandom 0.3.3",
  "serde",
  "stringly_conversions",
  "wasm-bindgen",
@@ -328,8 +331,9 @@ checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 
 [[package]]
 name = "commit_encoding_derive"
-version = "0.12.0-beta.6"
-source = "git+https://github.com/LNP-BP/client_side_validation?branch=revision#568d00688175c24c0cd1747534135cd09476079c"
+version = "0.12.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "783e42e09ad9dbc48d01532fc59fd1f1c64c98c09f523abeb6a069756651c9c3"
 dependencies = [
  "amplify",
  "amplify_syn",
@@ -340,8 +344,9 @@ dependencies = [
 
 [[package]]
 name = "commit_verify"
-version = "0.12.0-beta.6"
-source = "git+https://github.com/LNP-BP/client_side_validation?branch=revision#568d00688175c24c0cd1747534135cd09476079c"
+version = "0.12.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c91d4e2c820279c133f8cb1c7c7544caba346c8049d6a7749dca1031d7acb68"
 dependencies = [
  "amplify",
  "commit_encoding_derive",
@@ -475,7 +480,7 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "hypersonic"
-version = "0.12.0-beta.6"
+version = "0.12.0-rc.1"
 dependencies = [
  "aluvm",
  "amplify",
@@ -822,7 +827,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "sonic-api"
-version = "0.12.0-beta.6"
+version = "0.12.0-rc.1"
 dependencies = [
  "aluvm",
  "amplify",
@@ -844,7 +849,7 @@ dependencies = [
 
 [[package]]
 name = "sonic-callreq"
-version = "0.12.0-beta.6"
+version = "0.12.0-rc.1"
 dependencies = [
  "amplify",
  "baid64",
@@ -865,7 +870,7 @@ dependencies = [
 
 [[package]]
 name = "sonic-persist-fs"
-version = "0.12.0-beta.6"
+version = "0.12.0-rc.1"
 dependencies = [
  "amplify",
  "aora",
@@ -878,7 +883,7 @@ dependencies = [
 
 [[package]]
 name = "sonix"
-version = "0.12.0-beta.6"
+version = "0.12.0-rc.1"
 dependencies = [
  "amplify",
  "anyhow",
@@ -893,11 +898,13 @@ dependencies = [
 
 [[package]]
 name = "strict_encoding"
-version = "2.8.2"
+version = "2.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8553c0321466c11aa1e33f082c9190194f380efd8824bf5ce4fa56b64b875be9"
+checksum = "5b8d9721d221d797767f8d5ad72b3a34dcdb5b9d646fe76248ee0f5e6fa6ca89"
 dependencies = [
  "amplify",
+ "getrandom 0.2.16",
+ "getrandom 0.3.3",
  "serde",
  "strict_encoding_derive",
  "wasm-bindgen",
@@ -918,13 +925,15 @@ dependencies = [
 
 [[package]]
 name = "strict_types"
-version = "2.8.3"
+version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07dd1bdf4bfce0a1ff3eec041e7d4d20b06d22ca2aaf71338726dd9609e57a5e"
+checksum = "493821521630a023d79a210033fe1f5135ae3d3f8fccd8dbf1a98b7dfe56b144"
 dependencies = [
  "amplify",
  "ascii-armor",
  "baid64",
+ "getrandom 0.2.16",
+ "getrandom 0.3.3",
  "indexmap",
  "serde",
  "serde_json",
@@ -1043,8 +1052,9 @@ checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 
 [[package]]
 name = "ultrasonic"
-version = "0.12.0-beta.6"
-source = "git+https://github.com/AluVM/ultrasonic?branch=revision#b006b44c189809204505d112f10e2dd1b04b6707"
+version = "0.12.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5245198eb653a287955cd0ddaf7b7918373375592a28c189bd54a5345ce05377"
 dependencies = [
  "amplify",
  "baid64",
@@ -1233,9 +1243,9 @@ dependencies = [
 
 [[package]]
 name = "windows-core"
-version = "0.61.1"
+version = "0.61.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46ec44dc15085cea82cf9c78f85a9114c463a369786585ad2882d1ff0b0acf40"
+checksum = "c0fdd3ddb90610c7638aa2b3a3ab2904fb9e5cdbecc643ddb3647212781c4ae3"
 dependencies = [
  "windows-implement",
  "windows-interface",
@@ -1274,18 +1284,18 @@ checksum = "76840935b766e1b0a05c0066835fb9ec80071d4c09a16f6bd5f7e655e3c14c38"
 
 [[package]]
 name = "windows-result"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b895b5356fc36103d0f64dd1e94dfa7ac5633f1c9dd6e80fe9ec4adef69e09d"
+checksum = "56f42bd332cc6c8eac5af113fc0c1fd6a8fd2aa08a0119358686e5160d0586c6"
 dependencies = [
  "windows-link",
 ]
 
 [[package]]
 name = "windows-strings"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a7ab927b2637c19b3dbe0965e75d8f2d30bdd697a1516191cad2ec4df8fb28a"
+checksum = "56e6c93f3a0c3b36176cb1327a4958a0353d5d166c2a35cb268ace15e91d3b57"
 dependencies = [
  "windows-link",
 ]
@@ -1403,8 +1413,9 @@ dependencies = [
 
 [[package]]
 name = "zk-aluvm"
-version = "0.12.0-beta.6"
-source = "git+https://github.com/AluVM/zk-aluvm?branch=revision#36bd0202f6100c7ba4251fa02a404b91f40c8cea"
+version = "0.12.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7cf36dc73e2b1f5b173e44924b8e4822fe81fc5c9d5ab7a2570b6b9d0debbfb"
 dependencies = [
  "aluvm",
  "amplify",

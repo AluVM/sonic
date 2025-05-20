@@ -27,12 +27,13 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 
+use amplify::MultiError;
 use aora::file::{FileAoraIndex, FileAoraMap, FileAuraMap};
 use aora::{AoraIndex, AoraMap, AuraMap, TransactionalMap};
 use binfile::BinFile;
 use hypersonic::{
-    AcceptError, ApiDescriptor, Articles, ArticlesError, AuthToken, CellAddr, EffectiveState, EitherError, Genesis,
-    Issue, IssueError, Ledger, Operation, Opid, RawState, SigValidator, Stock, Transition,
+    AcceptError, ApiDescriptor, Articles, ArticlesError, AuthToken, CellAddr, EffectiveState, Genesis, Issue,
+    IssueError, Ledger, Operation, Opid, RawState, SigValidator, Stock, Transition,
 };
 use strict_encoding::{
     DecodeError, StreamReader, StreamWriter, StrictDecode, StrictEncode, StrictReader, StrictWriter,
@@ -208,16 +209,16 @@ impl Stock for StockFs {
     fn update_articles(
         &mut self,
         f: impl FnOnce(&mut Articles) -> Result<(), ArticlesError>,
-    ) -> Result<(), EitherError<ArticlesError, FsError>> {
-        f(&mut self.articles).map_err(EitherError::A)?;
+    ) -> Result<(), MultiError<ArticlesError, FsError>> {
+        f(&mut self.articles).map_err(MultiError::A)?;
 
         let file = BinFile::<APIS_MAGIC, VERSION_0>::create(self.path.join(Self::FILENAME_APIS))
-            .map_err(EitherError::from_b)?;
+            .map_err(MultiError::from_b)?;
         let writer = StreamWriter::new::<{ usize::MAX }>(file);
         self.articles
             .apis()
             .strict_write(writer)
-            .map_err(EitherError::from_b)?;
+            .map_err(MultiError::from_b)?;
 
         Ok(())
     }
@@ -250,7 +251,7 @@ impl Stock for StockFs {
 }
 
 impl LedgerDir {
-    pub fn new(articles: Articles, conf: PathBuf) -> Result<Self, EitherError<IssueError, FsError>> {
+    pub fn new(articles: Articles, conf: PathBuf) -> Result<Self, MultiError<IssueError, FsError>> {
         Ledger::new(articles, conf).map(Self)
     }
 
@@ -276,8 +277,8 @@ impl LedgerDir {
         &mut self,
         input: impl AsRef<Path>,
         sig_validator: impl SigValidator,
-    ) -> Result<(), EitherError<AcceptError, FsError>> {
-        let file = File::open(input).map_err(EitherError::from_b)?;
+    ) -> Result<(), MultiError<AcceptError, FsError>> {
+        let file = File::open(input).map_err(MultiError::from_b)?;
         let mut reader = StrictReader::with(StreamReader::new::<{ usize::MAX }>(file));
         self.accept(&mut reader, sig_validator)
     }

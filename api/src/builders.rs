@@ -176,7 +176,6 @@ impl IssueBuilder {
         let meta = ContractMeta {
             consensus: self.consensus,
             testnet: self.testnet,
-            reserved: zero!(),
             timestamp,
             name: ContractName::Named(name.into()),
             issuer: Identity::default(),

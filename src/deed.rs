@@ -24,12 +24,13 @@
 use std::collections::BTreeMap;
 
 use aluvm::LibSite;
+use amplify::MultiError;
 use sonic_callreq::StateName;
 use sonicapi::{CoreParams, OpBuilder};
 use strict_types::StrictVal;
 use ultrasonic::{AuthToken, CellAddr, Opid};
 
-use crate::{AcceptError, EitherError, Ledger, Stock};
+use crate::{AcceptError, Ledger, Stock};
 
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -94,7 +95,7 @@ impl<S: Stock> DeedBuilder<'_, S> {
         self
     }
 
-    pub fn commit<'a>(self) -> Result<Opid, EitherError<AcceptError, S::Error>>
+    pub fn commit<'a>(self) -> Result<Opid, MultiError<AcceptError, S::Error>>
     where Self: 'a {
         let deed = self.builder.finalize();
         let opid = deed.opid();

@@ -23,10 +23,11 @@
 
 use core::error::Error;
 
+use amplify::MultiError;
 use sonicapi::ArticlesError;
 use ultrasonic::{CallError, CellAddr, ContractName, Operation, Opid};
 
-use crate::{Articles, EffectiveState, EitherError, Transition};
+use crate::{Articles, EffectiveState, Transition};
 
 /// Stock is a persistence API for keeping and accessing contract data.
 ///
@@ -286,7 +287,7 @@ pub trait Stock {
     fn update_articles(
         &mut self,
         f: impl FnOnce(&mut Articles) -> Result<(), ArticlesError>,
-    ) -> Result<(), EitherError<ArticlesError, Self::Error>>;
+    ) -> Result<(), MultiError<ArticlesError, Self::Error>>;
 
     /// Updates contract effective state inside a callback method.
     ///

@@ -21,7 +21,8 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-#![cfg_attr(not(feature = "std"), no_std)]
+// TODO: Activate no_std once StrictEncoding will support it
+// #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(
     unsafe_code,
     dead_code,
