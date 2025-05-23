@@ -78,7 +78,7 @@ impl ApiDescriptor {
 /// - the only type of API adapter VM which can be used is [`crate::embedded::EmbeddedProc`] (see
 ///   [`crate::Api`] for more details).
 #[derive(Clone, Eq, PartialEq, Debug)]
-#[derive(StrictType, StrictDumb, StrictEncode)]
+#[derive(StrictType, StrictDumb, StrictDecode, StrictEncode)]
 #[strict_type(lib = LIB_NAME_SONIC)]
 pub struct Articles {
     apis: ApiDescriptor,
