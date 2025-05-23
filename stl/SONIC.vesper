@@ -38,9 +38,13 @@ rec Articles
           bytes semId, len 32, aka SemId
           enum published, Bool, false 0, true 1
           union convertor, StateConvertor
-            is typedEncoder, U256, wrapped, tag 0
+            is unit, Unit, tag 0
+            is typedEncoder, U256, wrapped, tag 1
+            is typedFieldEncoder, U256, wrapped, tag 2
           union builder, StateBuilder
-            is typedEncoder, U256, wrapped, tag 0
+            is unit, Unit, tag 0
+            is typedEncoder, U256, wrapped, tag 1
+            is typedFieldEncoder, U256, wrapped, tag 2
           union rawConvertor, RawConvertor
             bytes strictDecode, len 32, wrapped, aka SemId, tag 0
           union rawBuilder, RawBuilder
@@ -51,20 +55,35 @@ rec Articles
           bytes semId, len 32, aka SemId
           enum arithmetics, StateArithm, fungible 0, nonFungible 1
           union convertor, StateConvertor
-            is typedEncoder, U256, wrapped, tag 0
+            is unit, Unit, tag 0
+            is typedEncoder, U256, wrapped, tag 1
+            is typedFieldEncoder, U256, wrapped, tag 2
           union builder, StateBuilder
-            is typedEncoder, U256, wrapped, tag 0
+            is unit, Unit, tag 0
+            is typedEncoder, U256, wrapped, tag 1
+            is typedFieldEncoder, U256, wrapped, tag 2
           bytes witnessSemId, len 32, aka SemId
           union witnessBuilder, StateBuilder
-            is typedEncoder, U256, wrapped, tag 0
+            is unit, Unit, tag 0
+            is typedEncoder, U256, wrapped, tag 1
+            is typedFieldEncoder, U256, wrapped, tag 2
       map aggregators, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
         union value, StateAggregator
-          ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 0
-          ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 1
-          ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 2
-          ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 3
-          ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 4
+          is unit, Unit, tag 0
+          bytes const, len 0..MAX8, wrapped, tag 1
+          ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 2
+          ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 3
+          tuple sum, tag 4
+            ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
+            ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
+          tuple diff, tag 5
+            ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
+            ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
+          ascii toSome, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 6
+          ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 7
+          ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
+          ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
       map verifiers, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
         is value, U16
@@ -88,9 +107,13 @@ rec Articles
             bytes semId, len 32, aka SemId
             enum published, Bool, false 0, true 1
             union convertor, StateConvertor
-              is typedEncoder, U256, wrapped, tag 0
+              is unit, Unit, tag 0
+              is typedEncoder, U256, wrapped, tag 1
+              is typedFieldEncoder, U256, wrapped, tag 2
             union builder, StateBuilder
-              is typedEncoder, U256, wrapped, tag 0
+              is unit, Unit, tag 0
+              is typedEncoder, U256, wrapped, tag 1
+              is typedFieldEncoder, U256, wrapped, tag 2
             union rawConvertor, RawConvertor
               bytes strictDecode, len 32, wrapped, aka SemId, tag 0
             union rawBuilder, RawBuilder
@@ -101,20 +124,35 @@ rec Articles
             bytes semId, len 32, aka SemId
             enum arithmetics, StateArithm, fungible 0, nonFungible 1
             union convertor, StateConvertor
-              is typedEncoder, U256, wrapped, tag 0
+              is unit, Unit, tag 0
+              is typedEncoder, U256, wrapped, tag 1
+              is typedFieldEncoder, U256, wrapped, tag 2
             union builder, StateBuilder
-              is typedEncoder, U256, wrapped, tag 0
+              is unit, Unit, tag 0
+              is typedEncoder, U256, wrapped, tag 1
+              is typedFieldEncoder, U256, wrapped, tag 2
             bytes witnessSemId, len 32, aka SemId
             union witnessBuilder, StateBuilder
-              is typedEncoder, U256, wrapped, tag 0
+              is unit, Unit, tag 0
+              is typedEncoder, U256, wrapped, tag 1
+              is typedFieldEncoder, U256, wrapped, tag 2
         map aggregators, len 0..MAX8
           ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
           union value, StateAggregator
-            ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 0
-            ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 1
-            ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 2
-            ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 3
-            ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 4
+            is unit, Unit, tag 0
+            bytes const, len 0..MAX8, wrapped, tag 1
+            ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 2
+            ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 3
+            tuple sum, tag 4
+              ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
+              ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
+            tuple diff, tag 5
+              ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
+              ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
+            ascii toSome, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 6
+            ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 7
+            ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
+            ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
         map verifiers, len 0..MAX8
           ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
           is value, U16

@@ -1,5 +1,5 @@
 {-
-  Id: stl:UbCQQ8_w-HU0Pv~L-dwNVHSM-TBrsBQC-N_vdFIG-DYFnUjs#page-ventura-shelf
+  Id: stl:Lgb8Hs_Q-iB4SN_b-9h3E1~_-q8~i1Du-6~d62vm-2q76aKE#shock-jackson-pluto
   Name: SONIC
   Version: 0.12.0
   Description: Standard library for formally-verifiable distributed contracts
@@ -134,9 +134,14 @@ data RawConvertor      : strictDecode StrictTypes.SemId | (|)
 @mnemonic(insect-cello-avalon)
 data SigBlob           : [Byte ^ 1..0x1000]
 
-@mnemonic(griffin-patrol-film)
-data StateAggregator   : count#1 StrictTypes.VariantName
+@mnemonic(pocket-story-bombay)
+data StateAggregator   : unit ()
+                       | const [Byte ^ ..0xff]
+                       | count StrictTypes.VariantName
                        | sumV StrictTypes.VariantName
+                       | sum (StrictTypes.VariantName, StrictTypes.VariantName)
+                       | diff (StrictTypes.VariantName, StrictTypes.VariantName)
+                       | toSome#16 StrictTypes.VariantName
                        | listV#32 StrictTypes.VariantName
                        | setV#34 StrictTypes.VariantName
                        | mapV2u#48 StrictTypes.VariantName
@@ -145,11 +150,15 @@ data StateAggregator   : count#1 StrictTypes.VariantName
 data StateArithm       : fungible | nonFungible
 
 
-@mnemonic(bingo-deal-salami)
-data StateBuilder      : typedEncoder U256 | (|)
+@mnemonic(truck-domain-viking)
+data StateBuilder      : unit ()
+                       | typedEncoder#16 U256
+                       | typedFieldEncoder U256
 
-@mnemonic(snake-diploma-sensor)
-data StateConvertor    : typedEncoder U256 | (|)
+@mnemonic(random-morris-havana)
+data StateConvertor    : unit ()
+                       | typedEncoder#16 U256
+                       | typedFieldEncoder U256
 
 @mnemonic(explore-locate-zoom)
 data Transition        : opid UltraSONIC.Opid, destroyed {UltraSONIC.CellAddr -> UltraSONIC.StateCell}

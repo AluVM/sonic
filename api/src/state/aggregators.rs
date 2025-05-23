@@ -21,7 +21,9 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+use amplify::confinement::TinyBlob;
 use sonic_callreq::StateName;
+use strict_encoding::StrictDumb;
 use strict_types::value::StrictNum;
 use strict_types::StrictVal;
 
@@ -32,17 +34,30 @@ use crate::{StateAtom, LIB_NAME_SONIC};
 #[strict_type(lib = LIB_NAME_SONIC, tags = custom, dumb = Self::Count(strict_dumb!()))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub enum StateAggregator {
-    // #[strict_type(tag = 0)]
-    // Const(StrictVal),
+    #[strict_type(tag = 0)]
+    Unit,
+
     #[strict_type(tag = 1)]
+    Const(TinyBlob),
+
+    #[strict_type(tag = 2)]
     Count(StateName),
 
     /// Sum over verifiable field-element-based part of state.
     ///
-    /// If any of the verifiable state is absent or not in a form of unsigned integer, it is treated
-    /// as zero.
-    #[strict_type(tag = 2)]
+    /// If any of the verifiable state is absent or not in the form of unsigned integer,
+    /// it is treated as zero.
+    #[strict_type(tag = 3)]
     SumV(StateName),
+
+    #[strict_type(tag = 4)]
+    Sum(StateName, StateName),
+
+    #[strict_type(tag = 5)]
+    Diff(StateName, StateName),
+
+    #[strict_type(tag = 0x10)]
+    ToSome(StateName),
 
     /*
     /// Count values which verifiable field-element part binary representation is prefixed with a
@@ -64,8 +79,9 @@ pub enum StateAggregator {
 }
 
 impl StateAggregator {
-    pub fn read<'s, I: IntoIterator<Item = &'s StateAtom>>(&self, state: impl Fn(&StateName) -> I) -> StrictVal {
+    pub fn read<'s, I: IntoIterator<Item = StateAtom>>(&self, state: impl Fn(&StateName) -> I) -> StrictVal {
         match self {
+            StateAggregator::Unit => StrictVal::Unit,
             //EmbeddedReaders::Const(val) => val.clone(),
             StateAggregator::Count(name) => {
                 let count = state(name).into_iter().count();
@@ -107,6 +123,10 @@ impl StateAggregator {
                 }
                 StrictVal::Map(map)
             }
+            StateAggregator::Const(_) => todo!(),
+            StateAggregator::Sum(_, _) => todo!(),
+            StateAggregator::Diff(_, _) => todo!(),
+            StateAggregator::ToSome(_) => todo!(),
         }
     }
 }
@@ -131,22 +151,22 @@ mod test {
         assert_eq!(
             adaptor.read(|name| {
                 assert_eq!(name.as_str(), "test1");
-                state.iter()
+                state.clone().into_iter()
             }),
             svnum!(6u64)
         );
 
         let adaptor = StateAggregator::SumV(vname!("test"));
-        assert_eq!(adaptor.read(|_| { state.iter() }), svnum!(5u64 + 1 + 2 + 3 + 4 + 5));
+        assert_eq!(adaptor.read(|_| { state.clone().into_iter() }), svnum!(5u64 + 1 + 2 + 3 + 4 + 5));
 
         let adaptor = StateAggregator::ListV(vname!("test"));
-        assert_eq!(adaptor.read(|_| { state.iter() }), svlist!([5u64, 1u64, 2u64, 3u64, 4u64, 5u64]));
+        assert_eq!(adaptor.read(|_| { state.clone().into_iter() }), svlist!([5u64, 1u64, 2u64, 3u64, 4u64, 5u64]));
 
         let adaptor = StateAggregator::SetV(vname!("test"));
-        assert_eq!(adaptor.read(|_| { state.iter() }), svset!([5u64, 1u64, 2u64, 3u64, 4u64]));
+        assert_eq!(adaptor.read(|_| { state.clone().into_iter() }), svset!([5u64, 1u64, 2u64, 3u64, 4u64]));
 
         let adaptor = StateAggregator::MapV2U(vname!("test"));
-        assert_eq!(adaptor.read(|_| { state.iter() }), StrictVal::Map(none!()));
+        assert_eq!(adaptor.read(|_| { state.clone().into_iter() }), StrictVal::Map(none!()));
     }
 
     #[test]
@@ -161,19 +181,22 @@ mod test {
         ];
 
         let adaptor = StateAggregator::Count(vname!("test"));
-        assert_eq!(adaptor.read(|_| { state.iter() }), svnum!(6u64));
+        assert_eq!(adaptor.read(|_| { state.clone().into_iter() }), svnum!(6u64));
 
         let adaptor = StateAggregator::SumV(vname!("test"));
-        assert_eq!(adaptor.read(|_| { state.iter() }), svnum!(0u64));
+        assert_eq!(adaptor.read(|_| { state.clone().into_iter() }), svnum!(0u64));
 
         let adaptor = StateAggregator::ListV(vname!("test"));
-        assert_eq!(adaptor.read(|_| { state.iter() }), svlist!([(), (), (), (), (), ()]));
+        assert_eq!(adaptor.read(|_| { state.clone().into_iter() }), svlist!([(), (), (), (), (), ()]));
 
         let adaptor = StateAggregator::SetV(vname!("test"));
-        assert_eq!(adaptor.read(|_| { state.iter() }), svset!([()]));
+        assert_eq!(adaptor.read(|_| { state.clone().into_iter() }), svset!([()]));
 
         let adaptor = StateAggregator::MapV2U(vname!("test"));
-        assert_eq!(adaptor.read(|_| { state.iter() }), StrictVal::Map(vec![(StrictVal::Unit, svnum!(5u64)),]));
+        assert_eq!(
+            adaptor.read(|_| { state.clone().into_iter() }),
+            StrictVal::Map(vec![(StrictVal::Unit, svnum!(5u64)),])
+        );
     }
 
     #[test]
@@ -188,20 +211,20 @@ mod test {
         ];
 
         let adaptor = StateAggregator::Count(vname!("test"));
-        assert_eq!(adaptor.read(|_| { state.iter() }), svnum!(6u64));
+        assert_eq!(adaptor.read(|_| { state.clone().into_iter() }), svnum!(6u64));
 
         let adaptor = StateAggregator::SumV(vname!("test"));
-        assert_eq!(adaptor.read(|_| { state.iter() }), svnum!(5u64 + 1 + 2 + 3 + 4 + 5));
+        assert_eq!(adaptor.read(|_| { state.clone().into_iter() }), svnum!(5u64 + 1 + 2 + 3 + 4 + 5));
 
         let adaptor = StateAggregator::ListV(vname!("test"));
-        assert_eq!(adaptor.read(|_| { state.iter() }), svlist!([5u64, 1u64, 2u64, 3u64, 4u64, 5u64]));
+        assert_eq!(adaptor.read(|_| { state.clone().into_iter() }), svlist!([5u64, 1u64, 2u64, 3u64, 4u64, 5u64]));
 
         let adaptor = StateAggregator::SetV(vname!("test"));
-        assert_eq!(adaptor.read(|_| { state.iter() }), svset!([5u64, 1u64, 2u64, 3u64, 4u64]));
+        assert_eq!(adaptor.read(|_| { state.clone().into_iter() }), svset!([5u64, 1u64, 2u64, 3u64, 4u64]));
 
         let adaptor = StateAggregator::MapV2U(vname!("test"));
         assert_eq!(
-            adaptor.read(|_| { state.iter() }),
+            adaptor.read(|_| { state.clone().into_iter() }),
             StrictVal::Map(vec![
                 (svnum!(5u64), svstr!("state 1")),
                 (svnum!(1u64), svstr!("state 2")),

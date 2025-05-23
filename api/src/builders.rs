@@ -211,9 +211,10 @@ impl Builder {
         api: &Api,
         sys: &TypeSystem,
     ) -> Self {
+        let name = name.into();
         let data = api
-            .build_immutable(name, data, raw, sys)
-            .expect("invalid immutable state");
+            .build_immutable(name.clone(), data, raw, sys)
+            .unwrap_or_else(|e| panic!("invalid immutable state '{name}'; {e}"));
         self.immutable_out
             .push(data)
             .expect("too many state elements");

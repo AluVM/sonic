@@ -247,12 +247,19 @@ impl ProcessedState {
     }
 
     pub(super) fn aggregate(&mut self, api: &Api) {
-        let empty = bmap![];
         self.aggregated = bmap! {};
         for (name, aggregator) in api.aggregators() {
-            let val = aggregator.read(|state_name| match self.immutable(state_name) {
-                None => empty.values(),
-                Some(src) => src.values(),
+            let val = aggregator.read(|state_name| {
+                match self
+                    .immutable(state_name)
+                    .map(|map| map.values().cloned().collect::<Vec<_>>())
+                    .or_else(|| {
+                        let verified = self.aggregated.get(state_name)?.clone();
+                        Some(vec![StateAtom { verified, unverified: None }])
+                    }) {
+                    None => vec![],
+                    Some(src) => src,
+                }
             });
             self.aggregated.insert(name.clone(), val);
         }
