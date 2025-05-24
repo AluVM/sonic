@@ -43,10 +43,15 @@ pub const ISSUER_VERSION: [u8; 2] = [0x00, 0x01];
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct Issuer {
     pub codex: Codex,
+    /// Backward-compatible version number for the issuer.
+    ///
+    /// This version number is used to decide which contract APIs to apply if multiple
+    /// contract APIs are available.
+    pub version: u8,
     pub api: Api,
     pub libs: SmallOrdSet<Lib>,
     pub types: TypeSystem,
-    /// Signature of the `codex.developer` over the API Id.
+    /// Signature of a developer (`codex.developer`) over the [`IssuerId`].
     pub sig: Option<SigBlob>,
 }
 

@@ -56,6 +56,11 @@ pub struct ArticlesCommitment {
 #[strict_type(lib = LIB_NAME_SONIC)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct ApiDescriptor {
+    /// Backward-compatible version number for the issuer.
+    ///
+    /// This version number is used to decide which contract APIs to apply if multiple
+    /// contract APIs are available.
+    pub version: u8,
     pub default: Api,
     pub custom: SmallOrdMap<TypeName, Api>,
     pub libs: SmallOrdSet<Lib>,

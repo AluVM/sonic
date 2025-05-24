@@ -21,7 +21,7 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-//! API defines how a contract can be interfaced by software.
+//! API defines how software can interface a contract.
 //!
 //! SONIC provides four types of actions for working with contract (ROVT):
 //! 1. _Read_ the state of the contract;
@@ -37,13 +37,13 @@ use core::cmp::Ordering;
 use core::fmt::Debug;
 use core::hash::{Hash, Hasher};
 
-use amplify::confinement::{TinyOrdMap, TinyString};
+use amplify::confinement::{TinyOrdMap, TinyOrdSet, TinyString};
 use amplify::num::u256;
 use amplify::Bytes32;
-use commit_verify::{CommitId, ReservedBytes};
+use commit_verify::CommitId;
 use sonic_callreq::{CallState, MethodName, StateName};
-use strict_types::{SemId, StrictDecode, StrictDumb, StrictEncode, StrictVal, TypeName, TypeSystem};
-use ultrasonic::{CallId, CodexId, Identity, StateData, StateValue};
+use strict_types::{SemId, StrictDecode, StrictDumb, StrictEncode, StrictVal, TypeSystem};
+use ultrasonic::{CallId, CodexId, StateData, StateValue};
 
 use crate::{
     RawBuilder, RawConvertor, StateAggregator, StateArithm, StateAtom, StateBuildError, StateBuilder, StateCalc,
@@ -65,19 +65,12 @@ use crate::{
 #[commit_encode(strategy = strict, id = ApiId)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase", bound = ""))]
 pub struct Api {
-    /// Version of the API structure.
-    #[getter(as_copy)]
-    pub version: ReservedBytes<1>,
-
     /// Commitment to the codex under which the API is valid.
     #[getter(as_copy)]
     pub codex_id: CodexId,
 
-    /// Developer identity string.
-    pub developer: Identity,
-
-    /// Interface standard to which the API conforms.
-    pub conforms: Option<TypeName>,
+    /// Interface standards to which the API conforms.
+    pub conforms: TinyOrdSet<u16>,
 
     /// Name for the default API call and destructible state name.
     pub default_call: Option<CallState>,
@@ -106,10 +99,6 @@ pub struct Api {
     /// Maps error type reported by a contract verifier via `EA` value to an error description taken
     /// from the interfaces.
     pub errors: TinyOrdMap<u256, TinyString>,
-
-    /// Reserved for future use.
-    #[getter(skip)]
-    pub reserved: ReservedBytes<8>,
 }
 
 impl PartialEq for Api {
@@ -229,6 +218,7 @@ impl Api {
     }
 }
 
+/// TODO: Change to the issuer id
 #[derive(Wrapper, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, From)]
 #[wrapper(Deref, BorrowSlice, Hex, Index, RangeOps)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
