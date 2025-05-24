@@ -23,12 +23,12 @@ rec ArticlesCommitment
     bytes value, len 32, aka ApiId
 
 rec Articles
-  rec apis, ApiDescriptor
+  rec semantics, Semantics
+    is version, U16
     rec default, Api
-      bytes version, len 1, aka ReservedBytes1
       bytes codexId, len 32, aka CodexId
-      ascii developer, aka Identity, first AsciiPrintable, rest AsciiPrintable, len 1..4096
-        ascii some, option, wrapped, aka TypeName, first AlphaCapsLodash, rest AlphaNumLodash, len 1..100, tag 1
+      set conforms, len 0..MAX8
+        is element, U16
         rec some, CallState, option, wrapped, tag 1
           ascii method, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
             ascii some, option, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 1
@@ -90,14 +90,12 @@ rec Articles
       map errors, len 0..MAX8
         is key, U256
         str value, len 0..MAX8
-      bytes reserved, len 8, aka ReservedBytes8
     map custom, len 0..MAX16
       ascii key, aka TypeName, first AlphaCapsLodash, rest AlphaNumLodash, len 1..100
       rec value, Api
-        bytes version, len 1, aka ReservedBytes1
         bytes codexId, len 32, aka CodexId
-        ascii developer, aka Identity, first AsciiPrintable, rest AsciiPrintable, len 1..4096
-          ascii some, option, wrapped, aka TypeName, first AlphaCapsLodash, rest AlphaNumLodash, len 1..100, tag 1
+        set conforms, len 0..MAX8
+          is element, U16
           rec some, CallState, option, wrapped, tag 1
             ascii method, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
               ascii some, option, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 1
@@ -159,7 +157,6 @@ rec Articles
         map errors, len 0..MAX8
           is key, U256
           str value, len 0..MAX8
-        bytes reserved, len 8, aka ReservedBytes8
     set libs, len 0..MAX16
       rec Lib
         set isae, len 0..MAX8

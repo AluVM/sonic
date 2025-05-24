@@ -68,10 +68,8 @@ fn api() -> Api {
     let codex = codex();
 
     Api {
-        version: default!(),
         codex_id: codex.codex_id(),
-        developer: Identity::default(),
-        conforms: None,
+        conforms: none!(),
         default_call: None,
         immutable: tiny_bmap! {
             vname!("_parties") => ImmutableApi {
@@ -121,7 +119,6 @@ fn api() -> Api {
             vname!("castVote") => 2,
         },
         errors: Default::default(),
-        reserved: Default::default(),
     }
 }
 
@@ -132,7 +129,7 @@ fn main() {
     let api = api();
 
     // Creating DAO with three participants
-    let issuer = Issuer::new(codex, api, [libs::success()], types.type_system());
+    let issuer = Issuer::new(1, codex, api, [libs::success()], types.type_system());
     let filename = "examples/dao/data/SimpleDAO.issuer";
     fs::remove_file(filename).ok();
     issuer

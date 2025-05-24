@@ -61,8 +61,8 @@ mod state;
 
 pub use api::{Api, ApiId, DestructibleApi, ImmutableApi, StateUnknown};
 pub use articles::{
-    ApiDescriptor, Articles, ArticlesCommitment, ArticlesError, ArticlesId, SigBlob, SigValidator,
-    ARTICLES_MAGIC_NUMBER, ARTICLES_VERSION,
+    Articles, ArticlesCommitment, ArticlesError, ArticlesId, Semantics, SigBlob, SigValidator, ARTICLES_MAGIC_NUMBER,
+    ARTICLES_VERSION,
 };
 pub use builders::{Builder, BuilderRef, CoreParams, IssueParams, NamedState, OpBuilder, OpBuilderRef};
 pub use issuer::{Issuer, ISSUER_MAGIC_NUMBER, ISSUER_VERSION};

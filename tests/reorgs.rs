@@ -141,10 +141,8 @@ fn api() -> Api {
     let codex = codex();
 
     Api {
-        version: default!(),
         codex_id: codex.codex_id(),
-        developer: Identity::default(),
-        conforms: None,
+        conforms: none!(),
         default_call: None,
         immutable: none!(),
         destructible: tiny_bmap! {
@@ -163,7 +161,6 @@ fn api() -> Api {
             vname!("transfer") => 1,
         },
         errors: Default::default(),
-        reserved: Default::default(),
     }
 }
 
@@ -172,7 +169,7 @@ fn setup(name: &str) -> LedgerDir {
     let codex = codex();
     let api = api();
 
-    let issuer = Issuer::new(codex, api, [libs::success()], types.type_system());
+    let issuer = Issuer::new(1, codex, api, [libs::success()], types.type_system());
 
     let seed = &[0xCA; 30][..];
     let mut auth = Sha256::digest(seed);

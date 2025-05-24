@@ -32,8 +32,8 @@ use aora::file::{FileAoraIndex, FileAoraMap, FileAuraMap};
 use aora::{AoraIndex, AoraMap, AuraMap, TransactionalMap};
 use binfile::BinFile;
 use hypersonic::{
-    AcceptError, ApiDescriptor, Articles, ArticlesError, AuthToken, CellAddr, EffectiveState, Genesis, Issue,
-    IssueError, Ledger, Operation, Opid, RawState, SigValidator, Stock, Transition,
+    AcceptError, Articles, ArticlesError, AuthToken, CellAddr, EffectiveState, Genesis, Issue, IssueError, Ledger,
+    Operation, Opid, RawState, Semantics, SigValidator, Stock, Transition,
 };
 use strict_encoding::{
     DecodeError, StreamReader, StreamWriter, StrictDecode, StrictEncode, StrictReader, StrictWriter,
@@ -163,7 +163,7 @@ impl Stock for StockFs {
 
         let file = BinFile::<APIS_MAGIC, VERSION_0>::open(path.join(Self::FILENAME_APIS))?;
         let reader = StreamReader::new::<{ usize::MAX }>(file);
-        let apis = ApiDescriptor::strict_read(reader)?;
+        let apis = Semantics::strict_read(reader)?;
 
         let file = BinFile::<STATE_MAGIC, VERSION_0>::open(path.join(Self::FILENAME_STATE_RAW))?;
         let reader = StreamReader::new::<{ usize::MAX }>(file);

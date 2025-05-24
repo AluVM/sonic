@@ -29,7 +29,7 @@ use amplify::hex::ToHex;
 use amplify::MultiError;
 use indexmap::IndexSet;
 use sonic_callreq::MethodName;
-use sonicapi::{Api, ApiDescriptor, ArticlesError, NamedState, OpBuilder, SigValidator};
+use sonicapi::{Api, ArticlesError, NamedState, OpBuilder, Semantics, SigValidator};
 use strict_encoding::{
     DecodeError, ReadRaw, SerializeError, StrictDecode, StrictEncode, StrictReader, StrictWriter, WriteRaw,
 };
@@ -410,7 +410,7 @@ impl<S: Stock> Ledger<S> {
             }
 
             let contract_id = ContractId::strict_decode(reader)?;
-            let apis = ApiDescriptor::strict_decode(reader)?;
+            let apis = Semantics::strict_decode(reader)?;
             let issue = Issue::strict_decode(reader)?;
             let articles = Articles::with(apis, issue)?;
             if articles.contract_id() != contract_id {

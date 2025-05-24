@@ -1,5 +1,5 @@
 {-
-  Id: stl:Lgb8Hs_Q-iB4SN_b-9h3E1~_-q8~i1Du-6~d62vm-2q76aKE#shock-jackson-pluto
+  Id: stl:tyzJaGG6-0t0y7pw-RrvB~a9-adiS8We-x49ufrL-iZINc_s#hazard-profile-michael
   Name: SONIC
   Version: 0.12.0
   Description: Standard library for formally-verifiable distributed contracts
@@ -52,7 +52,6 @@ import AluVM#reward-accent-swim
 import CommitVerify#biology-news-adam
   use ReservedBytes1#origin-roger-relax
   use ReservedBytes2#florida-libra-circus
-  use ReservedBytes8#rudolf-tape-adrian
 
 import StrictTypes#henry-heart-survive
   use VariantName#theory-austin-before
@@ -72,31 +71,21 @@ import StrictTypes#henry-heart-survive
   use TypeSystem#adrian-boris-sponsor
 
 
-@mnemonic(current-manager-level)
-data Api               : version CommitVerify.ReservedBytes1
-                       , codexId UltraSONIC.CodexId
-                       , developer UltraSONIC.Identity
-                       , conforms StrictTypes.TypeName?
+@mnemonic(ricardo-mary-genius)
+data Api               : codexId UltraSONIC.CodexId
+                       , conforms {U16 ^ ..0xff}
                        , defaultCall CallState?
                        , immutable {StrictTypes.VariantName -> ^ ..0xff ImmutableApi}
                        , destructible {StrictTypes.VariantName -> ^ ..0xff DestructibleApi}
                        , aggregators {StrictTypes.VariantName -> ^ ..0xff StateAggregator}
                        , verifiers {StrictTypes.VariantName -> ^ ..0xff U16}
                        , errors {U256 -> ^ ..0xff [Unicode ^ ..0xff]}
-                       , reserved CommitVerify.ReservedBytes8
-
-@mnemonic(felix-dinner-forbid)
-data ApiDescriptor     : default Api
-                       , custom {StrictTypes.TypeName -> Api}
-                       , libs {AluVM.Lib}
-                       , types StrictTypes.TypeSystem
-                       , sig SigBlob?
 
 @mnemonic(sharp-section-left)
 data ApiId             : [Byte ^ 32]
 
-@mnemonic(visible-kinetic-stella)
-data Articles          : apis ApiDescriptor, issue UltraSONIC.Issue
+@mnemonic(stella-empire-rubber)
+data Articles          : semantics Semantics, issue UltraSONIC.Issue
 
 @mnemonic(distant-east-ritual)
 data ArticlesCommitment : contractId UltraSONIC.ContractId
@@ -130,6 +119,14 @@ data RawBuilder        : strictEncode StrictTypes.SemId | (|)
 
 @mnemonic(tripod-guitar-bishop)
 data RawConvertor      : strictDecode StrictTypes.SemId | (|)
+
+@mnemonic(ballet-serpent-brown)
+data Semantics         : version U16
+                       , default Api
+                       , custom {StrictTypes.TypeName -> Api}
+                       , libs {AluVM.Lib}
+                       , types StrictTypes.TypeSystem
+                       , sig SigBlob?
 
 @mnemonic(insect-cello-avalon)
 data SigBlob           : [Byte ^ 1..0x1000]

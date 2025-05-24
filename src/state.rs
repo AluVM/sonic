@@ -25,7 +25,7 @@ use alloc::collections::BTreeMap;
 use std::mem;
 
 use amplify::confinement::{LargeOrdMap, SmallOrdMap};
-use sonicapi::{Api, ApiDescriptor, Articles, StateAtom, StateName};
+use sonicapi::{Api, Articles, Semantics, StateAtom, StateName};
 use strict_encoding::{StrictDeserialize, StrictSerialize, TypeName};
 use strict_types::{StrictVal, TypeSystem};
 use ultrasonic::{AuthToken, CallError, CellAddr, Memory, Opid, StateCell, StateData, StateValue, VerifiedOperation};
@@ -95,7 +95,7 @@ impl EffectiveState {
     }
 
     /// Re-evaluates computable part of the state
-    pub fn recompute(&mut self, apis: &ApiDescriptor) {
+    pub fn recompute(&mut self, apis: &Semantics) {
         self.main.aggregate(&apis.default);
         self.aux = bmap! {};
         for (name, api) in &apis.custom {
@@ -106,7 +106,7 @@ impl EffectiveState {
     }
 
     #[must_use]
-    pub(crate) fn apply(&mut self, op: VerifiedOperation, apis: &ApiDescriptor) -> Transition {
+    pub(crate) fn apply(&mut self, op: VerifiedOperation, apis: &Semantics) -> Transition {
         self.main.apply(&op, &apis.default, &apis.types);
         for (name, api) in &apis.custom {
             let state = self.aux.entry(name.clone()).or_default();
@@ -115,7 +115,7 @@ impl EffectiveState {
         self.raw.apply(op)
     }
 
-    pub(crate) fn rollback(&mut self, transition: Transition, apis: &ApiDescriptor) {
+    pub(crate) fn rollback(&mut self, transition: Transition, apis: &Semantics) {
         self.main.rollback(&transition, &apis.default, &apis.types);
         let mut count = 0usize;
         for (name, api) in &apis.custom {

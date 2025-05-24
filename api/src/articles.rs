@@ -48,23 +48,40 @@ pub struct ArticlesCommitment {
     pub custom_api_ids: SmallOrdMap<TypeName, ApiId>,
 }
 
-/// A helper structure to store all API-related data.
+/// A helper structure to store the contract semantics.
 ///
 /// A contract may have multiple APIs defined. All of them a summarized in this structure.
+/// The structure also holds a set of AluVM libraries for the codex and type system used by the
+/// API.
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_SONIC)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
-pub struct ApiDescriptor {
+pub struct Semantics {
+    /// Backward-compatible version number for the issuer.
+    ///
+    /// This version number is used to decide which contract APIs to apply if multiple
+    /// contract APIs are available.
+    pub version: u16,
+    /// The default API.
     pub default: Api,
+    /// The custom named APIs.
+    ///
+    /// The mechanism of the custom APIs allows a contract to have multiple implementations
+    /// of the same interface.
+    ///
+    /// For instance, a contract may provide multiple tokens using different token names.
     pub custom: SmallOrdMap<TypeName, Api>,
+    /// A set of zk-AluVM libraries called from the contract codex.
     pub libs: SmallOrdSet<Lib>,
+    /// The type system used by the contract APIs.
     pub types: TypeSystem,
     /// Signature from the contract issuer (`issue.meta.issuer`) over the articles' id.
     pub sig: Option<SigBlob>,
 }
 
-impl ApiDescriptor {
+impl Semantics {
+    /// Iterates over all APIs, including default and named ones.
     pub fn all(&self) -> impl Iterator<Item = &Api> { [&self.default].into_iter().chain(self.custom.values()) }
 }
 
@@ -72,7 +89,7 @@ impl ApiDescriptor {
 ///
 /// # Invariance
 ///
-/// The structure provides the following invariance garantees:
+/// The structure provides the following invariance guarantees:
 /// - all the API codex matches the codex under which the contract was issued;
 /// - all the API ids are unique;
 /// - the only type of API adapter VM which can be used is [`crate::embedded::EmbeddedProc`] (see
@@ -81,21 +98,21 @@ impl ApiDescriptor {
 #[derive(StrictType, StrictDumb, StrictEncode)]
 #[strict_type(lib = LIB_NAME_SONIC)]
 pub struct Articles {
-    apis: ApiDescriptor,
+    semantics: Semantics,
     issue: Issue,
 }
 
 impl Articles {
     fn articles_id(&self) -> ArticlesId {
         let custom_api_ids = SmallOrdMap::from_iter_checked(
-            self.apis
+            self.semantics
                 .custom
                 .iter()
                 .map(|(name, api)| (name.clone(), api.api_id())),
         );
         ArticlesCommitment {
             contract_id: self.contract_id(),
-            default_api_id: self.apis.default.api_id(),
+            default_api_id: self.semantics.default.api_id(),
             custom_api_ids,
         }
         .commit_id()
@@ -105,16 +122,16 @@ impl Articles {
     pub fn codex_id(&self) -> CodexId { self.issue.codex_id() }
     pub fn genesis_opid(&self) -> Opid { self.issue.genesis_opid() }
 
-    pub fn apis(&self) -> &ApiDescriptor { &self.apis }
-    pub fn default_api(&self) -> &Api { &self.apis.default }
-    pub fn custom_apis(&self) -> impl Iterator<Item = (&TypeName, &Api)> { self.apis.custom.iter() }
-    pub fn types(&self) -> &TypeSystem { &self.apis.types }
+    pub fn apis(&self) -> &Semantics { &self.semantics }
+    pub fn default_api(&self) -> &Api { &self.semantics.default }
+    pub fn custom_apis(&self) -> impl Iterator<Item = (&TypeName, &Api)> { self.semantics.custom.iter() }
+    pub fn types(&self) -> &TypeSystem { &self.semantics.types }
 
     pub fn issue(&self) -> &Issue { &self.issue }
     pub fn codex(&self) -> &Codex { &self.issue.codex }
     pub fn genesis(&self) -> &Genesis { &self.issue.genesis }
 
-    pub fn with(apis: ApiDescriptor, issue: Issue) -> Result<Self, ArticlesError> {
+    pub fn with(apis: Semantics, issue: Issue) -> Result<Self, ArticlesError> {
         let mut ids = bset![];
         for api in apis.all() {
             if api.codex_id != issue.codex_id() {
@@ -126,7 +143,7 @@ impl Articles {
             }
         }
 
-        Ok(Self { apis, issue })
+        Ok(Self { semantics: apis, issue })
     }
 
     pub fn merge(&mut self, other: Self, sig_validator: impl SigValidator) -> Result<bool, ArticlesError> {
@@ -135,7 +152,7 @@ impl Articles {
         }
 
         let ts1 = self
-            .apis
+            .semantics
             .sig
             .as_ref()
             .and_then(|sig| {
@@ -144,13 +161,15 @@ impl Articles {
                     .ok()
             })
             .unwrap_or_default();
-        let Some(sig) = &other.apis.sig else { return Ok(false) };
+        let Some(sig) = &other.semantics.sig else {
+            return Ok(false);
+        };
         let ts2 = sig_validator
             .validate_sig(other.articles_id().to_byte_array(), &other.issue.meta.issuer, sig)
             .map_err(|_| ArticlesError::InvalidSignature)?;
 
         if ts2 > ts1 {
-            self.apis = other.apis;
+            self.semantics = other.semantics;
         }
 
         Ok(true)
@@ -164,7 +183,7 @@ impl Articles {
     pub fn call_id(&self, method: impl Into<MethodName>) -> CallId {
         let method = method.into();
         let name = method.to_string();
-        self.apis
+        self.semantics
             .default
             .verifier(method)
             .unwrap_or_else(|| panic!("requesting a method `{name}` absent in the contract API"))
@@ -172,7 +191,12 @@ impl Articles {
 }
 
 impl LibRepo for Articles {
-    fn get_lib(&self, lib_id: LibId) -> Option<&Lib> { self.apis.libs.iter().find(|lib| lib.lib_id() == lib_id) }
+    fn get_lib(&self, lib_id: LibId) -> Option<&Lib> {
+        self.semantics
+            .libs
+            .iter()
+            .find(|lib| lib.lib_id() == lib_id)
+    }
 }
 
 #[derive(Wrapper, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, From)]
