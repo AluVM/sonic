@@ -275,34 +275,29 @@ impl<S: Stock> Ledger<S> {
         chain.into_iter()
     }
 
-    pub fn export_all(&self, mut writer: StrictWriter<impl WriteRaw>) -> io::Result<()> {
-        // Write articles
-        writer = self.0.articles().strict_encode(writer)?;
-        // Stream operations
-        for (_, op) in self.0.operations() {
-            writer = op.strict_encode(writer)?;
-        }
-        Ok(())
+    /// Exports contract with all known operations
+    pub fn export_all(&self, writer: StrictWriter<impl WriteRaw>) -> io::Result<()> {
+        self.export_internal(self.0.operation_count(), writer, |_| true, |_, _, w| Ok(w))
     }
 
+    /// Export a part of a contract history: a graph between set of terminals and genesis.
     pub fn export(
         &self,
         terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
-        mut writer: StrictWriter<impl WriteRaw>,
+        writer: StrictWriter<impl WriteRaw>,
     ) -> io::Result<()> {
-        writer = self.contract_id().strict_encode(writer)?;
         self.export_aux(terminals, writer, |_, _, w| Ok(w))
     }
 
+    /// Exports contract and operations to a stream, extending operation data with some auxiliary
+    /// information returned by `aux`.
     // TODO: (v0.13) Return statistics
     pub fn export_aux<W: WriteRaw>(
         &self,
         terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
-        mut writer: StrictWriter<W>,
-        mut aux: impl FnMut(Opid, &Operation, StrictWriter<W>) -> io::Result<StrictWriter<W>>,
+        writer: StrictWriter<W>,
+        aux: impl FnMut(Opid, &Operation, StrictWriter<W>) -> io::Result<StrictWriter<W>>,
     ) -> io::Result<()> {
-        let contract_id = self.contract_id();
-
         let mut queue = terminals
             .into_iter()
             .map(|terminal| self.0.state().addr(*terminal.borrow()).opid)
@@ -342,17 +337,7 @@ impl<S: Stock> Ledger<S> {
         }
         opids.remove(&genesis_opid);
 
-        // Write articles
-        writer = articles.strict_encode(writer)?;
-        writer = aux(genesis_opid, &articles.genesis().to_operation(contract_id), writer)?;
-        // Stream operations
-        for (opid, op) in self.0.operations() {
-            if !opids.remove(&opid) {
-                continue;
-            }
-            writer = op.strict_encode(writer)?;
-            writer = aux(opid, &op, writer)?;
-        }
+        self.export_internal(opids.len() as u64, writer, |opid| opids.remove(opid), aux)?;
 
         debug_assert!(
             opids.is_empty(),
@@ -367,6 +352,40 @@ impl<S: Stock> Ledger<S> {
         Ok(())
     }
 
+    /// Exports only operations for which `should_include` returns `true`.
+    ///
+    /// # Nota bene
+    ///
+    /// Does not write the contract id.
+    pub fn export_internal<W: WriteRaw>(
+        &self,
+        count: u64,
+        mut writer: StrictWriter<W>,
+        mut should_include: impl FnMut(&Opid) -> bool,
+        mut aux: impl FnMut(Opid, &Operation, StrictWriter<W>) -> io::Result<StrictWriter<W>>,
+    ) -> io::Result<()> {
+        let articles = self.articles();
+        let genesis_opid = articles.genesis_opid();
+
+        // Write contract id
+        let contract_id = self.contract_id();
+        writer = self.contract_id().strict_encode(writer)?;
+        // Write no of operations
+        writer = count.strict_encode(writer)?;
+        // Write articles
+        writer = articles.strict_encode(writer)?;
+        writer = aux(genesis_opid, &articles.genesis().to_operation(contract_id), writer)?;
+        // Stream operations
+        for (opid, op) in self.0.operations() {
+            if !should_include(&opid) {
+                continue;
+            }
+            writer = op.strict_encode(writer)?;
+            writer = aux(opid, &op, writer)?;
+        }
+        Ok(())
+    }
+
     pub fn upgrade_apis(&mut self, new_articles: Articles) -> Result<bool, MultiError<SemanticError, S::Error>> {
         self.0
             .update_articles(|articles| articles.upgrade_apis(new_articles))
@@ -378,8 +397,10 @@ impl<S: Stock> Ledger<S> {
         sig_validator: impl FnOnce(StrictHash, &Identity, &SigBlob) -> Result<(), E>,
     ) -> Result<(), MultiError<AcceptError, S::Error>> {
         // We need this closure to avoid multiple `map_err`.
-        (|| -> Result<(), AcceptError> {
+        let count = (|| -> Result<u64, AcceptError> {
             let contract_id = ContractId::strict_decode(reader)?;
+            let count = u64::strict_decode(reader)?;
+
             let semantics = Semantics::strict_decode(reader)?;
             let sig = Option::<SigBlob>::strict_decode(reader)?;
             let issue = Issue::strict_decode(reader)?;
@@ -390,11 +411,12 @@ impl<S: Stock> Ledger<S> {
 
             self.upgrade_apis(articles)
                 .map_err(|e| AcceptError::Persistence(e.to_string()))?;
-            Ok(())
+            Ok(count)
         })()
         .map_err(MultiError::A)?;
 
-        loop {
+        // We need to account for genesis, which is not included in the `count`
+        for _ in 0..=count {
             let op = match Operation::strict_decode(reader) {
                 Ok(operation) => operation,
                 Err(DecodeError::Io(e)) if e.kind() == io::ErrorKind::UnexpectedEof => break,

@@ -117,6 +117,17 @@ pub trait Stock {
     /// This call MAY BE blocking.
     fn has_operation(&self, opid: Opid) -> bool;
 
+    /// Count the number of all known operations in the contract.
+    ///
+    /// # Nota bene
+    ///
+    /// Does not include genesis operation.
+    ///
+    /// # Blocking I/O
+    ///
+    /// This call MAY BE blocking.
+    fn operation_count(&self) -> u64;
+
     /// Returns an operation ([`Operation`]) with a given `opid` from the set of known contract
     /// operations ("stash").
     ///

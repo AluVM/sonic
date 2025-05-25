@@ -196,6 +196,8 @@ impl Stock for StockFs {
     #[inline]
     fn has_operation(&self, opid: Opid) -> bool { self.stash.contains_key(opid) }
     #[inline]
+    fn operation_count(&self) -> u64 { self.stash.len() as u64 }
+    #[inline]
     fn operation(&self, opid: Opid) -> Operation { self.stash.get_expect(opid) }
     #[inline]
     fn operations(&self) -> impl Iterator<Item = (Opid, Operation)> { self.stash.iter() }

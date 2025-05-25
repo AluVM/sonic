@@ -25,7 +25,7 @@ sonic-api = { version = "0.12.0-rc.1", path = "api" }
 sonic-callreq = { version = "0.12.0-rc.1", path = "callreq" }
 sonic-persist-fs = { version = "0.12.0-rc.1", path = "persistence/fs" }
 hypersonic = { version = "0.12.0-rc.1", path = "." }
-aora = ">=0.6.3"
+aora = ">=0.6.4"
 binfile = "0.2.0"
 baid64 = "0.4.1"
 indexmap = "2.9.0"
