@@ -25,7 +25,6 @@ use alloc::collections::BTreeSet;
 use core::borrow::Borrow;
 use std::io;
 
-use amplify::hex::ToHex;
 use amplify::MultiError;
 use commit_verify::StrictHash;
 use indexmap::IndexSet;
@@ -38,9 +37,6 @@ use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Identity, Issue, Op
 
 use crate::deed::{CallParams, DeedBuilder};
 use crate::{Articles, EffectiveState, IssueError, ProcessedState, Stock, Transition};
-
-pub const LEDGER_MAGIC_NUMBER: [u8; 8] = *b"DEEDLDGR";
-pub const LEDGER_VERSION: [u8; 2] = [0x00, 0x01];
 
 /// Contract with all its state and operations, supporting updates and rollbacks.
 // We need this structure to hide internal persistence methods and not to expose them.
@@ -294,11 +290,6 @@ impl<S: Stock> Ledger<S> {
         terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
         mut writer: StrictWriter<impl WriteRaw>,
     ) -> io::Result<()> {
-        // TODO Use binfile!
-        // This is compatible with BinFile
-        writer = LEDGER_MAGIC_NUMBER.strict_encode(writer)?;
-        // Version
-        writer = LEDGER_VERSION.strict_encode(writer)?;
         writer = self.contract_id().strict_encode(writer)?;
         self.export_aux(terminals, writer, |_, _, w| Ok(w))
     }
@@ -388,23 +379,6 @@ impl<S: Stock> Ledger<S> {
     ) -> Result<(), MultiError<AcceptError, S::Error>> {
         // We need this closure to avoid multiple `map_err`.
         (|| -> Result<(), AcceptError> {
-            let magic_bytes = <[u8; 8]>::strict_decode(reader)?;
-            if magic_bytes != LEDGER_MAGIC_NUMBER {
-                return Err(DecodeError::DataIntegrityError(format!(
-                    "wrong contract ledger magic bytes {}",
-                    magic_bytes.to_hex()
-                ))
-                .into());
-            }
-            let version = <[u8; 2]>::strict_decode(reader)?;
-            if version != LEDGER_VERSION {
-                return Err(DecodeError::DataIntegrityError(format!(
-                    "unsupported contract ledger version {}",
-                    u16::from_be_bytes(version)
-                ))
-                .into());
-            }
-
             let contract_id = ContractId::strict_decode(reader)?;
             let semantics = Semantics::strict_decode(reader)?;
             let sig = Option::<SigBlob>::strict_decode(reader)?;
@@ -607,4 +581,49 @@ pub enum AcceptError {
     Serialize(SerializeError),
 
     Persistence(String),
+
+    #[cfg(feature = "binfile")]
+    #[display("Invalid file format")]
+    InvalidFileFormat,
 }
+
+#[cfg(feature = "binfile")]
+mod _fs {
+    use std::path::Path;
+
+    use binfile::BinFile;
+    use strict_encoding::{StreamReader, StreamWriter};
+
+    use super::*;
+
+    pub const LEDGER_MAGIC_NUMBER: u64 = u64::from_be_bytes(*b"DEEDLDGR");
+    pub const LEDGER_VERSION: u16 = 0;
+
+    impl<S: Stock> Ledger<S> {
+        // TODO: Move this back to the main crate
+        pub fn export_to_file(
+            &mut self,
+            terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
+            output: impl AsRef<Path>,
+        ) -> io::Result<()> {
+            let file = BinFile::<LEDGER_MAGIC_NUMBER, LEDGER_VERSION>::create_new(output)?;
+            let writer = StrictWriter::with(StreamWriter::new::<{ usize::MAX }>(file));
+            self.export(terminals, writer)
+        }
+
+        // TODO: Move this back to the main crate
+        pub fn accept_from_file<E>(
+            &mut self,
+            input: impl AsRef<Path>,
+            sig_validator: impl FnOnce(StrictHash, &Identity, &SigBlob) -> Result<(), E>,
+        ) -> Result<(), MultiError<AcceptError, S::Error>> {
+            let file = BinFile::<LEDGER_MAGIC_NUMBER, LEDGER_VERSION>::open(input)
+                .map_err(|_| AcceptError::InvalidFileFormat)
+                .map_err(MultiError::from_a)?;
+            let mut reader = StrictReader::with(StreamReader::new::<{ usize::MAX }>(file));
+            self.accept(&mut reader, sig_validator)
+        }
+    }
+}
+#[cfg(feature = "binfile")]
+pub use _fs::*;

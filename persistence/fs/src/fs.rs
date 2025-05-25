@@ -21,7 +21,6 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use std::borrow::Borrow;
 use std::convert::Infallible;
 use std::fs::File;
 use std::io::Write;
@@ -32,14 +31,11 @@ use amplify::MultiError;
 use aora::file::{FileAoraIndex, FileAoraMap, FileAuraMap};
 use aora::{AoraIndex, AoraMap, AuraMap, TransactionalMap};
 use binfile::BinFile;
-use commit_verify::StrictHash;
 use hypersonic::{
-    AcceptError, Articles, AuthToken, CellAddr, EffectiveState, Genesis, Identity, Issue, IssueError, Ledger,
-    Operation, Opid, RawState, SemanticError, Semantics, SigBlob, Stock, Transition,
+    Articles, CellAddr, EffectiveState, Genesis, Issue, IssueError, Ledger, Operation, Opid, RawState, SemanticError,
+    Semantics, SigBlob, Stock, Transition,
 };
-use strict_encoding::{
-    DecodeError, StreamReader, StreamWriter, StrictDecode, StrictEncode, StrictReader, StrictWriter,
-};
+use strict_encoding::{DecodeError, StreamReader, StreamWriter, StrictDecode, StrictEncode, StrictWriter};
 
 #[derive(Wrapper, WrapperMut, Debug, From)]
 #[wrapper(Deref)]
@@ -56,7 +52,7 @@ const SEMANTICS_MAGIC: u64 = u64::from_be_bytes(*b"SEMANTIC");
 const STATE_MAGIC: u64 = u64::from_be_bytes(*b"CONSTATE");
 const GENESIS_MAGIC: u64 = u64::from_be_bytes(*b"CGENESIS");
 
-const VERSION_0: u16 = 0;
+const PERSISTENCE_VERSION_0: u16 = 0;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum OpValidity {
@@ -129,16 +125,16 @@ impl Stock for StockFs {
         let file = File::create_new(path.join(Self::FILENAME_CODEX))?;
         serde_yaml::to_writer(file, articles.codex())?;
 
-        let file = BinFile::<GENESIS_MAGIC, VERSION_0>::create_new(path.join(Self::FILENAME_GENESIS))?;
+        let file = BinFile::<GENESIS_MAGIC, PERSISTENCE_VERSION_0>::create_new(path.join(Self::FILENAME_GENESIS))?;
         let writer = StreamWriter::new::<{ usize::MAX }>(file);
         articles.genesis().strict_write(writer)?;
 
-        let file = BinFile::<SEMANTICS_MAGIC, VERSION_0>::create_new(path.join(Self::FILENAME_SEMANTICS))?;
+        let file = BinFile::<SEMANTICS_MAGIC, PERSISTENCE_VERSION_0>::create_new(path.join(Self::FILENAME_SEMANTICS))?;
         let mut writer = StreamWriter::new::<{ usize::MAX }>(file);
         articles.semantics().strict_write(&mut writer)?;
         articles.sig().strict_write(writer)?;
 
-        let file = BinFile::<STATE_MAGIC, VERSION_0>::create_new(path.join(Self::FILENAME_STATE_RAW))?;
+        let file = BinFile::<STATE_MAGIC, PERSISTENCE_VERSION_0>::create_new(path.join(Self::FILENAME_STATE_RAW))?;
         let writer = StreamWriter::new::<{ usize::MAX }>(file);
         state.raw.strict_write(writer)?;
 
@@ -161,16 +157,16 @@ impl Stock for StockFs {
         let codex = serde_yaml::from_reader(file)?;
 
         // TODO: Check there is no content left at the end of reading
-        let file = BinFile::<GENESIS_MAGIC, VERSION_0>::open(path.join(Self::FILENAME_GENESIS))?;
+        let file = BinFile::<GENESIS_MAGIC, PERSISTENCE_VERSION_0>::open(path.join(Self::FILENAME_GENESIS))?;
         let reader = StreamReader::new::<{ usize::MAX }>(file);
         let genesis = Genesis::strict_read(reader)?;
 
-        let file = BinFile::<SEMANTICS_MAGIC, VERSION_0>::open(path.join(Self::FILENAME_SEMANTICS))?;
+        let file = BinFile::<SEMANTICS_MAGIC, PERSISTENCE_VERSION_0>::open(path.join(Self::FILENAME_SEMANTICS))?;
         let mut reader = StreamReader::new::<{ usize::MAX }>(file);
         let semantics = Semantics::strict_read(&mut reader)?;
         let sig = Option::<SigBlob>::strict_read(reader)?;
 
-        let file = BinFile::<STATE_MAGIC, VERSION_0>::open(path.join(Self::FILENAME_STATE_RAW))?;
+        let file = BinFile::<STATE_MAGIC, PERSISTENCE_VERSION_0>::open(path.join(Self::FILENAME_STATE_RAW))?;
         let reader = StreamReader::new::<{ usize::MAX }>(file);
         let raw = RawState::strict_read(reader)?;
 
@@ -218,7 +214,7 @@ impl Stock for StockFs {
     ) -> Result<bool, MultiError<SemanticError, FsError>> {
         let res = f(&mut self.articles).map_err(MultiError::A)?;
 
-        let file = BinFile::<SEMANTICS_MAGIC, VERSION_0>::create(self.path.join(Self::FILENAME_SEMANTICS))
+        let file = BinFile::<SEMANTICS_MAGIC, PERSISTENCE_VERSION_0>::create(self.path.join(Self::FILENAME_SEMANTICS))
             .map_err(MultiError::from_b)?;
         let mut writer = StreamWriter::new::<{ usize::MAX }>(file);
         self.articles
@@ -236,7 +232,7 @@ impl Stock for StockFs {
     fn update_state<R>(&mut self, f: impl FnOnce(&mut EffectiveState, &Articles) -> R) -> Result<R, FsError> {
         let res = f(&mut self.state, &self.articles);
 
-        let file = BinFile::<STATE_MAGIC, VERSION_0>::create(self.path.join(Self::FILENAME_STATE_RAW))?;
+        let file = BinFile::<STATE_MAGIC, PERSISTENCE_VERSION_0>::create(self.path.join(Self::FILENAME_STATE_RAW))?;
         let writer = StreamWriter::new::<{ usize::MAX }>(file);
         self.state.raw.strict_write(writer)?;
 
@@ -271,26 +267,6 @@ impl LedgerDir {
         let file = File::create_new(output)?;
         let writer = StrictWriter::with(StreamWriter::new::<{ usize::MAX }>(file));
         self.export_all(writer)
-    }
-
-    pub fn export_to_file(
-        &mut self,
-        terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
-        output: impl AsRef<Path>,
-    ) -> io::Result<()> {
-        let file = File::create_new(output)?;
-        let writer = StrictWriter::with(StreamWriter::new::<{ usize::MAX }>(file));
-        self.export(terminals, writer)
-    }
-
-    pub fn accept_from_file<E>(
-        &mut self,
-        input: impl AsRef<Path>,
-        sig_validator: impl FnOnce(StrictHash, &Identity, &SigBlob) -> Result<(), E>,
-    ) -> Result<(), MultiError<AcceptError, FsError>> {
-        let file = File::open(input).map_err(MultiError::from_b)?;
-        let mut reader = StrictReader::with(StreamReader::new::<{ usize::MAX }>(file));
-        self.accept(&mut reader, sig_validator)
     }
 
     pub fn path(&self) -> &Path { &self.0.stock().path }

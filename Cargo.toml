@@ -74,6 +74,7 @@ aluvm.workspace = true
 ultrasonic.workspace = true
 sonic-api.workspace = true
 sonic-callreq.workspace = true
+binfile = { workspace = true, optional = true }
 indexmap.workspace = true
 serde = { workspace = true, optional = true }
 
@@ -87,7 +88,7 @@ petgraph = "0.8.1"
 default = ["std"]
 all = ["stl", "vesper", "binfile", "std", "serde"]
 
-binfile = ["sonic-api/binfile"]
+binfile = ["sonic-api/binfile", "dep:binfile"]
 std = ["sonic-api/std", "sonic-callreq/std"]
 vesper = ["ultrasonic/vesper"]
 stl = ["commit_verify/stl", "ultrasonic/stl", "strict_types/armor"]
