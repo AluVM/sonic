@@ -79,7 +79,7 @@ pub enum StateAggregator {
 }
 
 impl StateAggregator {
-    pub fn read<'s, I: IntoIterator<Item = StateAtom>>(&self, state: impl Fn(&StateName) -> I) -> StrictVal {
+    pub fn read<I: IntoIterator<Item = StateAtom>>(&self, state: impl Fn(&StateName) -> I) -> StrictVal {
         match self {
             StateAggregator::Unit => StrictVal::Unit,
             //EmbeddedReaders::Const(val) => val.clone(),

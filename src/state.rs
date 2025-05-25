@@ -256,7 +256,7 @@ impl ProcessedState {
                         let verified = self.aggregated.get(state_name)?.clone();
                         Some(vec![StateAtom { verified, unverified: None }])
                     })
-                    .unwrap_or_else(|| vec![])
+                    .unwrap_or_default()
             });
             self.aggregated.insert(name.clone(), val);
         }

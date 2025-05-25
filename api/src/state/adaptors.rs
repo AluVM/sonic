@@ -219,6 +219,7 @@ fn typed_build(ty: StateTy, ser: ConfinedBlob<0, TOTAL_BYTES>) -> StateValue {
     StateValue::from_iter(elems)
 }
 
+#[allow(clippy::result_large_err)]
 fn typed_field_build(ty: StateTy, val: StrictVal) -> Result<StateValue, StateBuildError> {
     let mut elems = Vec::with_capacity(4);
     elems.push(ty);
@@ -239,6 +240,7 @@ fn typed_field_build(ty: StateTy, val: StrictVal) -> Result<StateValue, StateBui
     })
 }
 
+#[allow(clippy::result_large_err)]
 fn typed_field_build_items(
     ty: StateTy,
     vals: impl IntoIterator<Item = StrictVal>,
@@ -253,6 +255,7 @@ fn typed_field_build_items(
     Ok(StateValue::from_iter(items))
 }
 
+#[allow(clippy::result_large_err)]
 fn typed_field_build_item(val: StrictVal) -> Result<Option<u256>, StateBuildError> {
     Ok(match val {
         StrictVal::Unit => None,
