@@ -30,11 +30,6 @@ use ultrasonic::{CallId, Codex, CodexId, Identity, LibRepo};
 
 use crate::{Api, SemanticError, Semantics, SigBlob, Versioned, LIB_NAME_SONIC};
 
-/// The magic number used in storing issuer as a binary file.
-pub const ISSUER_MAGIC_NUMBER: [u8; 8] = *b"ISSUER  ";
-/// The issuer encoding version used in storing issuer as a binary file.
-pub const ISSUER_VERSION: [u8; 2] = [0x00, 0x01];
-
 /// Articles id is a versioned variant for the contract id.
 pub type IssuerId = Versioned<CodexId>;
 
@@ -148,7 +143,9 @@ mod _fs {
 
     use crate::{Issuer, Semantics, SigBlob};
 
-    pub const ISSUER_MAGIC_NUMBER: u64 = u64::from_be_bytes(*b"COISSUER");
+    /// The magic number used in storing issuer as a binary file.
+    pub const ISSUER_MAGIC_NUMBER: u64 = u64::from_be_bytes(*b"ISSUER  ");
+    /// The issuer encoding version used in storing issuer as a binary file.
     pub const ISSUER_VERSION: u16 = 0;
 
     impl Issuer {
@@ -189,3 +186,5 @@ mod _fs {
         }
     }
 }
+#[cfg(feature = "binfile")]
+pub use _fs::*;
