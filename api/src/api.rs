@@ -53,7 +53,7 @@ use strict_types::{SemId, StrictDecode, StrictDumb, StrictEncode, StrictVal, Typ
 use ultrasonic::{CallId, Codex, CodexId, StateData, StateValue};
 
 use crate::{
-    RawBuilder, RawConvertor, StateAggregator, StateArithm, StateAtom, StateBuildError, StateBuilder, StateCalc,
+    Aggregator, RawBuilder, RawConvertor, StateArithm, StateAtom, StateBuildError, StateBuilder, StateCalc,
     StateConvertError, StateConvertor, LIB_NAME_SONIC,
 };
 
@@ -353,7 +353,7 @@ pub struct Api {
     ///
     /// The typical examples when readers are used are to sum individual asset issues and compute
     /// the number of totally issued assets.
-    pub aggregators: TinyOrdMap<MethodName, StateAggregator>,
+    pub aggregators: TinyOrdMap<MethodName, Aggregator>,
 
     /// Links between named transaction methods defined in the interface - and corresponding
     /// verifier call ids defined by the contract.

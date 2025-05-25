@@ -97,11 +97,12 @@ impl EffectiveState {
 
     /// Re-evaluates computable part of the state
     pub fn recompute(&mut self, apis: &Semantics) {
-        self.main.aggregate(&apis.default, &apis.api_libs);
+        self.main
+            .aggregate(&apis.default, &apis.api_libs, &apis.types);
         self.aux = bmap! {};
         for (name, api) in &apis.custom {
             let mut state = ProcessedState::default();
-            state.aggregate(api, &apis.api_libs);
+            state.aggregate(api, &apis.api_libs, &apis.types);
             self.aux.insert(name.clone(), state);
         }
     }
@@ -245,24 +246,32 @@ impl ProcessedState {
 
     pub fn owned(&self, name: &StateName) -> Option<&BTreeMap<CellAddr, StrictVal>> { self.owned.get(name) }
 
-    pub(super) fn aggregate(&mut self, api: &Api, libs: &SmallOrdSet<Lib>) {
+    /// Computes aggregated state.
+    ///
+    /// Ignores cycle dependencies between aggregators; the computed state with them is not
+    /// produced.
+    pub(super) fn aggregate(&mut self, api: &Api, libs: &SmallOrdSet<Lib>, types: &TypeSystem) {
         self.aggregated = bmap! {};
-        for (name, aggregator) in api.aggregators() {
-            let val = aggregator.aggregate(
-                |state_name| {
-                    self.global(state_name)
-                        .map(|map| map.values().cloned().collect::<Vec<_>>())
-                        .or_else(|| {
-                            let verified = self.aggregated.get(state_name)?.clone();
-                            Some(vec![StateAtom { verified, unverified: None }])
-                        })
-                        .unwrap_or_default()
-                },
-                libs,
-            );
-            if let Some(val) = val {
-                self.aggregated.insert(name.clone(), val);
+        let mut computed = 0usize;
+        loop {
+            for (name, aggregator) in api.aggregators() {
+                if aggregator
+                    .depends_on()
+                    .any(|s| !self.global.contains_key(s) && !self.aggregated.contains_key(s))
+                {
+                    break;
+                }
+                let val = aggregator.aggregate(&self.global, &self.aggregated, libs, types);
+                if let Some(val) = val {
+                    if self.aggregated.insert(name.clone(), val).is_none() {
+                        computed += 1;
+                    }
+                }
             }
+            if computed == 0 {
+                break;
+            }
+            computed = 0;
         }
     }
 

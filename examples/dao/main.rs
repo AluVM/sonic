@@ -39,7 +39,7 @@ use commit_verify::{Digest, Sha256};
 use hypersonic::{Api, GlobalApi, OwnedApi};
 use sonic_persist_fs::LedgerDir;
 use sonicapi::{
-    Issuer, RawBuilder, RawConvertor, Semantics, StateAggregator, StateArithm, StateBuilder, StateConvertor,
+    Aggregator, Issuer, RawBuilder, RawConvertor, Semantics, StateArithm, StateBuilder, StateConvertor, SubAggregator,
 };
 use strict_types::{SemId, StrictVal};
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
@@ -110,10 +110,10 @@ fn api() -> Api {
             }
         },
         aggregators: tiny_bmap! {
-            vname!("parties") => StateAggregator::MapV2U(vname!("_parties")),
-            vname!("votings") => StateAggregator::MapV2U(vname!("_votings")),
-            vname!("votes") => StateAggregator::SetV(vname!("_votes")),
-            vname!("votingCount") => StateAggregator::Count(vname!("_votings")),
+            vname!("parties") => Aggregator::Take(SubAggregator::MapV2U(vname!("_parties"))),
+            vname!("votings") => Aggregator::Take(SubAggregator::MapV2U(vname!("_votings"))),
+            vname!("votes") => Aggregator::Take(SubAggregator::SetV(vname!("_votes"))),
+            vname!("votingCount") => Aggregator::Count(vname!("_votings")),
         },
         verifiers: tiny_bmap! {
             vname!("setup") => 0,
