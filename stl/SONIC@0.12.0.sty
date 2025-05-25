@@ -1,5 +1,5 @@
 {-
-  Id: stl:ua~UUPtR-VR~rVc8-0tefjA~-sf0FNf~-a6kodv8-kYSgebM#crack-ballet-geneva
+  Id: stl:DNcqIYE8-uA_vWkA-0dU28ca-EX0FY0n-Pw7B27z-iUGfwIw#snow-taboo-popular
   Name: SONIC
   Version: 0.12.0
   Description: Standard library for formally-verifiable distributed contracts
@@ -129,17 +129,20 @@ data Semantics         : version U16
 @mnemonic(insect-cello-avalon)
 data SigBlob           : [Byte ^ 1..0x1000]
 
-@mnemonic(pocket-story-bombay)
+@mnemonic(retro-cycle-learn)
 data StateAggregator   : unit ()
+                       | toSome StrictTypes.VariantName
+                       | unwrapOr (StrictTypes.VariantName, [Byte ^ ..0xff])
                        | const [Byte ^ ..0xff]
-                       | count StrictTypes.VariantName
-                       | sumV StrictTypes.VariantName
-                       | sum (StrictTypes.VariantName, StrictTypes.VariantName)
-                       | diff (StrictTypes.VariantName, StrictTypes.VariantName)
-                       | toSome#16 StrictTypes.VariantName
-                       | listV#32 StrictTypes.VariantName
-                       | setV#34 StrictTypes.VariantName
-                       | mapV2u#48 StrictTypes.VariantName
+                       | if StrictTypes.VariantName
+                       | count#16 StrictTypes.VariantName
+                       | sum#32 (StrictTypes.VariantName, StrictTypes.VariantName)
+                       | diff#34 (StrictTypes.VariantName, StrictTypes.VariantName)
+                       | listV#48 StrictTypes.VariantName
+                       | setV StrictTypes.VariantName
+                       | mapV2u StrictTypes.VariantName
+                       | sumV#64 StrictTypes.VariantName
+                       | trySumV StrictTypes.VariantName
 
 @mnemonic(meteor-gondola-sweden)
 data StateArithm       : fungible | nonFungible

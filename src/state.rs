@@ -249,7 +249,7 @@ impl ProcessedState {
     pub(super) fn aggregate(&mut self, api: &Api) {
         self.aggregated = bmap! {};
         for (name, aggregator) in api.aggregators() {
-            let val = aggregator.read(|state_name| {
+            let val = aggregator.aggregate(|state_name| {
                 self.immutable(state_name)
                     .map(|map| map.values().cloned().collect::<Vec<_>>())
                     .or_else(|| {

@@ -67,19 +67,24 @@ rec Semantics
       ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
       union value, StateAggregator
         is unit, Unit, tag 0
-        bytes const, len 0..MAX8, wrapped, tag 1
-        ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 2
-        ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 3
-        tuple sum, tag 4
+        ascii toSome, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 1
+        tuple unwrapOr, tag 2
+          ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
+          bytes _, len 0..MAX8
+        bytes const, len 0..MAX8, wrapped, tag 3
+        ascii if, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 4
+        ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 5
+        tuple sum, tag 6
           ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
           ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-        tuple diff, tag 5
+        tuple diff, tag 7
           ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
           ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-        ascii toSome, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 6
-        ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 7
-        ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
-        ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
+        ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
+        ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
+        ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 10
+        ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 11
+        ascii trySumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 12
     map verifiers, len 0..MAX8
       ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
       is value, U16
@@ -134,19 +139,24 @@ rec Semantics
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
         union value, StateAggregator
           is unit, Unit, tag 0
-          bytes const, len 0..MAX8, wrapped, tag 1
-          ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 2
-          ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 3
-          tuple sum, tag 4
+          ascii toSome, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 1
+          tuple unwrapOr, tag 2
+            ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
+            bytes _, len 0..MAX8
+          bytes const, len 0..MAX8, wrapped, tag 3
+          ascii if, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 4
+          ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 5
+          tuple sum, tag 6
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-          tuple diff, tag 5
+          tuple diff, tag 7
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-          ascii toSome, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 6
-          ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 7
-          ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
-          ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
+          ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
+          ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
+          ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 10
+          ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 11
+          ascii trySumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 12
       map verifiers, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
         is value, U16
@@ -267,19 +277,24 @@ rec Issuer
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
         union value, StateAggregator
           is unit, Unit, tag 0
-          bytes const, len 0..MAX8, wrapped, tag 1
-          ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 2
-          ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 3
-          tuple sum, tag 4
+          ascii toSome, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 1
+          tuple unwrapOr, tag 2
+            ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
+            bytes _, len 0..MAX8
+          bytes const, len 0..MAX8, wrapped, tag 3
+          ascii if, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 4
+          ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 5
+          tuple sum, tag 6
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-          tuple diff, tag 5
+          tuple diff, tag 7
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-          ascii toSome, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 6
-          ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 7
-          ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
-          ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
+          ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
+          ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
+          ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 10
+          ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 11
+          ascii trySumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 12
       map verifiers, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
         is value, U16
@@ -334,19 +349,24 @@ rec Issuer
           ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
           union value, StateAggregator
             is unit, Unit, tag 0
-            bytes const, len 0..MAX8, wrapped, tag 1
-            ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 2
-            ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 3
-            tuple sum, tag 4
+            ascii toSome, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 1
+            tuple unwrapOr, tag 2
+              ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
+              bytes _, len 0..MAX8
+            bytes const, len 0..MAX8, wrapped, tag 3
+            ascii if, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 4
+            ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 5
+            tuple sum, tag 6
               ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
               ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-            tuple diff, tag 5
+            tuple diff, tag 7
               ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
               ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-            ascii toSome, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 6
-            ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 7
-            ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
-            ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
+            ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
+            ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
+            ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 10
+            ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 11
+            ascii trySumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 12
         map verifiers, len 0..MAX8
           ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
           is value, U16
@@ -451,19 +471,24 @@ rec Articles
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
         union value, StateAggregator
           is unit, Unit, tag 0
-          bytes const, len 0..MAX8, wrapped, tag 1
-          ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 2
-          ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 3
-          tuple sum, tag 4
+          ascii toSome, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 1
+          tuple unwrapOr, tag 2
+            ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
+            bytes _, len 0..MAX8
+          bytes const, len 0..MAX8, wrapped, tag 3
+          ascii if, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 4
+          ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 5
+          tuple sum, tag 6
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-          tuple diff, tag 5
+          tuple diff, tag 7
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-          ascii toSome, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 6
-          ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 7
-          ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
-          ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
+          ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
+          ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
+          ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 10
+          ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 11
+          ascii trySumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 12
       map verifiers, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
         is value, U16
@@ -518,19 +543,24 @@ rec Articles
           ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
           union value, StateAggregator
             is unit, Unit, tag 0
-            bytes const, len 0..MAX8, wrapped, tag 1
-            ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 2
-            ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 3
-            tuple sum, tag 4
+            ascii toSome, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 1
+            tuple unwrapOr, tag 2
+              ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
+              bytes _, len 0..MAX8
+            bytes const, len 0..MAX8, wrapped, tag 3
+            ascii if, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 4
+            ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 5
+            tuple sum, tag 6
               ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
               ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-            tuple diff, tag 5
+            tuple diff, tag 7
               ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
               ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-            ascii toSome, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 6
-            ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 7
-            ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
-            ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
+            ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
+            ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
+            ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 10
+            ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 11
+            ascii trySumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 12
         map verifiers, len 0..MAX8
           ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
           is value, U16
