@@ -173,7 +173,8 @@ fn setup(name: &str) -> LedgerDir {
         version: 0,
         default: api,
         custom: none!(),
-        libs: small_bset![libs::success()],
+        codex_libs: small_bset![libs::success()],
+        api_libs: none!(),
         types: types.type_system(),
     };
     let issuer = Issuer::new(codex, semantics).unwrap();

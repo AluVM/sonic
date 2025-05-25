@@ -24,7 +24,8 @@
 use alloc::collections::BTreeMap;
 use std::mem;
 
-use amplify::confinement::{LargeOrdMap, SmallOrdMap};
+use aluvm::Lib;
+use amplify::confinement::{LargeOrdMap, SmallOrdMap, SmallOrdSet};
 use sonicapi::{Api, Articles, Semantics, StateAtom, StateName};
 use strict_encoding::{StrictDeserialize, StrictSerialize, TypeName};
 use strict_types::{StrictVal, TypeSystem};
@@ -96,11 +97,11 @@ impl EffectiveState {
 
     /// Re-evaluates computable part of the state
     pub fn recompute(&mut self, apis: &Semantics) {
-        self.main.aggregate(&apis.default);
+        self.main.aggregate(&apis.default, &apis.api_libs);
         self.aux = bmap! {};
         for (name, api) in &apis.custom {
             let mut state = ProcessedState::default();
-            state.aggregate(api);
+            state.aggregate(api, &apis.api_libs);
             self.aux.insert(name.clone(), state);
         }
     }
@@ -244,19 +245,24 @@ impl ProcessedState {
 
     pub fn owned(&self, name: &StateName) -> Option<&BTreeMap<CellAddr, StrictVal>> { self.owned.get(name) }
 
-    pub(super) fn aggregate(&mut self, api: &Api) {
+    pub(super) fn aggregate(&mut self, api: &Api, libs: &SmallOrdSet<Lib>) {
         self.aggregated = bmap! {};
         for (name, aggregator) in api.aggregators() {
-            let val = aggregator.aggregate(|state_name| {
-                self.global(state_name)
-                    .map(|map| map.values().cloned().collect::<Vec<_>>())
-                    .or_else(|| {
-                        let verified = self.aggregated.get(state_name)?.clone();
-                        Some(vec![StateAtom { verified, unverified: None }])
-                    })
-                    .unwrap_or_default()
-            });
-            self.aggregated.insert(name.clone(), val);
+            let val = aggregator.aggregate(
+                |state_name| {
+                    self.global(state_name)
+                        .map(|map| map.values().cloned().collect::<Vec<_>>())
+                        .or_else(|| {
+                            let verified = self.aggregated.get(state_name)?.clone();
+                            Some(vec![StateAtom { verified, unverified: None }])
+                        })
+                        .unwrap_or_default()
+                },
+                libs,
+            );
+            if let Some(val) = val {
+                self.aggregated.insert(name.clone(), val);
+            }
         }
     }
 

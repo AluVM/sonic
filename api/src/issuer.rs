@@ -109,7 +109,7 @@ impl Issuer {
     /// Iterates over all APIs, including the default and the named ones.
     pub fn apis(&self) -> impl Iterator<Item = &Api> { self.semantics.apis() }
     /// Iterates over all codex libraries.
-    pub fn libs(&self) -> impl Iterator<Item = &Lib> { self.semantics.libs.iter() }
+    pub fn codex_libs(&self) -> impl Iterator<Item = &Lib> { self.semantics.codex_libs.iter() }
 
     /// Detect whether the issuer is signed.
     pub fn is_signed(&self) -> bool { self.sig.is_some() }
@@ -130,7 +130,7 @@ impl Issuer {
 impl LibRepo for Issuer {
     fn get_lib(&self, lib_id: LibId) -> Option<&Lib> {
         self.semantics
-            .libs
+            .codex_libs
             .iter()
             .find(|lib| lib.lib_id() == lib_id)
     }

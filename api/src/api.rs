@@ -142,8 +142,9 @@ pub enum ParseVersionedError {
 ///
 /// # Nota bene
 ///
-/// This is not a unique identifier! It is created just for UI, so users can easily vissually
-/// distinguish different sets of APIs from each other.
+/// This is not a unique identifier!
+/// It is created just for UI, so users can easily visually distinguish different sets of APIs from
+/// each other.
 ///
 /// This type is not - and must not be used in any verification.
 #[derive(Wrapper, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, From)]
@@ -224,7 +225,9 @@ pub struct Semantics {
     /// For instance, a contract may provide multiple tokens using different token names.
     pub custom: SmallOrdMap<TypeName, Api>,
     /// A set of zk-AluVM libraries called from the contract codex.
-    pub libs: SmallOrdSet<Lib>,
+    pub codex_libs: SmallOrdSet<Lib>,
+    /// A set of AluVM libraries called from the APIs.
+    pub api_libs: SmallOrdSet<Lib>,
     /// The type system used by the contract APIs.
     pub types: TypeSystem,
 }
@@ -255,14 +258,16 @@ impl CommitEncode for Semantics {
     type CommitmentId = ApisChecksum;
     fn commit_encode(&self, e: &mut CommitEngine) {
         e.commit_to_serialized(&self.version);
+        // We do not commit to the codex_libs since thea are not a part of APIs and are commit to inside the
+        // codex. The fact that there are no other libs is verified in the Articles and Issuer constructors.
         let apis = SmallOrdMap::from_iter_checked(
             self.custom
                 .iter()
                 .map(|(name, api)| (name.clone(), api.api_id())),
         );
         e.commit_to_linear_map(&apis);
-        // We do not commit to the libs since thea are not a part of APIs and are commit to inside the
-        // codes. The fact that there are no other libs is verified in the Articles and Issuer constructors.
+        let libs = SmallOrdSet::from_iter_checked(self.api_libs.iter().map(Lib::lib_id));
+        e.commit_to_linear_set(&libs);
         e.commit_to_serialized(&self.types.id());
     }
 }
@@ -289,7 +294,7 @@ impl Semantics {
         }
 
         let lib_map = self
-            .libs
+            .api_libs
             .iter()
             .map(|lib| (lib.lib_id(), lib))
             .collect::<BTreeMap<_, _>>();

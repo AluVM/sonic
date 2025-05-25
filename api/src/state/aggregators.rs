@@ -21,7 +21,10 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use amplify::confinement::TinyBlob;
+use std::collections::BTreeMap;
+
+use aluvm::{Lib, LibId, LibSite};
+use amplify::confinement::{TinyBlob, TinyOrdSet};
 use sonic_callreq::StateName;
 use strict_encoding::StrictDumb;
 use strict_types::value::StrictNum;
@@ -57,13 +60,6 @@ pub enum StateAggregator {
     /// Provide aggregated state as a constant value.
     #[strict_type(tag = 3)]
     Const(TinyBlob),
-
-    /// Converts an existing global or aggregated state into an optional, setting it to `Some`
-    /// some external check passes.
-    ///
-    /// Fails the check always if the `StateName` is another aggregated state.
-    #[strict_type(tag = 4)]
-    If(StateName),
 
     /// Count the number of elements in the state of a certain type.
     #[strict_type(tag = 0x10)]
@@ -103,12 +99,30 @@ pub enum StateAggregator {
     /// sets the aggregated state to `None`.
     #[strict_type(tag = 0x41)]
     TrySumV(StateName),
+
+    /// Execute a custom function on the state.
+    #[strict_type(tag = 0xFF)]
+    AluVM(
+        /// The entry point to the script (virtual machine uses libraries from
+        /// [`crate::Semantics`]).
+        LibSite,
+        /// The aggregated state which must be computed when the script is called.
+        TinyOrdSet<StateName>,
+    ),
 }
 
 impl StateAggregator {
+    /// Compute state via applying some aggregator function.
     ///
-    pub fn aggregate<I: IntoIterator<Item = StateAtom>>(&self, state: impl Fn(&StateName) -> I) -> StrictVal {
-        match self {
+    /// # Returns
+    ///
+    /// Aggregated state value. If the computing fails due to any exception, `None`.
+    pub fn aggregate<'libs, I: IntoIterator<Item = StateAtom>>(
+        &self,
+        state: impl Fn(&StateName) -> I,
+        libs: impl IntoIterator<Item = &'libs Lib>,
+    ) -> Option<StrictVal> {
+        Some(match self {
             StateAggregator::Unit => StrictVal::Unit,
             //EmbeddedReaders::Const(val) => val.clone(),
             StateAggregator::Count(name) => {
@@ -156,9 +170,21 @@ impl StateAggregator {
             StateAggregator::Diff(_, _) => todo!(),
             StateAggregator::ToSome(_) => todo!(),
             StateAggregator::UnwrapOr(_, _) => todo!(),
-            StateAggregator::If(_) => todo!(),
             StateAggregator::TrySumV(_) => todo!(),
-        }
+
+            StateAggregator::AluVM(entry, _) => {
+                let libs = libs
+                    .into_iter()
+                    .map(|lib| (lib.lib_id(), lib))
+                    .collect::<BTreeMap<_, _>>();
+                let mut vm = aluvm::Vm::<aluvm::isa::Instr<LibId>>::new();
+                // For now, we ignore all computations and return `None` anyway.
+                // This leaves a way to add proper VM computing in the future
+                // in a backward-compatible way.
+                let _status = vm.exec(*entry, &(), |id| libs.get(&id));
+                return None;
+            }
+        })
     }
 }
 
@@ -180,24 +206,49 @@ mod test {
 
         let adaptor = StateAggregator::Count(vname!("test1"));
         assert_eq!(
-            adaptor.aggregate(|name| {
-                assert_eq!(name.as_str(), "test1");
-                state.clone().into_iter()
-            }),
+            adaptor
+                .aggregate(
+                    |name| {
+                        assert_eq!(name.as_str(), "test1");
+                        state.clone().into_iter()
+                    },
+                    None
+                )
+                .unwrap(),
             svnum!(6u64)
         );
 
         let adaptor = StateAggregator::SumV(vname!("test"));
-        assert_eq!(adaptor.aggregate(|_| { state.clone().into_iter() }), svnum!(5u64 + 1 + 2 + 3 + 4 + 5));
+        assert_eq!(
+            adaptor
+                .aggregate(|_| { state.clone().into_iter() }, None)
+                .unwrap(),
+            svnum!(5u64 + 1 + 2 + 3 + 4 + 5)
+        );
 
         let adaptor = StateAggregator::ListV(vname!("test"));
-        assert_eq!(adaptor.aggregate(|_| { state.clone().into_iter() }), svlist!([5u64, 1u64, 2u64, 3u64, 4u64, 5u64]));
+        assert_eq!(
+            adaptor
+                .aggregate(|_| { state.clone().into_iter() }, None)
+                .unwrap(),
+            svlist!([5u64, 1u64, 2u64, 3u64, 4u64, 5u64])
+        );
 
         let adaptor = StateAggregator::SetV(vname!("test"));
-        assert_eq!(adaptor.aggregate(|_| { state.clone().into_iter() }), svset!([5u64, 1u64, 2u64, 3u64, 4u64]));
+        assert_eq!(
+            adaptor
+                .aggregate(|_| { state.clone().into_iter() }, None)
+                .unwrap(),
+            svset!([5u64, 1u64, 2u64, 3u64, 4u64])
+        );
 
         let adaptor = StateAggregator::MapV2U(vname!("test"));
-        assert_eq!(adaptor.aggregate(|_| { state.clone().into_iter() }), StrictVal::Map(none!()));
+        assert_eq!(
+            adaptor
+                .aggregate(|_| { state.clone().into_iter() }, None)
+                .unwrap(),
+            StrictVal::Map(none!())
+        );
     }
 
     #[test]
@@ -212,20 +263,42 @@ mod test {
         ];
 
         let adaptor = StateAggregator::Count(vname!("test"));
-        assert_eq!(adaptor.aggregate(|_| { state.clone().into_iter() }), svnum!(6u64));
+        assert_eq!(
+            adaptor
+                .aggregate(|_| { state.clone().into_iter() }, None)
+                .unwrap(),
+            svnum!(6u64)
+        );
 
         let adaptor = StateAggregator::SumV(vname!("test"));
-        assert_eq!(adaptor.aggregate(|_| { state.clone().into_iter() }), svnum!(0u64));
+        assert_eq!(
+            adaptor
+                .aggregate(|_| { state.clone().into_iter() }, None)
+                .unwrap(),
+            svnum!(0u64)
+        );
 
         let adaptor = StateAggregator::ListV(vname!("test"));
-        assert_eq!(adaptor.aggregate(|_| { state.clone().into_iter() }), svlist!([(), (), (), (), (), ()]));
+        assert_eq!(
+            adaptor
+                .aggregate(|_| { state.clone().into_iter() }, None)
+                .unwrap(),
+            svlist!([(), (), (), (), (), ()])
+        );
 
         let adaptor = StateAggregator::SetV(vname!("test"));
-        assert_eq!(adaptor.aggregate(|_| { state.clone().into_iter() }), svset!([()]));
+        assert_eq!(
+            adaptor
+                .aggregate(|_| { state.clone().into_iter() }, None)
+                .unwrap(),
+            svset!([()])
+        );
 
         let adaptor = StateAggregator::MapV2U(vname!("test"));
         assert_eq!(
-            adaptor.aggregate(|_| { state.clone().into_iter() }),
+            adaptor
+                .aggregate(|_| { state.clone().into_iter() }, None)
+                .unwrap(),
             StrictVal::Map(vec![(StrictVal::Unit, svnum!(5u64)),])
         );
     }
@@ -242,20 +315,42 @@ mod test {
         ];
 
         let adaptor = StateAggregator::Count(vname!("test"));
-        assert_eq!(adaptor.aggregate(|_| { state.clone().into_iter() }), svnum!(6u64));
+        assert_eq!(
+            adaptor
+                .aggregate(|_| { state.clone().into_iter() }, None)
+                .unwrap(),
+            svnum!(6u64)
+        );
 
         let adaptor = StateAggregator::SumV(vname!("test"));
-        assert_eq!(adaptor.aggregate(|_| { state.clone().into_iter() }), svnum!(5u64 + 1 + 2 + 3 + 4 + 5));
+        assert_eq!(
+            adaptor
+                .aggregate(|_| { state.clone().into_iter() }, None)
+                .unwrap(),
+            svnum!(5u64 + 1 + 2 + 3 + 4 + 5)
+        );
 
         let adaptor = StateAggregator::ListV(vname!("test"));
-        assert_eq!(adaptor.aggregate(|_| { state.clone().into_iter() }), svlist!([5u64, 1u64, 2u64, 3u64, 4u64, 5u64]));
+        assert_eq!(
+            adaptor
+                .aggregate(|_| { state.clone().into_iter() }, None)
+                .unwrap(),
+            svlist!([5u64, 1u64, 2u64, 3u64, 4u64, 5u64])
+        );
 
         let adaptor = StateAggregator::SetV(vname!("test"));
-        assert_eq!(adaptor.aggregate(|_| { state.clone().into_iter() }), svset!([5u64, 1u64, 2u64, 3u64, 4u64]));
+        assert_eq!(
+            adaptor
+                .aggregate(|_| { state.clone().into_iter() }, None)
+                .unwrap(),
+            svset!([5u64, 1u64, 2u64, 3u64, 4u64])
+        );
 
         let adaptor = StateAggregator::MapV2U(vname!("test"));
         assert_eq!(
-            adaptor.aggregate(|_| { state.clone().into_iter() }),
+            adaptor
+                .aggregate(|_| { state.clone().into_iter() }, None)
+                .unwrap(),
             StrictVal::Map(vec![
                 (svnum!(5u64), svstr!("state 1")),
                 (svnum!(1u64), svstr!("state 2")),

@@ -17,6 +17,8 @@ commitment ApisChecksum, hasher SHA256, tagged urn:ubideco:sonic:apis#2025-05-25
   map StrictHash, len 0..MAX16
     mapKey TypeName
     mapValue StrictHash
+  set LibId, len 0..MAX16
+    element LibId
   serialized TypeSysId
 
 rec Semantics
@@ -72,19 +74,24 @@ rec Semantics
           ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
           bytes _, len 0..MAX8
         bytes const, len 0..MAX8, wrapped, tag 3
-        ascii if, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 4
-        ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 5
-        tuple sum, tag 6
+        ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 4
+        tuple sum, tag 5
           ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
           ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-        tuple diff, tag 7
+        tuple diff, tag 6
           ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
           ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-        ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
-        ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
-        ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 10
-        ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 11
-        ascii trySumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 12
+        ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 7
+        ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
+        ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
+        ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 10
+        ascii trySumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 11
+        tuple aluVm, tag 12
+          rec LibSite
+            bytes libId, len 32, aka LibId
+            is offset, U16
+          set _, len 0..MAX8
+            ascii element, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
     map verifiers, len 0..MAX8
       ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
       is value, U16
@@ -144,26 +151,39 @@ rec Semantics
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
             bytes _, len 0..MAX8
           bytes const, len 0..MAX8, wrapped, tag 3
-          ascii if, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 4
-          ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 5
-          tuple sum, tag 6
+          ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 4
+          tuple sum, tag 5
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-          tuple diff, tag 7
+          tuple diff, tag 6
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-          ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
-          ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
-          ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 10
-          ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 11
-          ascii trySumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 12
+          ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 7
+          ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
+          ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
+          ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 10
+          ascii trySumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 11
+          tuple aluVm, tag 12
+            rec LibSite
+              bytes libId, len 32, aka LibId
+              is offset, U16
+            set _, len 0..MAX8
+              ascii element, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
       map verifiers, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
         is value, U16
       map errors, len 0..MAX8
         is key, U256
         str value, len 0..MAX8
-  set libs, len 0..MAX16
+  set codexLibs, len 0..MAX16
+    rec Lib
+      set isae, len 0..MAX8
+        ascii element, aka IsaId, first AlphaCapsNum, rest AlphaCapsNum, len 1..16
+      bytes code, len 0..MAX16
+      bytes data, len 0..MAX16
+      set libs, len 0..MAX8
+        bytes element, len 32, aka LibId
+  set apiLibs, len 0..MAX16
     rec Lib
       set isae, len 0..MAX8
         ascii element, aka IsaId, first AlphaCapsNum, rest AlphaCapsNum, len 1..16
@@ -282,19 +302,24 @@ rec Issuer
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
             bytes _, len 0..MAX8
           bytes const, len 0..MAX8, wrapped, tag 3
-          ascii if, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 4
-          ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 5
-          tuple sum, tag 6
+          ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 4
+          tuple sum, tag 5
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-          tuple diff, tag 7
+          tuple diff, tag 6
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-          ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
-          ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
-          ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 10
-          ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 11
-          ascii trySumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 12
+          ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 7
+          ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
+          ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
+          ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 10
+          ascii trySumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 11
+          tuple aluVm, tag 12
+            rec LibSite
+              bytes libId, len 32, aka LibId
+              is offset, U16
+            set _, len 0..MAX8
+              ascii element, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
       map verifiers, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
         is value, U16
@@ -354,26 +379,39 @@ rec Issuer
               ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
               bytes _, len 0..MAX8
             bytes const, len 0..MAX8, wrapped, tag 3
-            ascii if, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 4
-            ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 5
-            tuple sum, tag 6
+            ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 4
+            tuple sum, tag 5
               ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
               ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-            tuple diff, tag 7
+            tuple diff, tag 6
               ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
               ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-            ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
-            ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
-            ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 10
-            ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 11
-            ascii trySumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 12
+            ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 7
+            ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
+            ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
+            ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 10
+            ascii trySumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 11
+            tuple aluVm, tag 12
+              rec LibSite
+                bytes libId, len 32, aka LibId
+                is offset, U16
+              set _, len 0..MAX8
+                ascii element, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
         map verifiers, len 0..MAX8
           ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
           is value, U16
         map errors, len 0..MAX8
           is key, U256
           str value, len 0..MAX8
-    set libs, len 0..MAX16
+    set codexLibs, len 0..MAX16
+      rec Lib
+        set isae, len 0..MAX8
+          ascii element, aka IsaId, first AlphaCapsNum, rest AlphaCapsNum, len 1..16
+        bytes code, len 0..MAX16
+        bytes data, len 0..MAX16
+        set libs, len 0..MAX8
+          bytes element, len 32, aka LibId
+    set apiLibs, len 0..MAX16
       rec Lib
         set isae, len 0..MAX8
           ascii element, aka IsaId, first AlphaCapsNum, rest AlphaCapsNum, len 1..16
@@ -476,19 +514,24 @@ rec Articles
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
             bytes _, len 0..MAX8
           bytes const, len 0..MAX8, wrapped, tag 3
-          ascii if, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 4
-          ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 5
-          tuple sum, tag 6
+          ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 4
+          tuple sum, tag 5
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-          tuple diff, tag 7
+          tuple diff, tag 6
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
             ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-          ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
-          ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
-          ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 10
-          ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 11
-          ascii trySumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 12
+          ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 7
+          ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
+          ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
+          ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 10
+          ascii trySumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 11
+          tuple aluVm, tag 12
+            rec LibSite
+              bytes libId, len 32, aka LibId
+              is offset, U16
+            set _, len 0..MAX8
+              ascii element, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
       map verifiers, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
         is value, U16
@@ -548,26 +591,39 @@ rec Articles
               ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
               bytes _, len 0..MAX8
             bytes const, len 0..MAX8, wrapped, tag 3
-            ascii if, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 4
-            ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 5
-            tuple sum, tag 6
+            ascii count, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 4
+            tuple sum, tag 5
               ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
               ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-            tuple diff, tag 7
+            tuple diff, tag 6
               ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
               ascii _, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-            ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
-            ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
-            ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 10
-            ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 11
-            ascii trySumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 12
+            ascii listV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 7
+            ascii setV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 8
+            ascii mapV2u, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 9
+            ascii sumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 10
+            ascii trySumV, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 11
+            tuple aluVm, tag 12
+              rec LibSite
+                bytes libId, len 32, aka LibId
+                is offset, U16
+              set _, len 0..MAX8
+                ascii element, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
         map verifiers, len 0..MAX8
           ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
           is value, U16
         map errors, len 0..MAX8
           is key, U256
           str value, len 0..MAX8
-    set libs, len 0..MAX16
+    set codexLibs, len 0..MAX16
+      rec Lib
+        set isae, len 0..MAX8
+          ascii element, aka IsaId, first AlphaCapsNum, rest AlphaCapsNum, len 1..16
+        bytes code, len 0..MAX16
+        bytes data, len 0..MAX16
+        set libs, len 0..MAX8
+          bytes element, len 32, aka LibId
+    set apiLibs, len 0..MAX16
       rec Lib
         set isae, len 0..MAX8
           ascii element, aka IsaId, first AlphaCapsNum, rest AlphaCapsNum, len 1..16

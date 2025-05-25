@@ -55,7 +55,7 @@ pub fn dump_articles(articles: &Articles, dst: &Path) -> anyhow::Result<Opid> {
         serde_yaml::to_writer(&out, &api)?;
     }
 
-    for lib in articles.libs() {
+    for lib in articles.codex_libs() {
         let lib_id = lib.lib_id();
         let name = lib_id.to_baid64_mnemonic();
         lib.strict_serialize_to_file::<U24MAX>(dst.join(format!("{name}.alu")))?;

@@ -113,7 +113,7 @@ impl Articles {
     /// Iterates over all APIs, including the default and the named ones.
     pub fn apis(&self) -> impl Iterator<Item = &Api> { self.semantics.apis() }
     /// Iterates over all codex libraries.
-    pub fn libs(&self) -> impl Iterator<Item = &Lib> { self.semantics.libs.iter() }
+    pub fn codex_libs(&self) -> impl Iterator<Item = &Lib> { self.semantics.codex_libs.iter() }
 
     /// Get a reference to the contract issue information.
     pub fn issue(&self) -> &Issue { &self.issue }
@@ -172,7 +172,7 @@ impl Articles {
 impl LibRepo for Articles {
     fn get_lib(&self, lib_id: LibId) -> Option<&Lib> {
         self.semantics
-            .libs
+            .codex_libs
             .iter()
             .find(|lib| lib.lib_id() == lib_id)
     }
