@@ -294,6 +294,7 @@ impl<S: Stock> Ledger<S> {
         terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
         mut writer: StrictWriter<impl WriteRaw>,
     ) -> io::Result<()> {
+        // TODO Use binfile!
         // This is compatible with BinFile
         writer = LEDGER_MAGIC_NUMBER.strict_encode(writer)?;
         // Version
@@ -375,13 +376,9 @@ impl<S: Stock> Ledger<S> {
         Ok(())
     }
 
-    pub fn upgrade_apis<E>(
-        &mut self,
-        new_articles: Articles,
-        sig_validator: impl FnOnce(StrictHash, &Identity, &SigBlob) -> Result<(), E>,
-    ) -> Result<bool, MultiError<SemanticError, S::Error>> {
+    pub fn upgrade_apis(&mut self, new_articles: Articles) -> Result<bool, MultiError<SemanticError, S::Error>> {
         self.0
-            .update_articles(|articles| articles.upgrade_apis(new_articles, sig_validator))
+            .update_articles(|articles| articles.upgrade_apis(new_articles))
     }
 
     pub fn accept<E>(
@@ -410,13 +407,14 @@ impl<S: Stock> Ledger<S> {
 
             let contract_id = ContractId::strict_decode(reader)?;
             let semantics = Semantics::strict_decode(reader)?;
+            let sig = Option::<SigBlob>::strict_decode(reader)?;
             let issue = Issue::strict_decode(reader)?;
-            let articles = Articles::new(semantics, issue)?;
+            let articles = Articles::with(semantics, issue, sig, sig_validator)?;
             if articles.contract_id() != contract_id {
                 return Err(AcceptError::Articles(SemanticError::ContractMismatch));
             }
 
-            self.upgrade_apis(articles, sig_validator)
+            self.upgrade_apis(articles)
                 .map_err(|e| AcceptError::Persistence(e.to_string()))?;
             Ok(())
         })()

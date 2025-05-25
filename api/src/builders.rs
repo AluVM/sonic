@@ -21,6 +21,7 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+use std::convert::Infallible;
 use std::ops::{Deref, DerefMut};
 
 use aluvm::LibSite;
@@ -183,7 +184,8 @@ impl IssueBuilder {
         let genesis = self.builder.issue_genesis(self.issuer.codex_id());
         let (codex, semantics) = self.issuer.dismember();
         let issue = Issue { version: default!(), meta, codex, genesis };
-        Articles::new(semantics, issue).expect("broken issue builder")
+        Articles::with(semantics, issue, None, |_, _, _| -> Result<_, Infallible> { unreachable!() })
+            .expect("broken issue builder")
     }
 }
 

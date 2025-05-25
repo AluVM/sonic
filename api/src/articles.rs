@@ -46,7 +46,8 @@ pub type ArticlesId = Versioned<ContractId>;
 /// The structure provides the following invariance guarantees:
 /// - all the API codex matches the codex under which the contract was issued;
 /// - all the API ids are unique;
-/// - all custom APIs have unique names.
+/// - all custom APIs have unique names;
+/// - the signature, if present, is a valid sig over the [`ArticlesId`].
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode)]
 // We must not derive or implement StrictDecode for Issuer, since we cannot validate signature
@@ -57,31 +58,31 @@ pub struct Articles {
     /// Thus, a dedicated substructure [`Semantics`] is introduced, which keeps a shared part of
     /// both [`Issuer`] and [`Articles`].
     semantics: Semantics,
+    /// Signature from the contract issuer (`issue.meta.issuer`) over the articles' id.
+    ///
+    /// NB: it must precede the issue, which contains genesis!
+    /// Since genesis is read with a stream-supporting procedure later.
+    sig: Option<SigBlob>,
     /// The contract issue.
     issue: Issue,
-    /// Signature from the contract issuer (`issue.meta.issuer`) over the articles' id.
-    sig: Option<SigBlob>,
 }
 
 impl Articles {
-    /// Construct articles from a contract semantic and the contract issue under that semantics.
-    pub fn new(semantics: Semantics, issue: Issue) -> Result<Self, SemanticError> {
-        semantics.check(issue.codex_id())?;
-        Ok(Self { semantics, issue, sig: None })
-    }
-
     /// Construct articles from a signed contract semantic and the contract issue under that
     /// semantics.
     pub fn with<E>(
         semantics: Semantics,
         issue: Issue,
-        sig: SigBlob,
+        sig: Option<SigBlob>,
         sig_validator: impl FnOnce(StrictHash, &Identity, &SigBlob) -> Result<(), E>,
     ) -> Result<Self, SemanticError> {
-        let mut me = Self::new(semantics, issue)?;
+        semantics.check(issue.codex_id())?;
+        let mut me = Self { semantics, issue, sig: None };
         let id = me.articles_id().commit_id();
-        sig_validator(id, &me.issue.meta.issuer, &sig).map_err(|_| SemanticError::InvalidSignature)?;
-        me.sig = Some(sig);
+        if let Some(sig) = &sig {
+            sig_validator(id, &me.issue.meta.issuer, sig).map_err(|_| SemanticError::InvalidSignature)?;
+        }
+        me.sig = sig;
         Ok(me)
     }
 
@@ -133,18 +134,9 @@ impl Articles {
     /// # Returns
     ///
     /// Whether the upgrade has happened, i.e. `other` represents a valid later version of the APIs.
-    pub fn upgrade_apis<E>(
-        &mut self,
-        other: Self,
-        sig_validator: impl FnOnce(StrictHash, &Identity, &SigBlob) -> Result<(), E>,
-    ) -> Result<bool, SemanticError> {
+    pub fn upgrade_apis(&mut self, other: Self) -> Result<bool, SemanticError> {
         if self.contract_id() != other.contract_id() {
             return Err(SemanticError::ContractMismatch);
-        }
-
-        if let Some(sig) = &other.sig {
-            let id2 = other.articles_id().commit_id();
-            sig_validator(id2, &self.issue.meta.issuer, sig).map_err(|_| SemanticError::InvalidSignature)?;
         }
 
         Ok(match (&self.sig, &other.sig) {

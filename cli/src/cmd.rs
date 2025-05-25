@@ -153,7 +153,7 @@ fn export(dir: PathBuf, terminals: impl IntoIterator<Item = AuthToken>, output: 
 
 fn accept(dir: PathBuf, input: PathBuf) -> anyhow::Result<()> {
     let mut ledger = LedgerDir::load(dir)?;
-    ledger.accept_from_file(input, |_, _, _| -> Result<_, Infallible> { todo!("signature validation") })?;
+    ledger.accept_from_file(input, |_, _, _| Err("signature validation is not implemented yet"))?;
     Ok(())
 }
 

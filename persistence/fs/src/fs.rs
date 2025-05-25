@@ -22,6 +22,7 @@
 // the License.
 
 use std::borrow::Borrow;
+use std::convert::Infallible;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -174,10 +175,8 @@ impl Stock for StockFs {
         let raw = RawState::strict_read(reader)?;
 
         let issue = Issue { version: default!(), meta, codex, genesis };
-        let articles = match sig {
-            None => Articles::new(semantics, issue)?,
-            Some(_sig) => todo!("signature validation"),
-        };
+        // We trust the storage
+        let articles = Articles::with(semantics, issue, sig, |_, _, _| -> Result<_, Infallible> { Ok(()) })?;
 
         let state = EffectiveState::with_raw_state(raw, &articles);
 

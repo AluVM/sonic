@@ -584,6 +584,7 @@ rec Articles
           rec Sizing
             is min, U64
             is max, U64
+    bytes some, len 1..4096, option, wrapped, aka SigBlob, tag 1
   rec issue, Issue
     bytes version, len 1, aka ReservedBytes1
     rec meta, ContractMeta
@@ -659,5 +660,4 @@ rec Articles
               is third, U256, aka Fe256
               is fourth, U256, aka Fe256
             bytes some, len 0..MAX16, option, wrapped, aka RawData, tag 1
-    bytes some, len 1..4096, option, wrapped, aka SigBlob, tag 1
 
