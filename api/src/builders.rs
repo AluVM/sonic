@@ -34,7 +34,7 @@ use ultrasonic::{
     Input, Issue, Operation, StateCell, StateData, StateValue,
 };
 
-use crate::{Api, Articles, DataCell, Issuer, MethodName, Semantics, StateAtom, StateName};
+use crate::{Api, Articles, DataCell, Issuer, MethodName, StateAtom, StateName};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -155,7 +155,7 @@ impl IssueBuilder {
     pub fn append(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
         self.builder = self
             .builder
-            .add_immutable(name, data, raw, &self.issuer.api, &self.issuer.types);
+            .add_immutable(name, data, raw, self.issuer.default_api(), self.issuer.types());
         self
     }
 
@@ -166,9 +166,9 @@ impl IssueBuilder {
         data: StrictVal,
         lock: Option<LibSite>,
     ) -> Self {
-        self.builder = self
-            .builder
-            .add_destructible(name, auth, data, lock, &self.issuer.api, &self.issuer.types);
+        self.builder =
+            self.builder
+                .add_destructible(name, auth, data, lock, self.issuer.default_api(), self.issuer.types());
         self
     }
 
@@ -180,17 +180,10 @@ impl IssueBuilder {
             name: ContractName::Named(name.into()),
             issuer: Identity::default(),
         };
-        let genesis = self.builder.issue_genesis(self.issuer.codex.codex_id());
-        let issue = Issue { version: default!(), meta, codex: self.issuer.codex, genesis };
-        let apis = Semantics {
-            version: self.issuer.version,
-            default: self.issuer.api,
-            custom: none!(),
-            libs: self.issuer.libs,
-            types: self.issuer.types,
-            sig: None,
-        };
-        Articles::with(apis, issue).expect("broken issue builder")
+        let genesis = self.builder.issue_genesis(self.issuer.codex_id());
+        let (codex, semantics) = self.issuer.dismember();
+        let issue = Issue { version: default!(), meta, codex, genesis };
+        Articles::new(semantics, issue).expect("broken issue builder")
     }
 }
 

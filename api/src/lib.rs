@@ -46,8 +46,6 @@ extern crate alloc;
 extern crate amplify;
 #[macro_use]
 extern crate strict_types;
-#[macro_use]
-extern crate commit_verify;
 
 #[cfg(feature = "serde")]
 #[macro_use]
@@ -59,13 +57,13 @@ mod articles;
 mod builders;
 mod state;
 
-pub use api::{Api, ApiId, DestructibleApi, ImmutableApi, StateUnknown};
-pub use articles::{
-    Articles, ArticlesCommitment, ArticlesError, ArticlesId, Semantics, SigBlob, SigValidator, ARTICLES_MAGIC_NUMBER,
-    ARTICLES_VERSION,
+pub use api::{
+    Api, ApisChecksum, DestructibleApi, ImmutableApi, ParseVersionedError, SemanticError, Semantics, StateUnknown,
+    Versioned,
 };
+pub use articles::{Articles, ArticlesId, SigBlob};
 pub use builders::{Builder, BuilderRef, CoreParams, IssueParams, NamedState, OpBuilder, OpBuilderRef};
-pub use issuer::{Issuer, ISSUER_MAGIC_NUMBER, ISSUER_VERSION};
+pub use issuer::{Issuer, IssuerId, ISSUER_MAGIC_NUMBER, ISSUER_VERSION};
 pub use sonic_callreq::*;
 pub use state::*;
 pub use ultrasonic::*;

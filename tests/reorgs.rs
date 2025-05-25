@@ -44,7 +44,7 @@ use petgraph::Graph;
 use rand::rng;
 use rand::seq::SliceRandom;
 use sonic_persist_fs::LedgerDir;
-use sonicapi::{IssueParams, Issuer, StateArithm, StateBuilder, StateConvertor};
+use sonicapi::{IssueParams, Issuer, Semantics, StateArithm, StateBuilder, StateConvertor};
 use sonix::dump_ledger;
 use strict_types::SemId;
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
@@ -169,7 +169,14 @@ fn setup(name: &str) -> LedgerDir {
     let codex = codex();
     let api = api();
 
-    let issuer = Issuer::new(1, codex, api, [libs::success()], types.type_system());
+    let semantics = Semantics {
+        version: 0,
+        default: api,
+        custom: none!(),
+        libs: small_bset![libs::success()],
+        types: types.type_system(),
+    };
+    let issuer = Issuer::new(codex, semantics).unwrap();
 
     let seed = &[0xCA; 30][..];
     let mut auth = Sha256::digest(seed);

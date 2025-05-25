@@ -34,14 +34,20 @@
 //! performed directly, so these two are not covered by an API.
 
 use core::cmp::Ordering;
-use core::fmt::Debug;
+use core::fmt;
+use core::fmt::{Debug, Display, Formatter};
 use core::hash::{Hash, Hasher};
+use core::str::FromStr;
+use std::num::ParseIntError;
 
-use amplify::confinement::{TinyOrdMap, TinyOrdSet, TinyString};
+use aluvm::Lib;
+use amplify::confinement::{SmallOrdMap, SmallOrdSet, TinyOrdMap, TinyOrdSet, TinyString};
 use amplify::num::u256;
-use amplify::Bytes32;
-use commit_verify::CommitId;
+use amplify::Bytes4;
+use baid64::{Baid64ParseError, DisplayBaid64};
+use commit_verify::{CommitEncode, CommitEngine, CommitId, CommitmentId, StrictHash};
 use sonic_callreq::{CallState, MethodName, StateName};
+use strict_encoding::TypeName;
 use strict_types::{SemId, StrictDecode, StrictDumb, StrictEncode, StrictVal, TypeSystem};
 use ultrasonic::{CallId, CodexId, StateData, StateValue};
 
@@ -49,6 +55,235 @@ use crate::{
     RawBuilder, RawConvertor, StateAggregator, StateArithm, StateAtom, StateBuildError, StateBuilder, StateCalc,
     StateConvertError, StateConvertor, LIB_NAME_SONIC,
 };
+
+/// Create a versioned variant of a commitment ID (contract or codex), so information about a
+/// specific API version is added.
+///
+/// Both contracts and codexes may have multiple API implementations, which may be versioned.
+/// Issuers and articles include a specific version of the codex and contract APIs.
+/// This structure provides the necessary information for the user about a specific API version
+/// known and used by a system, so a user may avoid confusion when an API change due to upgrade
+/// happens.
+///
+/// # See also
+///
+/// - [`ContractId`]
+/// - [`CodexId`]
+/// - [`crate::ArticlesId`]
+/// - [`crate::IssuerId`]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONIC)]
+#[derive(CommitEncode)]
+#[commit_encode(strategy = strict, id = StrictHash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
+pub struct Versioned<Id: CommitmentId + StrictDumb + StrictEncode + StrictDecode> {
+    pub id: Id,
+    pub version: u16,
+    pub checksum: ApisChecksum,
+}
+
+impl<Id> Display for Versioned<Id>
+where Id: CommitmentId + StrictDumb + StrictEncode + StrictDecode + Display + DisplayBaid64
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if Id::MNEMONIC {
+            write!(f, "{:#}/{}#", self.id, self.version)?;
+        } else {
+            write!(f, "{}/{}#", self.id, self.version)?;
+        }
+        self.checksum.fmt_baid64(f)
+    }
+}
+
+impl<Id> FromStr for Versioned<Id>
+where Id: CommitmentId + StrictDumb + StrictEncode + StrictDecode + FromStr<Err = Baid64ParseError>
+{
+    type Err = ParseVersionedError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (id, remnant) = s
+            .split_once('/')
+            .ok_or_else(|| ParseVersionedError::NoVersion(s.to_string()))?;
+        let (version, api_id) = remnant
+            .split_once('#')
+            .ok_or_else(|| ParseVersionedError::NoChecksum(s.to_string()))?;
+        Ok(Self {
+            id: id.parse().map_err(ParseVersionedError::Id)?,
+            version: version.parse().map_err(ParseVersionedError::Version)?,
+            checksum: api_id.parse().map_err(ParseVersionedError::Checksum)?,
+        })
+    }
+}
+
+/// Errors happening during parsing of a versioned contract or codex ID.
+#[derive(Debug, Display, Error, From)]
+#[display(doc_comments)]
+pub enum ParseVersionedError {
+    /// the versioned id '{0}' misses the version component, which should be provided after a `/`
+    /// sign.
+    NoVersion(String),
+    /// the versioned id '{0}' misses the API checksum component, which should be provided after a
+    /// `#` sign.
+    NoChecksum(String),
+    /// invalid versioned identifier; {0}
+    Id(Baid64ParseError),
+    #[from]
+    /// invalid versioned number; {0}
+    Version(ParseIntError),
+    /// invalid API checksum value; {0}
+    Checksum(Baid64ParseError),
+}
+
+/// API checksum computed from a set of contract APIs present in [`Semantics`].
+///
+/// # Nota bene
+///
+/// This is not a unique identifier! It is created just for UI, so users can easily vissually
+/// distinguish different sets of APIs from each other.
+///
+/// This type is not - and must not be used in any verification.
+#[derive(Wrapper, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, From)]
+#[wrapper(Deref, BorrowSlice, Hex, Index, RangeOps)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONIC)]
+pub struct ApisChecksum(
+    #[from]
+    #[from([u8; 4])]
+    Bytes4,
+);
+
+mod _baid4 {
+    use core::fmt::{self, Display, Formatter};
+    use core::str::FromStr;
+
+    use amplify::ByteArray;
+    use baid64::{Baid64ParseError, DisplayBaid64, FromBaid64Str};
+    use commit_verify::{CommitmentId, DigestExt, Sha256};
+
+    use super::*;
+
+    impl DisplayBaid64<4> for ApisChecksum {
+        const HRI: &'static str = "api";
+        const CHUNKING: bool = false;
+        const PREFIX: bool = false;
+        const EMBED_CHECKSUM: bool = false;
+        const MNEMONIC: bool = false;
+        fn to_baid64_payload(&self) -> [u8; 4] { self.to_byte_array() }
+    }
+    impl FromBaid64Str<4> for ApisChecksum {}
+    impl FromStr for ApisChecksum {
+        type Err = Baid64ParseError;
+        fn from_str(s: &str) -> Result<Self, Self::Err> { Self::from_baid64_str(s) }
+    }
+    impl Display for ApisChecksum {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result { self.fmt_baid64(f) }
+    }
+
+    impl From<Sha256> for ApisChecksum {
+        fn from(hasher: Sha256) -> Self {
+            let hash = hasher.finish();
+            Self::from_slice_checked(&hash[..4])
+        }
+    }
+
+    impl CommitmentId for ApisChecksum {
+        const TAG: &'static str = "urn:ubideco:sonic:apis#2025-05-25";
+    }
+
+    #[cfg(feature = "serde")]
+    ultrasonic::impl_serde_str_bin_wrapper!(ApisChecksum, Bytes4);
+}
+
+/// A helper structure to store the contract semantics, made of a set of APIs, corresponding type
+/// system, and libs, used by the codex.
+///
+/// A contract may have multiple APIs defined; this structure summarizes information about them.
+/// The structure also holds a set of AluVM libraries for the codex and type system used by the
+/// APIs.
+#[derive(Clone, Eq, Debug)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONIC)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
+pub struct Semantics {
+    /// Backward-compatible version number for the issuer.
+    ///
+    /// This version number is used to decide which contract APIs to apply if multiple
+    /// contract APIs are available.
+    pub version: u16,
+    /// The default API.
+    pub default: Api,
+    /// The custom named APIs.
+    ///
+    /// The mechanism of the custom APIs allows a contract to have multiple implementations
+    /// of the same interface.
+    ///
+    /// For instance, a contract may provide multiple tokens using different token names.
+    pub custom: SmallOrdMap<TypeName, Api>,
+    /// A set of zk-AluVM libraries called from the contract codex.
+    pub libs: SmallOrdSet<Lib>,
+    /// The type system used by the contract APIs.
+    pub types: TypeSystem,
+}
+
+impl PartialEq for Semantics {
+    fn eq(&self, other: &Self) -> bool {
+        self.default.codex_id == other.default.codex_id
+            && self.version == other.version
+            && self.commit_id() == other.commit_id()
+    }
+}
+impl PartialOrd for Semantics {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
+}
+impl Ord for Semantics {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.default.codex_id.cmp(&other.default.codex_id) {
+            Ordering::Equal => match self.version.cmp(&other.version) {
+                Ordering::Equal => self.commit_id().cmp(&other.commit_id()),
+                other => other,
+            },
+            other => other,
+        }
+    }
+}
+
+impl CommitEncode for Semantics {
+    type CommitmentId = ApisChecksum;
+    fn commit_encode(&self, e: &mut CommitEngine) {
+        e.commit_to_serialized(&self.version);
+        let apis = SmallOrdMap::from_iter_checked(
+            self.custom
+                .iter()
+                .map(|(name, api)| (name.clone(), api.api_id())),
+        );
+        e.commit_to_linear_map(&apis);
+        // We do not commit to the libs since thea are not a part of APIs and are commit to inside the
+        // codes. The fact that there are no other libs is verified in the Articles and Issuer constructors.
+        e.commit_to_serialized(&self.types.id());
+    }
+}
+
+impl Semantics {
+    pub fn apis_checksum(&self) -> ApisChecksum { self.commit_id() }
+
+    /// Iterates over all APIs, including default and named ones.
+    pub fn apis(&self) -> impl Iterator<Item = &Api> { [&self.default].into_iter().chain(self.custom.values()) }
+
+    pub fn check(&self, codex_id: CodexId) -> Result<(), SemanticError> {
+        let mut ids = bset![];
+        for api in self.apis() {
+            if api.codex_id != codex_id {
+                return Err(SemanticError::CodexMismatch);
+            }
+            let api_id = api.api_id();
+            if !ids.insert(api_id) {
+                return Err(SemanticError::DuplicatedApi(api_id));
+            }
+        }
+
+        Ok(())
+    }
+}
 
 /// API is an interface implementation.
 ///
@@ -58,11 +293,11 @@ use crate::{
 ///
 /// API does not commit to an interface, since it can match multiple interfaces in the interface
 /// hierarchy.
-#[derive(Clone, Getters, Debug)]
+#[derive(Getters, Clone, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_SONIC)]
 #[derive(CommitEncode)]
-#[commit_encode(strategy = strict, id = ApiId)]
+#[commit_encode(strategy = strict, id = StrictHash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase", bound = ""))]
 pub struct Api {
     /// Commitment to the codex under which the API is valid.
@@ -116,7 +351,7 @@ impl Hash for Api {
 }
 
 impl Api {
-    pub fn api_id(&self) -> ApiId { self.commit_id() }
+    pub fn api_id(&self) -> StrictHash { self.commit_id() }
 
     pub fn verifier(&self, method: impl Into<MethodName>) -> Option<CallId> {
         self.verifiers.get(&method.into()).copied()
@@ -218,56 +453,6 @@ impl Api {
     }
 }
 
-/// TODO: Change to the issuer id
-#[derive(Wrapper, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, From)]
-#[wrapper(Deref, BorrowSlice, Hex, Index, RangeOps)]
-#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONIC)]
-pub struct ApiId(
-    #[from]
-    #[from([u8; 32])]
-    Bytes32,
-);
-
-mod _baid4 {
-    use core::fmt::{self, Display, Formatter};
-    use core::str::FromStr;
-
-    use amplify::ByteArray;
-    use baid64::{Baid64ParseError, DisplayBaid64, FromBaid64Str};
-    use commit_verify::{CommitmentId, DigestExt, Sha256};
-
-    use super::*;
-
-    impl DisplayBaid64 for ApiId {
-        const HRI: &'static str = "api";
-        const CHUNKING: bool = true;
-        const PREFIX: bool = false;
-        const EMBED_CHECKSUM: bool = false;
-        const MNEMONIC: bool = true;
-        fn to_baid64_payload(&self) -> [u8; 32] { self.to_byte_array() }
-    }
-    impl FromBaid64Str for ApiId {}
-    impl FromStr for ApiId {
-        type Err = Baid64ParseError;
-        fn from_str(s: &str) -> Result<Self, Self::Err> { Self::from_baid64_str(s) }
-    }
-    impl Display for ApiId {
-        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result { self.fmt_baid64(f) }
-    }
-
-    impl From<Sha256> for ApiId {
-        fn from(hasher: Sha256) -> Self { hasher.finish().into() }
-    }
-
-    impl CommitmentId for ApiId {
-        const TAG: &'static str = "urn:ubideco:sonic:api#2024-11-20";
-    }
-
-    #[cfg(feature = "serde")]
-    ultrasonic::impl_serde_str_bin_wrapper!(ApiId, Bytes32);
-}
-
 /// API for immutable (append-only) state.
 ///
 /// API covers two main functions: taking structured data from the user input and _building_ a valid
@@ -340,3 +525,21 @@ pub struct DestructibleApi {
 #[derive(Clone, Eq, PartialEq, Debug, Display, Error, From)]
 #[display("unknown state name '{0}'")]
 pub struct StateUnknown(pub StateName);
+
+/// Errors happening if it is attempted to construct an invalid semantic object [`Semantics`] or
+/// upgrade it inside a contract issuer or articles.
+#[derive(Clone, Eq, PartialEq, Debug, Display, Error)]
+#[display(doc_comments)]
+pub enum SemanticError {
+    /// contract id for the merged contract articles doesn't match.
+    ContractMismatch,
+
+    /// codex id for the merged articles doesn't match.
+    CodexMismatch,
+
+    /// articles contain duplicated API {0} under a different name.
+    DuplicatedApi(StrictHash),
+
+    /// invalid signature over the contract articles.
+    InvalidSignature,
+}

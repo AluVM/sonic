@@ -31,9 +31,10 @@ use amplify::MultiError;
 use aora::file::{FileAoraIndex, FileAoraMap, FileAuraMap};
 use aora::{AoraIndex, AoraMap, AuraMap, TransactionalMap};
 use binfile::BinFile;
+use commit_verify::StrictHash;
 use hypersonic::{
-    AcceptError, Articles, ArticlesError, AuthToken, CellAddr, EffectiveState, Genesis, Issue, IssueError, Ledger,
-    Operation, Opid, RawState, Semantics, SigValidator, Stock, Transition,
+    AcceptError, Articles, AuthToken, CellAddr, EffectiveState, Genesis, Identity, Issue, IssueError, Ledger,
+    Operation, Opid, RawState, SemanticError, Semantics, SigBlob, Stock, Transition,
 };
 use strict_encoding::{
     DecodeError, StreamReader, StreamWriter, StrictDecode, StrictEncode, StrictReader, StrictWriter,
@@ -50,7 +51,7 @@ const SPENT_MAGIC: u64 = u64::from_be_bytes(*b"OPSPENT ");
 const READ_MAGIC: u64 = u64::from_be_bytes(*b"OPREADBY");
 const VALID_MAGIC: u64 = u64::from_be_bytes(*b"OPVALID ");
 
-const APIS_MAGIC: u64 = u64::from_be_bytes(*b"CONAPIS ");
+const SEMANTICS_MAGIC: u64 = u64::from_be_bytes(*b"SEMANTIC");
 const STATE_MAGIC: u64 = u64::from_be_bytes(*b"CONSTATE");
 const GENESIS_MAGIC: u64 = u64::from_be_bytes(*b"CGENESIS");
 
@@ -105,7 +106,7 @@ impl StockFs {
     const FILENAME_CODEX: &'static str = "codex.yaml";
     const FILENAME_META: &'static str = "meta.toml";
     const FILENAME_GENESIS: &'static str = "genesis.dat";
-    const FILENAME_APIS: &'static str = "apis.dat";
+    const FILENAME_SEMANTICS: &'static str = "semantics.dat";
     const FILENAME_STATE_RAW: &'static str = "state.dat";
 }
 
@@ -131,9 +132,10 @@ impl Stock for StockFs {
         let writer = StreamWriter::new::<{ usize::MAX }>(file);
         articles.genesis().strict_write(writer)?;
 
-        let file = BinFile::<APIS_MAGIC, VERSION_0>::create_new(path.join(Self::FILENAME_APIS))?;
-        let writer = StreamWriter::new::<{ usize::MAX }>(file);
-        articles.apis().strict_write(writer)?;
+        let file = BinFile::<SEMANTICS_MAGIC, VERSION_0>::create_new(path.join(Self::FILENAME_SEMANTICS))?;
+        let mut writer = StreamWriter::new::<{ usize::MAX }>(file);
+        articles.semantics().strict_write(&mut writer)?;
+        articles.sig().strict_write(writer)?;
 
         let file = BinFile::<STATE_MAGIC, VERSION_0>::create_new(path.join(Self::FILENAME_STATE_RAW))?;
         let writer = StreamWriter::new::<{ usize::MAX }>(file);
@@ -157,20 +159,25 @@ impl Stock for StockFs {
         let file = File::open(path.join(Self::FILENAME_CODEX))?;
         let codex = serde_yaml::from_reader(file)?;
 
+        // TODO: Check there is no content left at the end of reading
         let file = BinFile::<GENESIS_MAGIC, VERSION_0>::open(path.join(Self::FILENAME_GENESIS))?;
         let reader = StreamReader::new::<{ usize::MAX }>(file);
         let genesis = Genesis::strict_read(reader)?;
 
-        let file = BinFile::<APIS_MAGIC, VERSION_0>::open(path.join(Self::FILENAME_APIS))?;
-        let reader = StreamReader::new::<{ usize::MAX }>(file);
-        let apis = Semantics::strict_read(reader)?;
+        let file = BinFile::<SEMANTICS_MAGIC, VERSION_0>::open(path.join(Self::FILENAME_SEMANTICS))?;
+        let mut reader = StreamReader::new::<{ usize::MAX }>(file);
+        let semantics = Semantics::strict_read(&mut reader)?;
+        let sig = Option::<SigBlob>::strict_read(reader)?;
 
         let file = BinFile::<STATE_MAGIC, VERSION_0>::open(path.join(Self::FILENAME_STATE_RAW))?;
         let reader = StreamReader::new::<{ usize::MAX }>(file);
         let raw = RawState::strict_read(reader)?;
 
         let issue = Issue { version: default!(), meta, codex, genesis };
-        let articles = Articles::with(apis, issue)?;
+        let articles = match sig {
+            None => Articles::new(semantics, issue)?,
+            Some(_sig) => todo!("signature validation"),
+        };
 
         let state = EffectiveState::with_raw_state(raw, &articles);
 
@@ -208,19 +215,23 @@ impl Stock for StockFs {
 
     fn update_articles(
         &mut self,
-        f: impl FnOnce(&mut Articles) -> Result<(), ArticlesError>,
-    ) -> Result<(), MultiError<ArticlesError, FsError>> {
-        f(&mut self.articles).map_err(MultiError::A)?;
+        f: impl FnOnce(&mut Articles) -> Result<bool, SemanticError>,
+    ) -> Result<bool, MultiError<SemanticError, FsError>> {
+        let res = f(&mut self.articles).map_err(MultiError::A)?;
 
-        let file = BinFile::<APIS_MAGIC, VERSION_0>::create(self.path.join(Self::FILENAME_APIS))
+        let file = BinFile::<SEMANTICS_MAGIC, VERSION_0>::create(self.path.join(Self::FILENAME_SEMANTICS))
             .map_err(MultiError::from_b)?;
-        let writer = StreamWriter::new::<{ usize::MAX }>(file);
+        let mut writer = StreamWriter::new::<{ usize::MAX }>(file);
         self.articles
-            .apis()
+            .semantics()
+            .strict_write(&mut writer)
+            .map_err(MultiError::from_b)?;
+        self.articles
+            .sig()
             .strict_write(writer)
             .map_err(MultiError::from_b)?;
 
-        Ok(())
+        Ok(res)
     }
 
     fn update_state<R>(&mut self, f: impl FnOnce(&mut EffectiveState, &Articles) -> R) -> Result<R, FsError> {
@@ -230,7 +241,7 @@ impl Stock for StockFs {
         let writer = StreamWriter::new::<{ usize::MAX }>(file);
         self.state.raw.strict_write(writer)?;
 
-        self.state.recompute(self.articles.apis());
+        self.state.recompute(self.articles.semantics());
 
         Ok(res)
     }
@@ -273,10 +284,10 @@ impl LedgerDir {
         self.export(terminals, writer)
     }
 
-    pub fn accept_from_file(
+    pub fn accept_from_file<E>(
         &mut self,
         input: impl AsRef<Path>,
-        sig_validator: impl SigValidator,
+        sig_validator: impl FnOnce(StrictHash, &Identity, &SigBlob) -> Result<(), E>,
     ) -> Result<(), MultiError<AcceptError, FsError>> {
         let file = File::open(input).map_err(MultiError::from_b)?;
         let mut reader = StrictReader::with(StreamReader::new::<{ usize::MAX }>(file));
@@ -296,7 +307,7 @@ pub enum FsError {
     Decode(DecodeError),
 
     #[from]
-    Articles(ArticlesError),
+    Articles(SemanticError),
 
     #[from]
     Yaml(serde_yaml::Error),

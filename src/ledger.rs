@@ -27,13 +27,14 @@ use std::io;
 
 use amplify::hex::ToHex;
 use amplify::MultiError;
+use commit_verify::StrictHash;
 use indexmap::IndexSet;
 use sonic_callreq::MethodName;
-use sonicapi::{Api, ArticlesError, NamedState, OpBuilder, Semantics, SigValidator};
+use sonicapi::{Api, NamedState, OpBuilder, SemanticError, Semantics, SigBlob};
 use strict_encoding::{
     DecodeError, ReadRaw, SerializeError, StrictDecode, StrictEncode, StrictReader, StrictWriter, WriteRaw,
 };
-use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Issue, Operation, Opid, VerifiedOperation};
+use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Identity, Issue, Operation, Opid, VerifiedOperation};
 
 use crate::deed::{CallParams, DeedBuilder};
 use crate::{Articles, EffectiveState, IssueError, ProcessedState, Stock, Transition};
@@ -340,8 +341,8 @@ impl<S: Stock> Ledger<S> {
                 }
             }
         };
-        collect(&articles.apis().default, &state.main);
-        for (api_name, api) in &articles.apis().custom {
+        collect(&articles.semantics().default, &state.main);
+        for (api_name, api) in &articles.semantics().custom {
             let Some(state) = state.aux.get(api_name) else {
                 continue;
             };
@@ -374,21 +375,19 @@ impl<S: Stock> Ledger<S> {
         Ok(())
     }
 
-    pub fn merge_articles<V: SigValidator>(
+    pub fn upgrade_apis<E>(
         &mut self,
         new_articles: Articles,
-        sig_validator: V,
-    ) -> Result<(), MultiError<ArticlesError, S::Error>> {
-        self.0.update_articles(|articles| {
-            articles.merge(new_articles, sig_validator)?;
-            Ok(())
-        })
+        sig_validator: impl FnOnce(StrictHash, &Identity, &SigBlob) -> Result<(), E>,
+    ) -> Result<bool, MultiError<SemanticError, S::Error>> {
+        self.0
+            .update_articles(|articles| articles.upgrade_apis(new_articles, sig_validator))
     }
 
-    pub fn accept(
+    pub fn accept<E>(
         &mut self,
         reader: &mut StrictReader<impl ReadRaw>,
-        sig_validator: impl SigValidator,
+        sig_validator: impl FnOnce(StrictHash, &Identity, &SigBlob) -> Result<(), E>,
     ) -> Result<(), MultiError<AcceptError, S::Error>> {
         // We need this closure to avoid multiple `map_err`.
         (|| -> Result<(), AcceptError> {
@@ -410,14 +409,14 @@ impl<S: Stock> Ledger<S> {
             }
 
             let contract_id = ContractId::strict_decode(reader)?;
-            let apis = Semantics::strict_decode(reader)?;
+            let semantics = Semantics::strict_decode(reader)?;
             let issue = Issue::strict_decode(reader)?;
-            let articles = Articles::with(apis, issue)?;
+            let articles = Articles::new(semantics, issue)?;
             if articles.contract_id() != contract_id {
-                return Err(AcceptError::Articles(ArticlesError::ContractMismatch));
+                return Err(AcceptError::Articles(SemanticError::ContractMismatch));
             }
 
-            self.merge_articles(articles, sig_validator)
+            self.upgrade_apis(articles, sig_validator)
                 .map_err(|e| AcceptError::Persistence(e.to_string()))?;
             Ok(())
         })()
@@ -451,7 +450,7 @@ impl<S: Stock> Ledger<S> {
                 }
             }
             self.0.update_state(|state, articles| {
-                state.rollback(transition, articles.apis());
+                state.rollback(transition, articles.semantics());
             })?;
             self.0.mark_invalid(opid);
         }
@@ -523,7 +522,7 @@ impl<S: Stock> Ledger<S> {
         force: bool,
     ) -> Result<bool, MultiError<AcceptError, S::Error>> {
         if operation.contract_id != self.contract_id() {
-            return Err(MultiError::A(AcceptError::Articles(ArticlesError::ContractMismatch)));
+            return Err(MultiError::A(AcceptError::Articles(SemanticError::ContractMismatch)));
         }
 
         let opid = operation.opid();
@@ -581,7 +580,7 @@ impl<S: Stock> Ledger<S> {
 
         let transition = self
             .0
-            .update_state(|state, articles| state.apply(operation, articles.apis()))?;
+            .update_state(|state, articles| state.apply(operation, articles.semantics()))?;
 
         self.0.add_transition(opid, &transition);
         self.0.mark_valid(opid);
@@ -598,7 +597,7 @@ pub enum AcceptError {
     Io(io::Error),
 
     #[from]
-    Articles(ArticlesError),
+    Articles(SemanticError),
 
     #[from]
     Verify(CallError),

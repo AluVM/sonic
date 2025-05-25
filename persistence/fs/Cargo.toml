@@ -16,6 +16,7 @@ exclude = [".github"]
 [dependencies]
 amplify = { workspace = true, features = ["serde"] }
 strict_encoding = { workspace = true, features = ["serde"] }
+commit_verify = { workspace = true, features = ["serde"] }
 hypersonic = { workspace = true, features = ["serde", "binfile"] }
 aora.workspace = true
 binfile.workspace = true

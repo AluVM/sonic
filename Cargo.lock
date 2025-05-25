@@ -875,6 +875,7 @@ dependencies = [
  "amplify",
  "aora",
  "binfile",
+ "commit_verify",
  "hypersonic",
  "serde_yaml",
  "strict_encoding",

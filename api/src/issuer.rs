@@ -21,55 +21,97 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use std::io;
-
 use aluvm::{Lib, LibId};
-use amplify::confinement::SmallOrdSet;
-use amplify::hex::ToHex;
+use commit_verify::{CommitId, StrictHash};
 use sonic_callreq::MethodName;
-use strict_encoding::{DecodeError, ReadRaw, StrictDecode, StrictEncode, StrictReader, StrictWriter, WriteRaw};
+use strict_encoding::TypeName;
 use strict_types::TypeSystem;
-use ultrasonic::{CallId, Codex, LibRepo};
+use ultrasonic::{CallId, Codex, CodexId, Identity, LibRepo};
 
-use crate::{Api, SigBlob, LIB_NAME_SONIC};
+use crate::{Api, SemanticError, Semantics, SigBlob, Versioned, LIB_NAME_SONIC};
 
-pub const ISSUER_MAGIC_NUMBER: [u8; 8] = *b"COISSUER";
+/// The magic number used in storing issuer as a binary file.
+pub const ISSUER_MAGIC_NUMBER: [u8; 8] = *b"ISSUER  ";
+/// The issuer encoding version used in storing issuer as a binary file.
 pub const ISSUER_VERSION: [u8; 2] = [0x00, 0x01];
 
-/// An issuer contains information required for the creation of a contract.
-#[derive(Clone, Eq, PartialEq, Debug)]
-#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONIC)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
-pub struct Issuer {
-    pub codex: Codex,
-    /// Backward-compatible version number for the issuer.
-    ///
-    /// This version number is used to decide which contract APIs to apply if multiple
-    /// contract APIs are available.
-    pub version: u16,
-    pub api: Api,
-    pub libs: SmallOrdSet<Lib>,
-    pub types: TypeSystem,
-    /// Signature of a developer (`codex.developer`) over the [`IssuerId`].
-    pub sig: Option<SigBlob>,
-}
+/// Articles id is a versioned variant for the contract id.
+pub type IssuerId = Versioned<CodexId>;
 
-impl LibRepo for Issuer {
-    fn get_lib(&self, lib_id: LibId) -> Option<&Lib> { self.libs.iter().find(|lib| lib.lib_id() == lib_id) }
+/// An issuer contains information required for the creation of a contract and interaction with an
+/// existing contract.
+///
+/// # Invariance
+///
+/// The structure provides the following invariance guarantees:
+/// - all the API codex matches the codex under which the contract was issued;
+/// - all the API ids are unique;
+/// - all custom APIs have unique names.
+#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(StrictType, StrictDumb, StrictEncode)]
+// We must not derive or implement StrictDecode for Issuer, since we cannot validate signature
+// inside it
+#[strict_type(lib = LIB_NAME_SONIC)]
+pub struct Issuer {
+    /// Codex data.
+    codex: Codex,
+    /// A dedicated substructure [`Semantics`] keeping shared parts of both [`Issuer`] and
+    /// [`Articles`].
+    semantics: Semantics,
+    /// Signature of a developer (`codex.developer`) over the [`IssuerId`] for a standalone issuer;
+    /// and from a contract issuer (`issue.meta.issuer`) for an issuer instance within a contract.
+    sig: Option<SigBlob>,
 }
 
 impl Issuer {
-    pub fn new(version: u16, codex: Codex, api: Api, libs: impl IntoIterator<Item = Lib>, types: TypeSystem) -> Self {
-        Issuer {
-            version,
-            codex,
-            api,
-            libs: SmallOrdSet::from_iter_checked(libs),
-            types,
-            sig: none!(),
+    /// Construct issuer from a codex and its semantics.
+    pub fn new(codex: Codex, semantics: Semantics) -> Result<Self, SemanticError> {
+        semantics.check(codex.codex_id())?;
+        Ok(Self { semantics, codex, sig: None })
+    }
+
+    /// Construct issuer from a codex and signed semantics.
+    pub fn with<E>(
+        codex: Codex,
+        semantics: Semantics,
+        sig: SigBlob,
+        sig_validator: impl FnOnce(StrictHash, &Identity, &SigBlob) -> Result<(), E>,
+    ) -> Result<Self, SemanticError> {
+        let mut me = Self::new(codex, semantics)?;
+        let id = me.issuer_id().commit_id();
+        sig_validator(id, &me.codex.developer, &sig).map_err(|_| SemanticError::InvalidSignature)?;
+        me.sig = Some(sig);
+        Ok(me)
+    }
+
+    pub fn dismember(self) -> (Codex, Semantics) { (self.codex, self.semantics) }
+
+    /// Compute an issuer id, which includes information about the codex id, API version and
+    /// checksum.
+    pub fn issuer_id(&self) -> IssuerId {
+        IssuerId {
+            id: self.codex.codex_id(),
+            version: self.semantics.version,
+            checksum: self.semantics.apis_checksum(),
         }
     }
+    /// Compute a codex id.
+    pub fn codex_id(&self) -> CodexId { self.codex.codex_id() }
+    /// Get a reference to the underlying codex.
+    pub fn codex(&self) -> &Codex { &self.codex }
+
+    /// Get a reference to the contract semantic.
+    pub fn semantics(&self) -> &Semantics { &self.semantics }
+    /// Get a reference to the default API.
+    pub fn default_api(&self) -> &Api { &self.semantics.default }
+    /// Get an iterator over the custom APIs.
+    pub fn custom_apis(&self) -> impl Iterator<Item = (&TypeName, &Api)> { self.semantics.custom.iter() }
+    /// Get a reference to the type system.
+    pub fn types(&self) -> &TypeSystem { &self.semantics.types }
+    /// Iterates over all APIs, including the default and the named ones.
+    pub fn apis(&self) -> impl Iterator<Item = &Api> { self.semantics.apis() }
+    /// Iterates over all codex libraries.
+    pub fn libs(&self) -> impl Iterator<Item = &Lib> { self.semantics.libs.iter() }
 
     /// Get a [`CallId`] for a method from the default API.
     ///
@@ -77,36 +119,19 @@ impl Issuer {
     ///
     /// If the method name is not known.
     pub fn call_id(&self, method: impl Into<MethodName>) -> CallId {
-        self.api
+        self.semantics
+            .default
             .verifier(method)
             .expect("calling to method absent in Codex API")
     }
+}
 
-    pub fn decode(reader: &mut StrictReader<impl ReadRaw>) -> Result<Self, DecodeError> {
-        let magic_bytes = <[u8; 8]>::strict_decode(reader)?;
-        if magic_bytes != ISSUER_MAGIC_NUMBER {
-            return Err(DecodeError::DataIntegrityError(format!(
-                "wrong contract issuer magic bytes {}",
-                magic_bytes.to_hex()
-            )));
-        }
-        let version = <[u8; 2]>::strict_decode(reader)?;
-        if version != ISSUER_VERSION {
-            return Err(DecodeError::DataIntegrityError(format!(
-                "unsupported contract issuer version {}",
-                u16::from_be_bytes(version)
-            )));
-        }
-        Self::strict_decode(reader)
-    }
-
-    pub fn encode(&self, mut writer: StrictWriter<impl WriteRaw>) -> io::Result<()> {
-        // This is compatible with BinFile
-        writer = ISSUER_MAGIC_NUMBER.strict_encode(writer)?;
-        // Version
-        writer = ISSUER_VERSION.strict_encode(writer)?;
-        self.strict_encode(writer)?;
-        Ok(())
+impl LibRepo for Issuer {
+    fn get_lib(&self, lib_id: LibId) -> Option<&Lib> {
+        self.semantics
+            .libs
+            .iter()
+            .find(|lib| lib.lib_id() == lib_id)
     }
 }
 
@@ -117,19 +142,40 @@ mod _fs {
 
     use amplify::confinement::U24 as U24MAX;
     use binfile::BinFile;
-    use strict_encoding::{DeserializeError, StreamReader, StreamWriter, StrictReader, StrictWriter};
+    use commit_verify::{CommitId, StrictHash};
+    use strict_encoding::{DecodeError, DeserializeError, StreamReader, StreamWriter, StrictDecode, StrictEncode};
+    use ultrasonic::{Codex, Identity};
 
-    use crate::Issuer;
+    use crate::{Issuer, Semantics, SigBlob};
 
     pub const ISSUER_MAGIC_NUMBER: u64 = u64::from_be_bytes(*b"COISSUER");
     pub const ISSUER_VERSION: u16 = 0;
 
     impl Issuer {
-        pub fn load(path: impl AsRef<Path>) -> Result<Self, DeserializeError> {
+        pub fn load<E>(
+            path: impl AsRef<Path>,
+            sig_validator: impl FnOnce(StrictHash, &Identity, &SigBlob) -> Result<(), E>,
+        ) -> Result<Self, DeserializeError> {
+            // We use a manual implementation since we can't validate signature inside StrictDecode
+            // implementation for the Issuer
             let file = BinFile::<ISSUER_MAGIC_NUMBER, ISSUER_VERSION>::open(path)?;
-            let mut reader = StrictReader::with(StreamReader::new::<U24MAX>(file));
-            let me = Self::decode(&mut reader)?;
-            match reader.unbox().unconfine().read_exact(&mut [0u8; 1]) {
+            let mut reader = StreamReader::new::<U24MAX>(file);
+
+            let codex = Codex::strict_read(&mut reader)?;
+            let semantics = Semantics::strict_read(&mut reader)?;
+            semantics
+                .check(codex.codex_id())
+                .map_err(|e| DecodeError::DataIntegrityError(e.to_string()))?;
+
+            let sig = Option::<SigBlob>::strict_read(&mut reader)?;
+            let me = Self { codex, semantics, sig };
+
+            if let Some(sig) = &me.sig {
+                sig_validator(me.issuer_id().commit_id(), &me.codex.developer, sig)
+                    .map_err(|_| DecodeError::DataIntegrityError(s!("invalid signature")))?;
+            }
+
+            match reader.unconfine().read_exact(&mut [0u8; 1]) {
                 Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => Ok(me),
                 Err(e) => Err(e.into()),
                 Ok(()) => Err(DeserializeError::DataNotEntirelyConsumed),
@@ -138,8 +184,8 @@ mod _fs {
 
         pub fn save(&self, path: impl AsRef<Path>) -> io::Result<()> {
             let file = BinFile::<ISSUER_MAGIC_NUMBER, ISSUER_VERSION>::create_new(path)?;
-            let writer = StrictWriter::with(StreamWriter::new::<U24MAX>(file));
-            self.encode(writer)
+            let writer = StreamWriter::new::<U24MAX>(file);
+            self.strict_write(writer)
         }
     }
 }

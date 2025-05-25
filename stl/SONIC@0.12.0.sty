@@ -1,5 +1,5 @@
 {-
-  Id: stl:tyzJaGG6-0t0y7pw-RrvB~a9-adiS8We-x49ufrL-iZINc_s#hazard-profile-michael
+  Id: stl:fhdn5LdZ-9IjcDFg-cAvoJl5-ZW_DqGM-4rM020O-MMt7Yew#patient-temple-cricket
   Name: SONIC
   Version: 0.12.0
   Description: Standard library for formally-verifiable distributed contracts
@@ -81,19 +81,13 @@ data Api               : codexId UltraSONIC.CodexId
                        , verifiers {StrictTypes.VariantName -> ^ ..0xff U16}
                        , errors {U256 -> ^ ..0xff [Unicode ^ ..0xff]}
 
-@mnemonic(sharp-section-left)
-data ApiId             : [Byte ^ 32]
+@mnemonic(viva-index-tempo)
+data ApisChecksum      : [Byte ^ 4]
 
-@mnemonic(stella-empire-rubber)
-data Articles          : semantics Semantics, issue UltraSONIC.Issue
-
-@mnemonic(distant-east-ritual)
-data ArticlesCommitment : contractId UltraSONIC.ContractId
-                       , defaultApiId ApiId
-                       , customApiIds {StrictTypes.TypeName -> ApiId}
-
-@mnemonic(danube-pilot-karate)
-data ArticlesId        : [Byte ^ 32]
+@mnemonic(cake-horse-equal)
+data Articles          : semantics Semantics
+                       , issue UltraSONIC.Issue
+                       , sig SigBlob?
 
 @mnemonic(alpha-balsa-verona)
 data CallState         : method StrictTypes.VariantName, destructible StrictTypes.VariantName?
@@ -114,19 +108,23 @@ data ImmutableApi      : semId StrictTypes.SemId
                        , rawConvertor RawConvertor
                        , rawBuilder RawBuilder
 
+@mnemonic(peace-film-video)
+data Issuer            : codex UltraSONIC.Codex
+                       , semantics Semantics
+                       , sig SigBlob?
+
 @mnemonic(tomato-gordon-craft)
 data RawBuilder        : strictEncode StrictTypes.SemId | (|)
 
 @mnemonic(tripod-guitar-bishop)
 data RawConvertor      : strictDecode StrictTypes.SemId | (|)
 
-@mnemonic(ballet-serpent-brown)
+@mnemonic(gray-paint-pagoda)
 data Semantics         : version U16
                        , default Api
                        , custom {StrictTypes.TypeName -> Api}
                        , libs {AluVM.Lib}
                        , types StrictTypes.TypeSystem
-                       , sig SigBlob?
 
 @mnemonic(insect-cello-avalon)
 data SigBlob           : [Byte ^ 1..0x1000]
@@ -159,5 +157,15 @@ data StateConvertor    : unit ()
 
 @mnemonic(explore-locate-zoom)
 data Transition        : opid UltraSONIC.Opid, destroyed {UltraSONIC.CellAddr -> UltraSONIC.StateCell}
+
+@mnemonic(sabrina-exit-marina)
+data VersionedCodexId  : id UltraSONIC.CodexId
+                       , version U16
+                       , checksum ApisChecksum
+
+@mnemonic(miller-alien-comrade)
+data VersionedContractId : id UltraSONIC.ContractId
+                       , version U16
+                       , checksum ApisChecksum
 
 

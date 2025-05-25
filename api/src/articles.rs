@@ -21,69 +21,23 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use core::error::Error;
+#![allow(unused_braces)]
 
 use aluvm::{Lib, LibId};
-use amplify::confinement::{NonEmptyBlob, SmallOrdMap, SmallOrdSet};
-use amplify::Bytes32;
-use commit_verify::{CommitId, CommitmentId, DigestExt, Sha256};
+use amplify::confinement::NonEmptyBlob;
+use amplify::Wrapper;
+use commit_verify::{CommitId, StrictHash};
 use sonic_callreq::MethodName;
 use strict_encoding::TypeName;
 use strict_types::TypeSystem;
-use ultrasonic::{CallId, Codex, CodexId, ContractId, Genesis, Identity, Issue, LibRepo, Opid};
+use ultrasonic::{
+    CallId, Codex, CodexId, ContractId, ContractMeta, ContractName, Genesis, Identity, Issue, LibRepo, Opid,
+};
 
-use crate::{Api, ApiId, LIB_NAME_SONIC};
+use crate::{Api, SemanticError, Semantics, Versioned, LIB_NAME_SONIC};
 
-pub const ARTICLES_MAGIC_NUMBER: [u8; 8] = *b"ARTICLES";
-pub const ARTICLES_VERSION: [u8; 2] = [0x00, 0x01];
-
-#[derive(Clone, Eq, PartialEq, Debug)]
-#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONIC)]
-#[derive(CommitEncode)]
-#[commit_encode(strategy = strict, id = ArticlesId)]
-pub struct ArticlesCommitment {
-    pub contract_id: ContractId,
-    pub default_api_id: ApiId,
-    pub custom_api_ids: SmallOrdMap<TypeName, ApiId>,
-}
-
-/// A helper structure to store the contract semantics.
-///
-/// A contract may have multiple APIs defined. All of them a summarized in this structure.
-/// The structure also holds a set of AluVM libraries for the codex and type system used by the
-/// API.
-#[derive(Clone, Eq, PartialEq, Debug)]
-#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONIC)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
-pub struct Semantics {
-    /// Backward-compatible version number for the issuer.
-    ///
-    /// This version number is used to decide which contract APIs to apply if multiple
-    /// contract APIs are available.
-    pub version: u16,
-    /// The default API.
-    pub default: Api,
-    /// The custom named APIs.
-    ///
-    /// The mechanism of the custom APIs allows a contract to have multiple implementations
-    /// of the same interface.
-    ///
-    /// For instance, a contract may provide multiple tokens using different token names.
-    pub custom: SmallOrdMap<TypeName, Api>,
-    /// A set of zk-AluVM libraries called from the contract codex.
-    pub libs: SmallOrdSet<Lib>,
-    /// The type system used by the contract APIs.
-    pub types: TypeSystem,
-    /// Signature from the contract issuer (`issue.meta.issuer`) over the articles' id.
-    pub sig: Option<SigBlob>,
-}
-
-impl Semantics {
-    /// Iterates over all APIs, including default and named ones.
-    pub fn all(&self) -> impl Iterator<Item = &Api> { [&self.default].into_iter().chain(self.custom.values()) }
-}
+/// Articles id is a versioned variant for the contract id.
+pub type ArticlesId = Versioned<ContractId>;
 
 /// Articles contain the contract and all related codex and API information for interacting with it.
 ///
@@ -92,87 +46,118 @@ impl Semantics {
 /// The structure provides the following invariance guarantees:
 /// - all the API codex matches the codex under which the contract was issued;
 /// - all the API ids are unique;
-/// - the only type of API adapter VM which can be used is [`crate::embedded::EmbeddedProc`] (see
-///   [`crate::Api`] for more details).
+/// - all custom APIs have unique names.
 #[derive(Clone, Eq, PartialEq, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode)]
+// We must not derive or implement StrictDecode for Issuer, since we cannot validate signature
+// inside it
 #[strict_type(lib = LIB_NAME_SONIC)]
 pub struct Articles {
+    /// We can't use [`Issuer`] here since we will duplicate the codex between it and the [`Issue`].
+    /// Thus, a dedicated substructure [`Semantics`] is introduced, which keeps a shared part of
+    /// both [`Issuer`] and [`Articles`].
     semantics: Semantics,
+    /// The contract issue.
     issue: Issue,
+    /// Signature from the contract issuer (`issue.meta.issuer`) over the articles' id.
+    sig: Option<SigBlob>,
 }
 
 impl Articles {
-    fn articles_id(&self) -> ArticlesId {
-        let custom_api_ids = SmallOrdMap::from_iter_checked(
-            self.semantics
-                .custom
-                .iter()
-                .map(|(name, api)| (name.clone(), api.api_id())),
-        );
-        ArticlesCommitment {
-            contract_id: self.contract_id(),
-            default_api_id: self.semantics.default.api_id(),
-            custom_api_ids,
-        }
-        .commit_id()
+    /// Construct articles from a contract semantic and the contract issue under that semantics.
+    pub fn new(semantics: Semantics, issue: Issue) -> Result<Self, SemanticError> {
+        semantics.check(issue.codex_id())?;
+        Ok(Self { semantics, issue, sig: None })
     }
 
+    /// Construct articles from a signed contract semantic and the contract issue under that
+    /// semantics.
+    pub fn with<E>(
+        semantics: Semantics,
+        issue: Issue,
+        sig: SigBlob,
+        sig_validator: impl FnOnce(StrictHash, &Identity, &SigBlob) -> Result<(), E>,
+    ) -> Result<Self, SemanticError> {
+        let mut me = Self::new(semantics, issue)?;
+        let id = me.articles_id().commit_id();
+        sig_validator(id, &me.issue.meta.issuer, &sig).map_err(|_| SemanticError::InvalidSignature)?;
+        me.sig = Some(sig);
+        Ok(me)
+    }
+
+    /// Compute an article id, which includes information about the contract id, API version and
+    /// checksum.
+    pub fn articles_id(&self) -> ArticlesId {
+        ArticlesId {
+            id: self.issue.contract_id(),
+            version: self.semantics.version,
+            checksum: self.semantics.apis_checksum(),
+        }
+    }
+    /// Compute a contract id.
     pub fn contract_id(&self) -> ContractId { self.issue.contract_id() }
+    /// Compute a codex id.
     pub fn codex_id(&self) -> CodexId { self.issue.codex_id() }
+    /// Compute a genesis opid.
     pub fn genesis_opid(&self) -> Opid { self.issue.genesis_opid() }
 
-    pub fn apis(&self) -> &Semantics { &self.semantics }
+    /// Get a reference to the contract semantic.
+    pub fn semantics(&self) -> &Semantics { &self.semantics }
+    /// Get a reference to the default API.
     pub fn default_api(&self) -> &Api { &self.semantics.default }
+    /// Get an iterator over the custom APIs.
     pub fn custom_apis(&self) -> impl Iterator<Item = (&TypeName, &Api)> { self.semantics.custom.iter() }
+    /// Get a reference to the type system.
     pub fn types(&self) -> &TypeSystem { &self.semantics.types }
+    /// Iterates over all APIs, including the default and the named ones.
+    pub fn apis(&self) -> impl Iterator<Item = &Api> { self.semantics.apis() }
+    /// Iterates over all codex libraries.
+    pub fn libs(&self) -> impl Iterator<Item = &Lib> { self.semantics.libs.iter() }
 
+    /// Get a reference to the contract issue information.
     pub fn issue(&self) -> &Issue { &self.issue }
+    /// Get a reference to the contract codex.
     pub fn codex(&self) -> &Codex { &self.issue.codex }
+    /// Get a reference to the contract genesis.
     pub fn genesis(&self) -> &Genesis { &self.issue.genesis }
+    /// Get a reference to the contract meta-information.
+    pub fn contract_meta(&self) -> &ContractMeta { &self.issue.meta }
+    /// Get a reference to the contract name.
+    pub fn contract_name(&self) -> &ContractName { &self.issue.meta.name }
 
-    pub fn with(apis: Semantics, issue: Issue) -> Result<Self, ArticlesError> {
-        let mut ids = bset![];
-        for api in apis.all() {
-            if api.codex_id != issue.codex_id() {
-                return Err(ArticlesError::CodexMismatch);
-            }
-            let api_id = api.api_id();
-            if !ids.insert(api_id) {
-                return Err(ArticlesError::DuplicatedApi(api_id));
-            }
-        }
+    /// Get a reference to a signature over the contract semantics.
+    pub fn sig(&self) -> &Option<SigBlob> { &self.sig }
 
-        Ok(Self { semantics: apis, issue })
-    }
-
-    pub fn merge(&mut self, other: Self, sig_validator: impl SigValidator) -> Result<bool, ArticlesError> {
+    /// Upgrades contract APIs if a newer version is available.
+    ///
+    /// # Returns
+    ///
+    /// Whether the upgrade has happened, i.e. `other` represents a valid later version of the APIs.
+    pub fn upgrade_apis<E>(
+        &mut self,
+        other: Self,
+        sig_validator: impl FnOnce(StrictHash, &Identity, &SigBlob) -> Result<(), E>,
+    ) -> Result<bool, SemanticError> {
         if self.contract_id() != other.contract_id() {
-            return Err(ArticlesError::ContractMismatch);
+            return Err(SemanticError::ContractMismatch);
         }
 
-        let ts1 = self
-            .semantics
-            .sig
-            .as_ref()
-            .and_then(|sig| {
-                sig_validator
-                    .validate_sig(self.articles_id().to_byte_array(), &self.issue.meta.issuer, sig)
-                    .ok()
-            })
-            .unwrap_or_default();
-        let Some(sig) = &other.semantics.sig else {
-            return Ok(false);
-        };
-        let ts2 = sig_validator
-            .validate_sig(other.articles_id().to_byte_array(), &other.issue.meta.issuer, sig)
-            .map_err(|_| ArticlesError::InvalidSignature)?;
-
-        if ts2 > ts1 {
-            self.semantics = other.semantics;
+        if let Some(sig) = &other.sig {
+            let id2 = other.articles_id().commit_id();
+            sig_validator(id2, &self.issue.meta.issuer, sig).map_err(|_| SemanticError::InvalidSignature)?;
         }
 
-        Ok(true)
+        Ok(match (&self.sig, &other.sig) {
+            (None, None) | (Some(_), Some(_)) if other.semantics.version > self.semantics.version => {
+                self.semantics = other.semantics;
+                true
+            }
+            (None, Some(_)) => {
+                self.semantics = other.semantics;
+                true
+            }
+            _ => false, // No upgrade
+        })
     }
 
     /// Get a [`CallId`] for a method from the default API.
@@ -199,58 +184,13 @@ impl LibRepo for Articles {
     }
 }
 
-#[derive(Wrapper, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug, From)]
-#[wrapper(Deref, BorrowSlice, Hex, Index, RangeOps)]
-#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONIC)]
-pub struct ArticlesId(
-    #[from]
-    #[from([u8; 32])]
-    Bytes32,
-);
-
-impl From<Sha256> for ArticlesId {
-    fn from(hasher: Sha256) -> Self { hasher.finish().into() }
-}
-
-impl CommitmentId for ArticlesId {
-    const TAG: &'static str = "urn:ubideco:sonic:articles#2025-05-18";
-}
-
-pub trait SigValidator {
-    /// Validate the signature using the provided identity information.
-    ///
-    /// # Returns
-    ///
-    /// If successful, returns the timestamp of ths signature.
-    fn validate_sig(&self, message: impl Into<[u8; 32]>, identity: &Identity, sig: &SigBlob)
-        -> Result<u64, impl Error>;
-}
-
+/// A signature blob.
+///
+/// Helps to abstract from a specific signing algorithm.
 #[derive(Wrapper, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, From, Display)]
 #[wrapper(Deref, AsSlice, BorrowSlice, Hex)]
 #[display(LowerHex)]
-#[derive(StrictType, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONIC)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONIC, dumb = { Self(NonEmptyBlob::with(0)) })]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(transparent))]
 pub struct SigBlob(NonEmptyBlob<4096>);
-
-impl Default for SigBlob {
-    fn default() -> Self { SigBlob(NonEmptyBlob::with(0)) }
-}
-
-#[derive(Clone, Eq, PartialEq, Debug, Display, Error)]
-#[display(doc_comments)]
-pub enum ArticlesError {
-    /// contract id for the merged contract articles doesn't match.
-    ContractMismatch,
-
-    /// codex id for the merged articles doesn't match.
-    CodexMismatch,
-
-    /// articles contain duplicated API {0} under a different name.
-    DuplicatedApi(ApiId),
-
-    /// invalid signature over the contract articles.
-    InvalidSignature,
-}

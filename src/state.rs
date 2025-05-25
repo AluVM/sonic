@@ -66,7 +66,7 @@ impl EffectiveState {
             .verify(contract_id, genesis, &state.raw, articles)?;
 
         // We do not need state transition for genesis.
-        let _ = state.apply(verified, articles.apis());
+        let _ = state.apply(verified, articles.semantics());
 
         Ok(state)
     }
@@ -79,7 +79,7 @@ impl EffectiveState {
             let state = ProcessedState::with(&me.raw, api, articles.types());
             me.aux.insert(name.clone(), state);
         }
-        me.recompute(articles.apis());
+        me.recompute(articles.semantics());
         me
     }
 
@@ -250,16 +250,13 @@ impl ProcessedState {
         self.aggregated = bmap! {};
         for (name, aggregator) in api.aggregators() {
             let val = aggregator.read(|state_name| {
-                match self
-                    .immutable(state_name)
+                self.immutable(state_name)
                     .map(|map| map.values().cloned().collect::<Vec<_>>())
                     .or_else(|| {
                         let verified = self.aggregated.get(state_name)?.clone();
                         Some(vec![StateAtom { verified, unverified: None }])
-                    }) {
-                    None => vec![],
-                    Some(src) => src,
-                }
+                    })
+                    .unwrap_or_else(|| vec![])
             });
             self.aggregated.insert(name.clone(), val);
         }

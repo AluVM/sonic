@@ -24,7 +24,7 @@
 use core::error::Error;
 
 use amplify::MultiError;
-use sonicapi::ArticlesError;
+use sonicapi::SemanticError;
 use ultrasonic::{CallError, CellAddr, ContractName, Operation, Opid};
 
 use crate::{Articles, EffectiveState, Transition};
@@ -286,8 +286,8 @@ pub trait Stock {
     /// updated state after calling the callback `f` method.
     fn update_articles(
         &mut self,
-        f: impl FnOnce(&mut Articles) -> Result<(), ArticlesError>,
-    ) -> Result<(), MultiError<ArticlesError, Self::Error>>;
+        f: impl FnOnce(&mut Articles) -> Result<bool, SemanticError>,
+    ) -> Result<bool, MultiError<SemanticError, Self::Error>>;
 
     /// Updates contract effective state inside a callback method.
     ///

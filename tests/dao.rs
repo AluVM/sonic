@@ -36,7 +36,9 @@ use amplify::num::u256;
 use commit_verify::{Digest, Sha256};
 use hypersonic::{Api, DestructibleApi, ImmutableApi};
 use sonic_persist_fs::LedgerDir;
-use sonicapi::{Issuer, RawBuilder, RawConvertor, StateAggregator, StateArithm, StateBuilder, StateConvertor};
+use sonicapi::{
+    Issuer, RawBuilder, RawConvertor, Semantics, StateAggregator, StateArithm, StateBuilder, StateConvertor,
+};
 use strict_types::{SemId, StrictVal};
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
 use ultrasonic::{AuthToken, CellAddr, Codex, Consensus, Identity};
@@ -126,7 +128,14 @@ fn main() {
     let api = api();
 
     // Creating DAO with three participants
-    let issuer = Issuer::new(1, codex, api, [libs::success()], types.type_system());
+    let semantics = Semantics {
+        version: 0,
+        default: api,
+        custom: none!(),
+        libs: small_bset![libs::success()],
+        types: types.type_system(),
+    };
+    let issuer = Issuer::new(codex, semantics).unwrap();
     let filename = "examples/dao/data/SimpleDAO.issuer";
     fs::remove_file(filename).ok();
     issuer
