@@ -324,9 +324,9 @@ impl<S: Stock> Ledger<S> {
         // Include all operations defining published state
         let state = self.state();
         let mut collect = |api: &Api, state: &ProcessedState| {
-            for (state_name, immutable) in &api.immutable {
-                if immutable.published {
-                    let Some(cells) = state.immutable.get(state_name) else {
+            for (state_name, owned) in &api.global {
+                if owned.published {
+                    let Some(cells) = state.global.get(state_name) else {
                         continue;
                     };
                     opids.extend(cells.keys().map(|addr| addr.opid));

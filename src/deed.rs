@@ -76,7 +76,7 @@ impl<S: Stock> DeedBuilder<'_, S> {
     pub fn append(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
         let api = &self.ledger.articles().default_api();
         let types = &self.ledger.articles().types();
-        self.builder = self.builder.add_immutable(name, data, raw, api, types);
+        self.builder = self.builder.add_global(name, data, raw, api, types);
         self
     }
 
@@ -89,9 +89,7 @@ impl<S: Stock> DeedBuilder<'_, S> {
     ) -> Self {
         let api = &self.ledger.articles().default_api();
         let types = &self.ledger.articles().types();
-        self.builder = self
-            .builder
-            .add_destructible(name, auth, data, lock, api, types);
+        self.builder = self.builder.add_owned(name, auth, data, lock, api, types);
         self
     }
 

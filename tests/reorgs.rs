@@ -35,7 +35,7 @@ use std::path::PathBuf;
 use aluvm::{CoreConfig, LibSite};
 use amplify::num::u256;
 use commit_verify::{Digest, Sha256};
-use hypersonic::{Api, DestructibleApi};
+use hypersonic::{Api, OwnedApi};
 use indexmap::{indexset, IndexSet};
 use petgraph::dot::{Config, Dot};
 use petgraph::graph::EdgeReference;
@@ -144,9 +144,9 @@ fn api() -> Api {
         codex_id: codex.codex_id(),
         conforms: none!(),
         default_call: None,
-        immutable: none!(),
-        destructible: tiny_bmap! {
-            vname!("amount") => DestructibleApi {
+        global: none!(),
+        owned: tiny_bmap! {
+            vname!("amount") => OwnedApi {
                 sem_id: types.get("Fungible.Amount"),
                 arithmetics: StateArithm::Fungible,
                 convertor: StateConvertor::TypedEncoder(u256::ZERO),
@@ -202,7 +202,7 @@ fn setup(name: &str) -> LedgerDir {
     fs::create_dir_all(&contract_path).expect("Unable to create a contract folder");
     let mut ledger = LedgerDir::new(articles, contract_path).expect("Can't issue a contract");
 
-    let owned = &ledger.state().main.destructible;
+    let owned = &ledger.state().main.owned;
     assert_eq!(owned.len(), 1);
     let owned = owned.get("amount").unwrap();
     assert_eq!(owned.len(), 20);
@@ -234,7 +234,7 @@ fn setup(name: &str) -> LedgerDir {
         prev = new_prev;
     }
 
-    let owned = &ledger.state().main.destructible;
+    let owned = &ledger.state().main.owned;
     assert_eq!(owned.len(), 1);
     assert_eq!(prev.len(), 20);
     let owned = owned.get("amount").unwrap();
@@ -324,7 +324,7 @@ fn check_rollback(ledger: LedgerDir, mut removed: IndexSet<Operation>) -> IndexS
     }
 
     // Now we check that no outputs of the rolled-back ops participate in the valid state
-    let state = ledger.state().main.destructible.get("amount").unwrap();
+    let state = ledger.state().main.owned.get("amount").unwrap();
     eprintln!("Not rolled back outputs:");
     for addr in state.keys() {
         assert!(!removed_opids.contains(&addr.opid));

@@ -78,7 +78,7 @@ impl<T, A> CallRequest<T, A> {
         let mut call = self
             .call
             .expect("use_method must be called before use_state");
-        call.destructible = Some(state);
+        call.owned = Some(state);
         self.call = Some(call);
         self
     }

@@ -28,9 +28,9 @@ rec Semantics
       rec some, CallState, option, wrapped, tag 1
         ascii method, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
           ascii some, option, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 1
-    map immutable, len 0..MAX8
+    map global, len 0..MAX8
       ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-      rec value, ImmutableApi
+      rec value, GlobalApi
         bytes semId, len 32, aka SemId
         enum published, Bool, false 0, true 1
         union convertor, StateConvertor
@@ -45,9 +45,9 @@ rec Semantics
           bytes strictDecode, len 32, wrapped, aka SemId, tag 0
         union rawBuilder, RawBuilder
           bytes strictEncode, len 32, wrapped, aka SemId, tag 0
-    map destructible, len 0..MAX8
+    map owned, len 0..MAX8
       ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-      rec value, DestructibleApi
+      rec value, OwnedApi
         bytes semId, len 32, aka SemId
         enum arithmetics, StateArithm, fungible 0, nonFungible 1
         union convertor, StateConvertor
@@ -100,9 +100,9 @@ rec Semantics
         rec some, CallState, option, wrapped, tag 1
           ascii method, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
             ascii some, option, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 1
-      map immutable, len 0..MAX8
+      map global, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-        rec value, ImmutableApi
+        rec value, GlobalApi
           bytes semId, len 32, aka SemId
           enum published, Bool, false 0, true 1
           union convertor, StateConvertor
@@ -117,9 +117,9 @@ rec Semantics
             bytes strictDecode, len 32, wrapped, aka SemId, tag 0
           union rawBuilder, RawBuilder
             bytes strictEncode, len 32, wrapped, aka SemId, tag 0
-      map destructible, len 0..MAX8
+      map owned, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-        rec value, DestructibleApi
+        rec value, OwnedApi
           bytes semId, len 32, aka SemId
           enum arithmetics, StateArithm, fungible 0, nonFungible 1
           union convertor, StateConvertor
@@ -238,9 +238,9 @@ rec Issuer
         rec some, CallState, option, wrapped, tag 1
           ascii method, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
             ascii some, option, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 1
-      map immutable, len 0..MAX8
+      map global, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-        rec value, ImmutableApi
+        rec value, GlobalApi
           bytes semId, len 32, aka SemId
           enum published, Bool, false 0, true 1
           union convertor, StateConvertor
@@ -255,9 +255,9 @@ rec Issuer
             bytes strictDecode, len 32, wrapped, aka SemId, tag 0
           union rawBuilder, RawBuilder
             bytes strictEncode, len 32, wrapped, aka SemId, tag 0
-      map destructible, len 0..MAX8
+      map owned, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-        rec value, DestructibleApi
+        rec value, OwnedApi
           bytes semId, len 32, aka SemId
           enum arithmetics, StateArithm, fungible 0, nonFungible 1
           union convertor, StateConvertor
@@ -310,9 +310,9 @@ rec Issuer
           rec some, CallState, option, wrapped, tag 1
             ascii method, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
               ascii some, option, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 1
-        map immutable, len 0..MAX8
+        map global, len 0..MAX8
           ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-          rec value, ImmutableApi
+          rec value, GlobalApi
             bytes semId, len 32, aka SemId
             enum published, Bool, false 0, true 1
             union convertor, StateConvertor
@@ -327,9 +327,9 @@ rec Issuer
               bytes strictDecode, len 32, wrapped, aka SemId, tag 0
             union rawBuilder, RawBuilder
               bytes strictEncode, len 32, wrapped, aka SemId, tag 0
-        map destructible, len 0..MAX8
+        map owned, len 0..MAX8
           ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-          rec value, DestructibleApi
+          rec value, OwnedApi
             bytes semId, len 32, aka SemId
             enum arithmetics, StateArithm, fungible 0, nonFungible 1
             union convertor, StateConvertor
@@ -432,9 +432,9 @@ rec Articles
         rec some, CallState, option, wrapped, tag 1
           ascii method, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
             ascii some, option, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 1
-      map immutable, len 0..MAX8
+      map global, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-        rec value, ImmutableApi
+        rec value, GlobalApi
           bytes semId, len 32, aka SemId
           enum published, Bool, false 0, true 1
           union convertor, StateConvertor
@@ -449,9 +449,9 @@ rec Articles
             bytes strictDecode, len 32, wrapped, aka SemId, tag 0
           union rawBuilder, RawBuilder
             bytes strictEncode, len 32, wrapped, aka SemId, tag 0
-      map destructible, len 0..MAX8
+      map owned, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-        rec value, DestructibleApi
+        rec value, OwnedApi
           bytes semId, len 32, aka SemId
           enum arithmetics, StateArithm, fungible 0, nonFungible 1
           union convertor, StateConvertor
@@ -504,9 +504,9 @@ rec Articles
           rec some, CallState, option, wrapped, tag 1
             ascii method, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
               ascii some, option, wrapped, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100, tag 1
-        map immutable, len 0..MAX8
+        map global, len 0..MAX8
           ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-          rec value, ImmutableApi
+          rec value, GlobalApi
             bytes semId, len 32, aka SemId
             enum published, Bool, false 0, true 1
             union convertor, StateConvertor
@@ -521,9 +521,9 @@ rec Articles
               bytes strictDecode, len 32, wrapped, aka SemId, tag 0
             union rawBuilder, RawBuilder
               bytes strictEncode, len 32, wrapped, aka SemId, tag 0
-        map destructible, len 0..MAX8
+        map owned, len 0..MAX8
           ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
-          rec value, DestructibleApi
+          rec value, OwnedApi
             bytes semId, len 32, aka SemId
             enum arithmetics, StateArithm, fungible 0, nonFungible 1
             union convertor, StateConvertor

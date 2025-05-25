@@ -332,16 +332,16 @@ pub struct Api {
     /// Interface standards to which the API conforms.
     pub conforms: TinyOrdSet<u16>,
 
-    /// Name for the default API call and destructible state name.
+    /// Name for the default API call and owned state name.
     pub default_call: Option<CallState>,
 
-    /// State API defines how a structured contract state is constructed out of (and converted into)
-    /// UltraSONIC immutable memory cells.
-    pub immutable: TinyOrdMap<StateName, ImmutableApi>,
+    /// State API defines how a structured global contract state is constructed out of (and
+    /// converted into) UltraSONIC immutable memory cells.
+    pub global: TinyOrdMap<StateName, GlobalApi>,
 
-    /// State API defines how a structured contract state is constructed out of (and converted into)
-    /// UltraSONIC destructible memory cells.
-    pub destructible: TinyOrdMap<StateName, DestructibleApi>,
+    /// State API defines how a structured owned contract state is constructed out of (and converted
+    /// into) UltraSONIC destructible memory cells.
+    pub owned: TinyOrdMap<StateName, OwnedApi>,
 
     /// Readers have access to the converted global `state` and can construct a derived state out of
     /// it.
@@ -382,7 +382,7 @@ impl Api {
         self.verifiers.get(&method.into()).copied()
     }
 
-    pub fn convert_immutable(
+    pub fn convert_global(
         &self,
         data: &StateData,
         sys: &TypeSystem,
@@ -391,7 +391,7 @@ impl Api {
         // of `StateValue`. Thus, we are trying all available convertors until they succeed, since the
         // convertors check the state type. Then, we use the state name associated with the succeeding
         // convertor.
-        for (name, api) in &self.immutable {
+        for (name, api) in &self.global {
             if let Some(verified) = api.convertor.convert(api.sem_id, data.value, sys)? {
                 let unverified =
                     if let Some(raw) = data.raw.as_ref() { Some(api.raw_convertor.convert(raw, sys)?) } else { None };
@@ -402,7 +402,7 @@ impl Api {
         Ok(None)
     }
 
-    pub fn convert_destructible(
+    pub fn convert_owned(
         &self,
         value: StateValue,
         sys: &TypeSystem,
@@ -411,7 +411,7 @@ impl Api {
         // of `StateValue`. Thus, we are trying all available convertors until they succeed, since the
         // convertors check the state type. Then, we use the state name associated with the succeeding
         // convertor.
-        for (name, api) in &self.destructible {
+        for (name, api) in &self.owned {
             if let Some(atom) = api.convertor.convert(api.sem_id, value, sys)? {
                 return Ok(Some((name.clone(), atom)));
             }
@@ -430,7 +430,7 @@ impl Api {
     ) -> Result<StateData, StateBuildError> {
         let name = name.into();
         let api = self
-            .immutable
+            .global
             .get(&name)
             .ok_or(StateBuildError::UnknownStateName(name))?;
         let value = api.builder.build(api.sem_id, data, sys)?;
@@ -447,7 +447,7 @@ impl Api {
     ) -> Result<StateValue, StateBuildError> {
         let name = name.into();
         let api = self
-            .destructible
+            .owned
             .get(&name)
             .ok_or(StateBuildError::UnknownStateName(name))?;
 
@@ -463,7 +463,7 @@ impl Api {
     ) -> Result<StateValue, StateBuildError> {
         let name = name.into();
         let api = self
-            .destructible
+            .owned
             .get(&name)
             .ok_or(StateBuildError::UnknownStateName(name))?;
 
@@ -472,13 +472,13 @@ impl Api {
 
     pub fn calculate(&self, name: impl Into<StateName>) -> Result<StateCalc, StateUnknown> {
         let name = name.into();
-        let api = self.destructible.get(&name).ok_or(StateUnknown(name))?;
+        let api = self.owned.get(&name).ok_or(StateUnknown(name))?;
 
         Ok(api.arithmetics.calculator())
     }
 }
 
-/// API for immutable (append-only) state.
+/// API for global (immutable, or append-only) state.
 ///
 /// API covers two main functions: taking structured data from the user input and _building_ a valid
 /// state included in a new contract operation - and taking contract state and _converting_ it
@@ -488,7 +488,7 @@ impl Api {
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_SONIC)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
-pub struct ImmutableApi {
+pub struct GlobalApi {
     /// Semantic type id for verifiable part of the state.
     pub sem_id: SemId,
 
@@ -512,7 +512,7 @@ pub struct ImmutableApi {
     pub raw_builder: RawBuilder,
 }
 
-/// API for destructible (read-once) state.
+/// API for owned (destrictible, or read-once) state.
 ///
 /// API covers two main functions: taking structured data from the user input and _building_ a valid
 /// state included in a new contract operation - and taking contract state and _converting_ it
@@ -522,7 +522,7 @@ pub struct ImmutableApi {
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_SONIC)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
-pub struct DestructibleApi {
+pub struct OwnedApi {
     /// Semantic type id for the structured converted state data.
     pub sem_id: SemId,
 

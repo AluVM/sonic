@@ -1,5 +1,5 @@
 {-
-  Id: stl:DNcqIYE8-uA_vWkA-0dU28ca-EX0FY0n-Pw7B27z-iUGfwIw#snow-taboo-popular
+  Id: stl:QcQOlgo9-KA7gO0h-4Zg_evI-wz7beHw-JWI4Hts-0aYtSWg#chant-bridge-rondo
   Name: SONIC
   Version: 0.12.0
   Description: Standard library for formally-verifiable distributed contracts
@@ -71,12 +71,12 @@ import StrictTypes#henry-heart-survive
   use TypeSystem#adrian-boris-sponsor
 
 
-@mnemonic(ricardo-mary-genius)
+@mnemonic(super-cool-julius)
 data Api               : codexId UltraSONIC.CodexId
                        , conforms {U16 ^ ..0xff}
                        , defaultCall CallState?
-                       , immutable {StrictTypes.VariantName -> ^ ..0xff ImmutableApi}
-                       , destructible {StrictTypes.VariantName -> ^ ..0xff DestructibleApi}
+                       , global {StrictTypes.VariantName -> ^ ..0xff GlobalApi}
+                       , owned {StrictTypes.VariantName -> ^ ..0xff OwnedApi}
                        , aggregators {StrictTypes.VariantName -> ^ ..0xff StateAggregator}
                        , verifiers {StrictTypes.VariantName -> ^ ..0xff U16}
                        , errors {U256 -> ^ ..0xff [Unicode ^ ..0xff]}
@@ -89,19 +89,11 @@ data Articles          : semantics Semantics
                        , sig SigBlob?
                        , issue UltraSONIC.Issue
 
-@mnemonic(alpha-balsa-verona)
-data CallState         : method StrictTypes.VariantName, destructible StrictTypes.VariantName?
+@mnemonic(sparta-ginger-analyze)
+data CallState         : method StrictTypes.VariantName, owned StrictTypes.VariantName?
 
-@mnemonic(career-ultra-harbor)
-data DestructibleApi   : semId StrictTypes.SemId
-                       , arithmetics StateArithm
-                       , convertor StateConvertor
-                       , builder StateBuilder
-                       , witnessSemId StrictTypes.SemId
-                       , witnessBuilder StateBuilder
-
-@mnemonic(lexicon-mary-ceramic)
-data ImmutableApi      : semId StrictTypes.SemId
+@mnemonic(polaris-yellow-public)
+data GlobalApi         : semId StrictTypes.SemId
                        , published Std.Bool
                        , convertor StateConvertor
                        , builder StateBuilder
@@ -112,6 +104,14 @@ data ImmutableApi      : semId StrictTypes.SemId
 data Issuer            : codex UltraSONIC.Codex
                        , semantics Semantics
                        , sig SigBlob?
+
+@mnemonic(history-support-manual)
+data OwnedApi          : semId StrictTypes.SemId
+                       , arithmetics StateArithm
+                       , convertor StateConvertor
+                       , builder StateBuilder
+                       , witnessSemId StrictTypes.SemId
+                       , witnessBuilder StateBuilder
 
 @mnemonic(tomato-gordon-craft)
 data RawBuilder        : strictEncode StrictTypes.SemId | (|)

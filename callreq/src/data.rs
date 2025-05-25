@@ -44,17 +44,14 @@ pub type MethodName = VariantName;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase", bound = ""))]
 pub struct CallState {
     pub method: MethodName,
-    pub destructible: Option<StateName>,
+    pub owned: Option<StateName>,
 }
 
 impl CallState {
-    pub fn new(method: impl Into<MethodName>) -> Self { Self { method: method.into(), destructible: None } }
+    pub fn new(method: impl Into<MethodName>) -> Self { Self { method: method.into(), owned: None } }
 
-    pub fn with(method: impl Into<MethodName>, destructible: impl Into<StateName>) -> Self {
-        Self {
-            method: method.into(),
-            destructible: Some(destructible.into()),
-        }
+    pub fn with(method: impl Into<MethodName>, owned: impl Into<StateName>) -> Self {
+        Self { method: method.into(), owned: Some(owned.into()) }
     }
 }
 

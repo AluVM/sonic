@@ -156,7 +156,7 @@ impl IssueBuilder {
     pub fn append(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
         self.builder = self
             .builder
-            .add_immutable(name, data, raw, self.issuer.default_api(), self.issuer.types());
+            .add_global(name, data, raw, self.issuer.default_api(), self.issuer.types());
         self
     }
 
@@ -167,9 +167,9 @@ impl IssueBuilder {
         data: StrictVal,
         lock: Option<LibSite>,
     ) -> Self {
-        self.builder =
-            self.builder
-                .add_destructible(name, auth, data, lock, self.issuer.default_api(), self.issuer.types());
+        self.builder = self
+            .builder
+            .add_owned(name, auth, data, lock, self.issuer.default_api(), self.issuer.types());
         self
     }
 
@@ -199,7 +199,7 @@ pub struct Builder {
 impl Builder {
     pub fn new(call_id: CallId) -> Self { Builder { call_id, destructible_out: none!(), immutable_out: none!() } }
 
-    pub fn add_immutable(
+    pub fn add_global(
         mut self,
         name: impl Into<StateName>,
         data: StrictVal,
@@ -217,7 +217,7 @@ impl Builder {
         self
     }
 
-    pub fn add_destructible(
+    pub fn add_owned(
         mut self,
         name: impl Into<StateName>,
         auth: AuthToken,
@@ -262,14 +262,14 @@ impl<'c> BuilderRef<'c> {
         BuilderRef { type_system: sys, api, inner: Builder::new(call_id) }
     }
 
-    pub fn add_immutable(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
+    pub fn add_global(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
         self.inner = self
             .inner
-            .add_immutable(name, data, raw, self.api, self.type_system);
+            .add_global(name, data, raw, self.api, self.type_system);
         self
     }
 
-    pub fn add_destructible(
+    pub fn add_owned(
         mut self,
         name: impl Into<StateName>,
         auth: AuthToken,
@@ -278,7 +278,7 @@ impl<'c> BuilderRef<'c> {
     ) -> Self {
         self.inner = self
             .inner
-            .add_destructible(name, auth, data, lock, self.api, self.type_system);
+            .add_owned(name, auth, data, lock, self.api, self.type_system);
         self
     }
 
@@ -304,7 +304,7 @@ impl OpBuilder {
         }
     }
 
-    pub fn add_immutable(
+    pub fn add_global(
         mut self,
         name: impl Into<StateName>,
         data: StrictVal,
@@ -312,11 +312,11 @@ impl OpBuilder {
         api: &Api,
         sys: &TypeSystem,
     ) -> Self {
-        self.inner = self.inner.add_immutable(name, data, raw, api, sys);
+        self.inner = self.inner.add_global(name, data, raw, api, sys);
         self
     }
 
-    pub fn add_destructible(
+    pub fn add_owned(
         mut self,
         name: impl Into<StateName>,
         auth: AuthToken,
@@ -325,9 +325,7 @@ impl OpBuilder {
         api: &Api,
         sys: &TypeSystem,
     ) -> Self {
-        self.inner = self
-            .inner
-            .add_destructible(name, auth, data, lock, api, sys);
+        self.inner = self.inner.add_owned(name, auth, data, lock, api, sys);
         self
     }
 
@@ -391,14 +389,14 @@ impl<'c> OpBuilderRef<'c> {
         Self { api, type_system: sys, inner }
     }
 
-    pub fn add_immutable(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
+    pub fn add_global(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
         self.inner = self
             .inner
-            .add_immutable(name, data, raw, self.api, self.type_system);
+            .add_global(name, data, raw, self.api, self.type_system);
         self
     }
 
-    pub fn add_destructible(
+    pub fn add_owned(
         mut self,
         name: impl Into<StateName>,
         auth: AuthToken,
@@ -407,7 +405,7 @@ impl<'c> OpBuilderRef<'c> {
     ) -> Self {
         self.inner = self
             .inner
-            .add_destructible(name, auth, data, lock, self.api, self.type_system);
+            .add_owned(name, auth, data, lock, self.api, self.type_system);
         self
     }
 

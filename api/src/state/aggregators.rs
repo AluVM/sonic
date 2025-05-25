@@ -42,7 +42,7 @@ pub enum StateAggregator {
     #[strict_type(tag = 0)]
     Unit,
 
-    /// Wrap an existing immutable state with an `Option::Some`.
+    /// Wrap an existing state with an `Option::Some`.
     ///
     /// This is useful when an interface requires a value to be optional.
     #[strict_type(tag = 1)]
@@ -58,7 +58,7 @@ pub enum StateAggregator {
     #[strict_type(tag = 3)]
     Const(TinyBlob),
 
-    /// Converts an existing immutable or aggregated state into an optional, setting it to `Some`
+    /// Converts an existing global or aggregated state into an optional, setting it to `Some`
     /// some external check passes.
     ///
     /// Fails the check always if the `StateName` is another aggregated state.

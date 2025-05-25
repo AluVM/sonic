@@ -34,7 +34,7 @@ use std::path::Path;
 use aluvm::{CoreConfig, LibSite};
 use amplify::num::u256;
 use commit_verify::{Digest, Sha256};
-use hypersonic::{Api, DestructibleApi, ImmutableApi};
+use hypersonic::{Api, GlobalApi, OwnedApi};
 use sonic_persist_fs::LedgerDir;
 use sonicapi::{
     Issuer, RawBuilder, RawConvertor, Semantics, StateAggregator, StateArithm, StateBuilder, StateConvertor,
@@ -71,8 +71,8 @@ fn api() -> Api {
         codex_id: codex.codex_id(),
         conforms: none!(),
         default_call: None,
-        immutable: tiny_bmap! {
-            vname!("_parties") => ImmutableApi {
+        global: tiny_bmap! {
+            vname!("_parties") => GlobalApi {
                 published: true,
                 sem_id: types.get("DAO.PartyId"),
                 convertor: StateConvertor::TypedEncoder(u256::ZERO),
@@ -80,7 +80,7 @@ fn api() -> Api {
                 raw_convertor: RawConvertor::StrictDecode(types.get("DAO.Party")),
                 raw_builder: RawBuilder::StrictEncode(types.get("DAO.Party")),
             },
-            vname!("_votings") => ImmutableApi {
+            vname!("_votings") => GlobalApi {
                 published: true,
                 sem_id: types.get("DAO.VoteId"),
                 convertor: StateConvertor::TypedEncoder(u256::ONE),
@@ -88,7 +88,7 @@ fn api() -> Api {
                 raw_convertor: RawConvertor::StrictDecode(types.get("DAO.Voting")),
                 raw_builder: RawBuilder::StrictEncode(types.get("DAO.Voting")),
             },
-            vname!("_votes") => ImmutableApi {
+            vname!("_votes") => GlobalApi {
                 published: true,
                 sem_id: types.get("DAO.CastVote"),
                 convertor: StateConvertor::TypedEncoder(u256::from(2u8)),
@@ -97,8 +97,8 @@ fn api() -> Api {
                 raw_builder: RawBuilder::StrictEncode(SemId::unit()),
             },
         },
-        destructible: tiny_bmap! {
-            vname!("signers") => DestructibleApi {
+        owned: tiny_bmap! {
+            vname!("signers") => OwnedApi {
                 sem_id: types.get("DAO.PartyId"),
                 arithmetics: StateArithm::NonFungible,
                 convertor: StateConvertor::TypedEncoder(u256::ZERO),

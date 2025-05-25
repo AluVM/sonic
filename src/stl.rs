@@ -34,7 +34,7 @@ pub use ultrasonic::stl::usonic_stl;
 use crate::Transition;
 
 /// Strict types id for the library providing data types for RGB consensus.
-pub const LIB_ID_SONIC: &str = "stl:DNcqIYE8-uA_vWkA-0dU28ca-EX0FY0n-Pw7B27z-iUGfwIw#snow-taboo-popular";
+pub const LIB_ID_SONIC: &str = "stl:QcQOlgo9-KA7gO0h-4Zg_evI-wz7beHw-JWI4Hts-0aYtSWg#chant-bridge-rondo";
 
 #[allow(clippy::result_large_err)]
 fn _sonic_stl() -> Result<TypeLib, CompileError> {

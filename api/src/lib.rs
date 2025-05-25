@@ -58,8 +58,7 @@ mod builders;
 mod state;
 
 pub use api::{
-    Api, ApisChecksum, DestructibleApi, ImmutableApi, ParseVersionedError, SemanticError, Semantics, StateUnknown,
-    Versioned,
+    Api, ApisChecksum, GlobalApi, OwnedApi, ParseVersionedError, SemanticError, Semantics, StateUnknown, Versioned,
 };
 pub use articles::{Articles, ArticlesId, SigBlob};
 pub use builders::{Builder, BuilderRef, CoreParams, IssueParams, NamedState, OpBuilder, OpBuilderRef};
