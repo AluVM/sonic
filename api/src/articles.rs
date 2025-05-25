@@ -128,6 +128,8 @@ impl Articles {
 
     /// Get a reference to a signature over the contract semantics.
     pub fn sig(&self) -> &Option<SigBlob> { &self.sig }
+    /// Detect whether the articles are signed.
+    pub fn is_signed(&self) -> bool { self.sig.is_some() }
 
     /// Upgrades contract APIs if a newer version is available.
     ///

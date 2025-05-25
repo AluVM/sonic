@@ -22,6 +22,7 @@
 // the License.
 
 use aluvm::{Lib, LibId};
+use amplify::confinement::TinyString;
 use commit_verify::{CommitId, StrictHash};
 use sonic_callreq::MethodName;
 use strict_encoding::TypeName;
@@ -94,6 +95,8 @@ impl Issuer {
     pub fn codex_id(&self) -> CodexId { self.codex.codex_id() }
     /// Get a reference to the underlying codex.
     pub fn codex(&self) -> &Codex { &self.codex }
+    /// Get the name of the underlying codex.
+    pub fn codex_name(&self) -> &TinyString { &self.codex.name }
 
     /// Get a reference to the contract semantic.
     pub fn semantics(&self) -> &Semantics { &self.semantics }
@@ -107,6 +110,9 @@ impl Issuer {
     pub fn apis(&self) -> impl Iterator<Item = &Api> { self.semantics.apis() }
     /// Iterates over all codex libraries.
     pub fn libs(&self) -> impl Iterator<Item = &Lib> { self.semantics.libs.iter() }
+
+    /// Detect whether the issuer is signed.
+    pub fn is_signed(&self) -> bool { self.sig.is_some() }
 
     /// Get a [`CallId`] for a method from the default API.
     ///
