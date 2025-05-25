@@ -37,10 +37,11 @@ use core::cmp::Ordering;
 use core::fmt;
 use core::fmt::{Debug, Display, Formatter};
 use core::hash::{Hash, Hasher};
+use core::num::ParseIntError;
 use core::str::FromStr;
-use std::num::ParseIntError;
+use std::collections::{BTreeMap, BTreeSet};
 
-use aluvm::Lib;
+use aluvm::{Lib, LibId};
 use amplify::confinement::{SmallOrdMap, SmallOrdSet, TinyOrdMap, TinyOrdSet, TinyString};
 use amplify::num::u256;
 use amplify::Bytes4;
@@ -49,7 +50,7 @@ use commit_verify::{CommitEncode, CommitEngine, CommitId, CommitmentId, StrictHa
 use sonic_callreq::{CallState, MethodName, StateName};
 use strict_encoding::TypeName;
 use strict_types::{SemId, StrictDecode, StrictDumb, StrictEncode, StrictVal, TypeSystem};
-use ultrasonic::{CallId, CodexId, StateData, StateValue};
+use ultrasonic::{CallId, Codex, CodexId, StateData, StateValue};
 
 use crate::{
     RawBuilder, RawConvertor, StateAggregator, StateArithm, StateAtom, StateBuildError, StateBuilder, StateCalc,
@@ -78,8 +79,11 @@ use crate::{
 #[commit_encode(strategy = strict, id = StrictHash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct Versioned<Id: CommitmentId + StrictDumb + StrictEncode + StrictDecode> {
+    /// An identifier of the contract or codex.
     pub id: Id,
+    /// Version number of the API.
     pub version: u16,
+    /// A checksum for the APIs from the Semantics structure.
     pub checksum: ApisChecksum,
 }
 
@@ -269,7 +273,10 @@ impl Semantics {
     /// Iterates over all APIs, including default and named ones.
     pub fn apis(&self) -> impl Iterator<Item = &Api> { [&self.default].into_iter().chain(self.custom.values()) }
 
-    pub fn check(&self, codex_id: CodexId) -> Result<(), SemanticError> {
+    /// Check whether this semantics object matches codex and the provided set of libraries for it.
+    pub fn check(&self, codex: &Codex) -> Result<(), SemanticError> {
+        let codex_id = codex.codex_id();
+
         let mut ids = bset![];
         for api in self.apis() {
             if api.codex_id != codex_id {
@@ -279,6 +286,24 @@ impl Semantics {
             if !ids.insert(api_id) {
                 return Err(SemanticError::DuplicatedApi(api_id));
             }
+        }
+
+        let lib_map = self
+            .libs
+            .iter()
+            .map(|lib| (lib.lib_id(), lib))
+            .collect::<BTreeMap<_, _>>();
+
+        let libs_set = codex
+            .verifiers
+            .values()
+            .map(|site| site.lib_id)
+            .filter_map(|id| lib_map.get(&id))
+            .flat_map(|lib| lib.libs.iter().copied().chain([lib.lib_id()]))
+            .collect::<BTreeSet<LibId>>();
+
+        if lib_map.into_keys().collect::<BTreeSet<LibId>>() != libs_set {
+            return Err(SemanticError::InvalidLibSet);
         }
 
         Ok(())
@@ -539,6 +564,10 @@ pub enum SemanticError {
 
     /// articles contain duplicated API {0} under a different name.
     DuplicatedApi(StrictHash),
+
+    /// the set of libraries provided in the contract articles doesn't match the set of libraries
+    /// required for the codex.
+    InvalidLibSet,
 
     /// invalid signature over the contract articles.
     InvalidSignature,

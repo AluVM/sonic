@@ -66,7 +66,7 @@ pub struct Issuer {
 impl Issuer {
     /// Construct issuer from a codex and its semantics.
     pub fn new(codex: Codex, semantics: Semantics) -> Result<Self, SemanticError> {
-        semantics.check(codex.codex_id())?;
+        semantics.check(&codex)?;
         Ok(Self { semantics, codex, sig: None })
     }
 
@@ -164,7 +164,7 @@ mod _fs {
             let codex = Codex::strict_read(&mut reader)?;
             let semantics = Semantics::strict_read(&mut reader)?;
             semantics
-                .check(codex.codex_id())
+                .check(&codex)
                 .map_err(|e| DecodeError::DataIntegrityError(e.to_string()))?;
 
             let sig = Option::<SigBlob>::strict_read(&mut reader)?;

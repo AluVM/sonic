@@ -76,7 +76,7 @@ impl Articles {
         sig: Option<SigBlob>,
         sig_validator: impl FnOnce(StrictHash, &Identity, &SigBlob) -> Result<(), E>,
     ) -> Result<Self, SemanticError> {
-        semantics.check(issue.codex_id())?;
+        semantics.check(&issue.codex)?;
         let mut me = Self { semantics, issue, sig: None };
         let id = me.articles_id().commit_id();
         if let Some(sig) = &sig {
