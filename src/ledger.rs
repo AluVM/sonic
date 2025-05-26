@@ -31,7 +31,7 @@ use indexmap::IndexSet;
 use sonic_callreq::MethodName;
 use sonicapi::{Api, NamedState, OpBuilder, SemanticError, Semantics, SigBlob};
 use strict_encoding::{
-    DecodeError, ReadRaw, SerializeError, StrictDecode, StrictEncode, StrictReader, StrictWriter, WriteRaw,
+    DecodeError, ReadRaw, SerializeError, StrictDecode, StrictEncode, StrictReader, StrictWriter, TypedRead, WriteRaw,
 };
 use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Identity, Issue, Operation, Opid, VerifiedOperation};
 
@@ -372,6 +372,8 @@ impl<S: Stock> Ledger<S> {
         // Write contract id
         let contract_id = self.contract_id();
         writer = self.contract_id().strict_encode(writer)?;
+        // Write an empty extension block
+        writer = 0u8.strict_encode(writer)?;
         // Write articles
         writer = articles.strict_encode(writer)?;
         writer = aux(genesis_opid, &articles.genesis().to_operation(contract_id), writer)?;
@@ -404,6 +406,15 @@ impl<S: Stock> Ledger<S> {
 
             // Check version number
             let _ = ReservedBytes::<1, { DEEDS_VERSION as u8 }>::strict_decode(reader)?;
+            // Read and ignore the extension block
+            let ext_blocks = u8::strict_decode(reader)?;
+            for _ in 0..ext_blocks {
+                let len = u16::strict_decode(reader)?;
+                let r = unsafe { reader.raw_reader() };
+                let _ = r.read_raw::<{ u16::MAX as usize }>(len as usize)?;
+            }
+
+            // Read articles
             let semantics = Semantics::strict_decode(reader)?;
             let sig = Option::<SigBlob>::strict_decode(reader)?;
             let issue = Issue::strict_decode(reader)?;
@@ -429,6 +440,9 @@ impl<S: Stock> Ledger<S> {
             };
             self.apply_verify(op, false)?;
         }
+        // Here we do not check for the end of the stream,
+        // so in the future we can have arbitrary extensions
+        // put here with no backward compatibility issues.
         self.commit_transaction();
         Ok(())
     }
