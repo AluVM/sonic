@@ -65,6 +65,6 @@ pub mod stl;
 pub use deed::{CallParams, DeedBuilder, Satisfaction};
 pub use ledger::{AcceptError, Ledger};
 #[cfg(feature = "binfile")]
-pub use ledger::{LEDGER_MAGIC_NUMBER, LEDGER_VERSION};
+pub use ledger::{DEEDS_MAGIC_NUMBER, DEEDS_VERSION};
 pub use state::{EffectiveState, ProcessedState, RawState, Transition};
 pub use stock::{IssueError, Stock};

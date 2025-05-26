@@ -618,28 +618,26 @@ mod _fs {
 
     use super::*;
 
-    pub const LEDGER_MAGIC_NUMBER: u64 = u64::from_be_bytes(*b"DEEDLDGR");
-    pub const LEDGER_VERSION: u16 = 0;
+    pub const DEEDS_MAGIC_NUMBER: u64 = u64::from_be_bytes(*b"DEEDLDGR");
+    pub const DEEDS_VERSION: u16 = 0;
 
     impl<S: Stock> Ledger<S> {
-        // TODO: Move this back to the main crate
         pub fn export_to_file(
             &mut self,
             terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
             output: impl AsRef<Path>,
         ) -> io::Result<()> {
-            let file = BinFile::<LEDGER_MAGIC_NUMBER, LEDGER_VERSION>::create_new(output)?;
+            let file = BinFile::<DEEDS_MAGIC_NUMBER, DEEDS_VERSION>::create_new(output)?;
             let writer = StrictWriter::with(StreamWriter::new::<{ usize::MAX }>(file));
             self.export(terminals, writer)
         }
 
-        // TODO: Move this back to the main crate
         pub fn accept_from_file<E>(
             &mut self,
             input: impl AsRef<Path>,
             sig_validator: impl FnOnce(StrictHash, &Identity, &SigBlob) -> Result<(), E>,
         ) -> Result<(), MultiError<AcceptError, S::Error>> {
-            let file = BinFile::<LEDGER_MAGIC_NUMBER, LEDGER_VERSION>::open(input)
+            let file = BinFile::<DEEDS_MAGIC_NUMBER, DEEDS_VERSION>::open(input)
                 .map_err(|_| AcceptError::InvalidFileFormat)
                 .map_err(MultiError::from_a)?;
             let mut reader = StrictReader::with(StreamReader::new::<{ usize::MAX }>(file));

@@ -178,6 +178,7 @@ fn setup(name: &str) -> LedgerDir {
         types: types.type_system(),
     };
     let issuer = Issuer::new(codex, semantics).unwrap();
+    issuer.save("tests/data/Test.issuer").ok();
 
     let seed = &[0xCA; 30][..];
     let mut auth = Sha256::digest(seed);

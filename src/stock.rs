@@ -266,7 +266,7 @@ pub trait Stock {
     /// [`Self::add_reading`] as an `addr` argument.
     fn read_by(&self, addr: CellAddr) -> impl Iterator<Item = Opid>;
 
-    /// Returns an id of an operation spending a provided address (operation owned state output).
+    /// Returns an id of an operation spending a provided address (operation-owned state output).
     ///
     /// # Nota bene
     ///
@@ -362,7 +362,7 @@ pub trait Stock {
     /// - add the `reader` to the list of readers who had accessed the address.
     fn add_reading(&mut self, addr: CellAddr, reader: Opid);
 
-    /// Registers a given operation owned output (`spent`) to be spent (used as an input) in
+    /// Registers a given operation-owned output (`spent`) to be spent (used as an input) in
     /// operation `spender`.
     ///
     /// # Blocking I/O
