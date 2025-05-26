@@ -39,7 +39,6 @@ use core::fmt::{Debug, Display, Formatter};
 use core::hash::{Hash, Hasher};
 use core::num::ParseIntError;
 use core::str::FromStr;
-use std::collections::{BTreeMap, BTreeSet};
 
 use aluvm::{Lib, LibId};
 use amplify::confinement::{SmallOrdMap, SmallOrdSet, TinyOrdMap, TinyOrdSet, TinyString};
@@ -47,6 +46,7 @@ use amplify::num::u256;
 use amplify::Bytes4;
 use baid64::{Baid64ParseError, DisplayBaid64};
 use commit_verify::{CommitEncode, CommitEngine, CommitId, CommitmentId, StrictHash};
+use indexmap::{indexset, IndexMap, IndexSet};
 use sonic_callreq::{CallState, MethodName, StateName};
 use strict_encoding::TypeName;
 use strict_types::{SemId, StrictDecode, StrictDumb, StrictEncode, StrictVal, TypeSystem};
@@ -293,22 +293,89 @@ impl Semantics {
             }
         }
 
+        // Check codex libs for redundancies and completeness
+        let lib_map = self
+            .codex_libs
+            .iter()
+            .map(|lib| (lib.lib_id(), lib))
+            .collect::<IndexMap<_, _>>();
+
+        let mut lib_ids = codex
+            .verifiers
+            .values()
+            .map(|entry| entry.lib_id)
+            .collect::<IndexSet<_>>();
+        let mut i = 0usize;
+        let mut count = lib_ids.len();
+        while i < count {
+            let id = lib_ids.get_index(i).expect("index is valid");
+            let lib = lib_map.get(id).ok_or(SemanticError::MissedCodexLib(*id))?;
+            lib_ids.extend(lib.libs.iter().copied());
+            count = lib_ids.len();
+            i += 1;
+        }
+        for id in lib_map.keys() {
+            if !lib_ids.contains(id) {
+                return Err(SemanticError::ExcessiveCodexLib(*id));
+            }
+        }
+
+        // Check API libs for redundancies and completeness
         let lib_map = self
             .api_libs
             .iter()
             .map(|lib| (lib.lib_id(), lib))
-            .collect::<BTreeMap<_, _>>();
+            .collect::<IndexMap<_, _>>();
 
-        let libs_set = codex
-            .verifiers
-            .values()
-            .map(|site| site.lib_id)
-            .filter_map(|id| lib_map.get(&id))
-            .flat_map(|lib| lib.libs.iter().copied().chain([lib.lib_id()]))
-            .collect::<BTreeSet<LibId>>();
-
-        if lib_map.into_keys().collect::<BTreeSet<LibId>>() != libs_set {
-            return Err(SemanticError::InvalidLibSet);
+        let mut lib_ids = indexset![];
+        for api in self.apis() {
+            for agg in api.aggregators.values() {
+                if let Aggregator::AluVM(entry) = agg {
+                    lib_ids.insert(entry.lib_id);
+                }
+            }
+            for glob in api.global.values() {
+                if let StateConvertor::AluVM(entry) = glob.convertor {
+                    lib_ids.insert(entry.lib_id);
+                }
+                if let StateBuilder::AluVM(entry) = glob.builder {
+                    lib_ids.insert(entry.lib_id);
+                }
+                if let RawConvertor::AluVM(entry) = glob.raw_convertor {
+                    lib_ids.insert(entry.lib_id);
+                }
+                if let RawBuilder::AluVM(entry) = glob.raw_builder {
+                    lib_ids.insert(entry.lib_id);
+                }
+            }
+            for owned in api.owned.values() {
+                if let StateConvertor::AluVM(entry) = owned.convertor {
+                    lib_ids.insert(entry.lib_id);
+                }
+                if let StateBuilder::AluVM(entry) = owned.builder {
+                    lib_ids.insert(entry.lib_id);
+                }
+                if let StateBuilder::AluVM(entry) = owned.witness_builder {
+                    lib_ids.insert(entry.lib_id);
+                }
+                if let StateArithm::AluVM(entry) = owned.arithmetics {
+                    lib_ids.insert(entry.lib_id);
+                }
+            }
+        }
+        let mut i = 0usize;
+        let mut count = lib_ids.len();
+        while i < count {
+            let id = lib_ids.get_index(i).expect("index is valid");
+            let lib = lib_map.get(id).ok_or(SemanticError::MissedApiLib(*id))?;
+            lib_ids.extend(lib.libs.iter().copied());
+            count = lib_ids.len();
+            i += 1;
+        }
+        for id in lib_map.keys() {
+            if !lib_ids.contains(id) {
+                return Err(SemanticError::ExcessiveApiLib(*id));
+            }
         }
 
         Ok(())
@@ -570,9 +637,17 @@ pub enum SemanticError {
     /// articles contain duplicated API {0} under a different name.
     DuplicatedApi(StrictHash),
 
-    /// the set of libraries provided in the contract articles doesn't match the set of libraries
-    /// required for the codex.
-    InvalidLibSet,
+    /// library {0} is used by the contract codex verifiers but absent from the articles.
+    MissedCodexLib(LibId),
+
+    /// library {0} is present in the contract articles but not used in the codex verifiers.
+    ExcessiveCodexLib(LibId),
+
+    /// library {0} is used by the contract APIs but absent from the articles.
+    MissedApiLib(LibId),
+
+    /// library {0} is present in the contract articles but not used in the APIs.
+    ExcessiveApiLib(LibId),
 
     /// invalid signature over the contract articles.
     InvalidSignature,

@@ -838,6 +838,7 @@ dependencies = [
  "commit_verify",
  "getrandom 0.2.16",
  "getrandom 0.3.3",
+ "indexmap",
  "rand",
  "serde",
  "sonic-callreq",

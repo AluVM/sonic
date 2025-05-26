@@ -21,10 +21,11 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use std::collections::BTreeMap;
+use alloc::collections::BTreeMap;
 
 use aluvm::{Lib, LibId, LibSite};
 use amplify::confinement::TinyBlob;
+use indexmap::IndexMap;
 use sonic_callreq::StateName;
 use strict_encoding::StrictDumb;
 use strict_types::value::{EnumTag, StrictNum};
@@ -131,7 +132,7 @@ impl Aggregator {
                 let libs = libs
                     .into_iter()
                     .map(|lib| (lib.lib_id(), lib))
-                    .collect::<BTreeMap<_, _>>();
+                    .collect::<IndexMap<_, _>>();
                 let mut vm = aluvm::Vm::<aluvm::isa::Instr<LibId>>::new();
                 // For now, we ignore all computations and return `None` anyway.
                 // This leaves a way to add proper VM computing in the future

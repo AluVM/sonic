@@ -21,9 +21,9 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+use core::convert::Infallible;
 use core::fmt::{self, Display, Formatter};
 use core::str::FromStr;
-use std::convert::Infallible;
 
 use amplify::confinement::{ConfinedVec, TinyBlob};
 use baid64::Baid64ParseError;

@@ -22,7 +22,7 @@
 // the License.
 
 use alloc::collections::BTreeMap;
-use std::mem;
+use core::mem;
 
 use aluvm::Lib;
 use amplify::confinement::{LargeOrdMap, SmallOrdMap, SmallOrdSet};

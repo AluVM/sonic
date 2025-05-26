@@ -26,6 +26,7 @@ aluvm.workspace = true
 ultrasonic.workspace = true
 sonic-callreq.workspace = true
 binfile = { workspace = true, optional = true }
+indexmap.workspace = true
 serde = { workspace = true, optional = true }
 chrono.workspace = true
 
