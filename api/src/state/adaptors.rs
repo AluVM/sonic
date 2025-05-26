@@ -23,6 +23,7 @@
 
 use std::io;
 
+use aluvm::LibSite;
 use amplify::confinement::{Confined, ConfinedBlob};
 use amplify::num::u256;
 use sonic_callreq::StateName;
@@ -50,10 +51,17 @@ pub enum StateConvertor {
     #[strict_type(tag = 0x11)]
     TypedFieldEncoder(StateTy),
     // In the future we can add more adaptors:
-    // - doing more compact encoding (storing type in bits, not a full field element);
+    // - doing more compact encoding (storing state type in bits, not using a full field element);
     // - using just a specific range of field element bits, not a full value - such that multiple APIs may read
     //   different parts of the same data;
-    // - using a Turing complete grammar with some VM (AluVM? RISC-V? WASM?).
+    /// Execute a custom function.
+    // AluVM is reserved for the future. We need it here to avoid breaking changes.
+    #[strict_type(tag = 0xFF)]
+    AluVM(
+        /// The entry point to the script (virtual machine uses libraries from
+        /// [`crate::Semantics`]).
+        LibSite,
+    ),
 }
 
 impl StateConvertor {
@@ -68,6 +76,7 @@ impl StateConvertor {
             Self::Unit => Err(StateConvertError::UnitState),
             Self::TypedEncoder(ty) => typed_convert(*ty, sem_id, value, sys),
             Self::TypedFieldEncoder(ty) => typed_field_convert(*ty, sem_id, value, sys),
+            Self::AluVM(_) => Err(StateConvertError::Unsupported),
         }
     }
 }
@@ -86,8 +95,15 @@ pub enum StateBuilder {
     #[strict_type(tag = 0x11)]
     TypedFieldEncoder(StateTy),
     // In the future we can add more adaptors:
-    // - doing more compact encoding (storing type in bits, not a full field element);
-    // - using a Turing complete grammar with some VM (AluVM? RISC-V? WASM?).
+    // - doing more compact encoding (storing state type in bits, not using a full field element);
+    /// Execute a custom function.
+    // AluVM is reserved for the future. We need it here to avoid breaking changes.
+    #[strict_type(tag = 0xFF)]
+    AluVM(
+        /// The entry point to the script (virtual machine uses libraries from
+        /// [`crate::Semantics`]).
+        LibSite,
+    ),
 }
 
 impl StateBuilder {
@@ -102,6 +118,7 @@ impl StateBuilder {
                 typed_build(*ty, ser)
             }
             Self::TypedFieldEncoder(ty) => typed_field_build(*ty, typed.unbox())?,
+            Self::AluVM(_) => return Err(StateBuildError::Unsupported),
         })
     }
 }
@@ -127,6 +144,9 @@ pub enum StateBuildError {
 
     #[display("the provided value doesn't match the required unit type")]
     InvalidUnit,
+
+    #[display("AluVM is not yet supported for a state builder.")]
+    Unsupported,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Display, Error, From)]
@@ -143,6 +163,9 @@ pub enum StateConvertError {
 
     #[display("state has no data")]
     UnitState,
+
+    #[display("AluVM is not yet supported for a state conversion.")]
+    Unsupported,
 }
 
 fn typed_convert(

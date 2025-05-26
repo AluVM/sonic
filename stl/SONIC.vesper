@@ -39,10 +39,16 @@ rec Semantics
           is unit, Unit, tag 0
           is typedEncoder, U256, wrapped, tag 1
           is typedFieldEncoder, U256, wrapped, tag 2
+          rec aluVm, LibSite, wrapped, tag 3
+            bytes libId, len 32, aka LibId
+            is offset, U16
         union builder, StateBuilder
           is unit, Unit, tag 0
           is typedEncoder, U256, wrapped, tag 1
           is typedFieldEncoder, U256, wrapped, tag 2
+          rec aluVm, LibSite, wrapped, tag 3
+            bytes libId, len 32, aka LibId
+            is offset, U16
         union rawConvertor, RawConvertor
           bytes strictDecode, len 32, wrapped, aka SemId, tag 0
         union rawBuilder, RawBuilder
@@ -51,20 +57,34 @@ rec Semantics
       ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
       rec value, OwnedApi
         bytes semId, len 32, aka SemId
-        enum arithmetics, StateArithm, fungible 0, nonFungible 1
+        union arithmetics, StateArithm
+          is fungible, Unit, tag 0
+          is nonFungible, Unit, tag 1
+          rec aluVm, LibSite, wrapped, tag 2
+            bytes libId, len 32, aka LibId
+            is offset, U16
         union convertor, StateConvertor
           is unit, Unit, tag 0
           is typedEncoder, U256, wrapped, tag 1
           is typedFieldEncoder, U256, wrapped, tag 2
+          rec aluVm, LibSite, wrapped, tag 3
+            bytes libId, len 32, aka LibId
+            is offset, U16
         union builder, StateBuilder
           is unit, Unit, tag 0
           is typedEncoder, U256, wrapped, tag 1
           is typedFieldEncoder, U256, wrapped, tag 2
+          rec aluVm, LibSite, wrapped, tag 3
+            bytes libId, len 32, aka LibId
+            is offset, U16
         bytes witnessSemId, len 32, aka SemId
         union witnessBuilder, StateBuilder
           is unit, Unit, tag 0
           is typedEncoder, U256, wrapped, tag 1
           is typedFieldEncoder, U256, wrapped, tag 2
+          rec aluVm, LibSite, wrapped, tag 3
+            bytes libId, len 32, aka LibId
+            is offset, U16
     map aggregators, len 0..MAX8
       ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
       union value, Aggregator
@@ -174,10 +194,16 @@ rec Semantics
             is unit, Unit, tag 0
             is typedEncoder, U256, wrapped, tag 1
             is typedFieldEncoder, U256, wrapped, tag 2
+            rec aluVm, LibSite, wrapped, tag 3
+              bytes libId, len 32, aka LibId
+              is offset, U16
           union builder, StateBuilder
             is unit, Unit, tag 0
             is typedEncoder, U256, wrapped, tag 1
             is typedFieldEncoder, U256, wrapped, tag 2
+            rec aluVm, LibSite, wrapped, tag 3
+              bytes libId, len 32, aka LibId
+              is offset, U16
           union rawConvertor, RawConvertor
             bytes strictDecode, len 32, wrapped, aka SemId, tag 0
           union rawBuilder, RawBuilder
@@ -186,20 +212,34 @@ rec Semantics
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
         rec value, OwnedApi
           bytes semId, len 32, aka SemId
-          enum arithmetics, StateArithm, fungible 0, nonFungible 1
+          union arithmetics, StateArithm
+            is fungible, Unit, tag 0
+            is nonFungible, Unit, tag 1
+            rec aluVm, LibSite, wrapped, tag 2
+              bytes libId, len 32, aka LibId
+              is offset, U16
           union convertor, StateConvertor
             is unit, Unit, tag 0
             is typedEncoder, U256, wrapped, tag 1
             is typedFieldEncoder, U256, wrapped, tag 2
+            rec aluVm, LibSite, wrapped, tag 3
+              bytes libId, len 32, aka LibId
+              is offset, U16
           union builder, StateBuilder
             is unit, Unit, tag 0
             is typedEncoder, U256, wrapped, tag 1
             is typedFieldEncoder, U256, wrapped, tag 2
+            rec aluVm, LibSite, wrapped, tag 3
+              bytes libId, len 32, aka LibId
+              is offset, U16
           bytes witnessSemId, len 32, aka SemId
           union witnessBuilder, StateBuilder
             is unit, Unit, tag 0
             is typedEncoder, U256, wrapped, tag 1
             is typedFieldEncoder, U256, wrapped, tag 2
+            rec aluVm, LibSite, wrapped, tag 3
+              bytes libId, len 32, aka LibId
+              is offset, U16
       map aggregators, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
         union value, Aggregator
@@ -383,10 +423,16 @@ rec Issuer
             is unit, Unit, tag 0
             is typedEncoder, U256, wrapped, tag 1
             is typedFieldEncoder, U256, wrapped, tag 2
+            rec aluVm, LibSite, wrapped, tag 3
+              bytes libId, len 32, aka LibId
+              is offset, U16
           union builder, StateBuilder
             is unit, Unit, tag 0
             is typedEncoder, U256, wrapped, tag 1
             is typedFieldEncoder, U256, wrapped, tag 2
+            rec aluVm, LibSite, wrapped, tag 3
+              bytes libId, len 32, aka LibId
+              is offset, U16
           union rawConvertor, RawConvertor
             bytes strictDecode, len 32, wrapped, aka SemId, tag 0
           union rawBuilder, RawBuilder
@@ -395,20 +441,34 @@ rec Issuer
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
         rec value, OwnedApi
           bytes semId, len 32, aka SemId
-          enum arithmetics, StateArithm, fungible 0, nonFungible 1
+          union arithmetics, StateArithm
+            is fungible, Unit, tag 0
+            is nonFungible, Unit, tag 1
+            rec aluVm, LibSite, wrapped, tag 2
+              bytes libId, len 32, aka LibId
+              is offset, U16
           union convertor, StateConvertor
             is unit, Unit, tag 0
             is typedEncoder, U256, wrapped, tag 1
             is typedFieldEncoder, U256, wrapped, tag 2
+            rec aluVm, LibSite, wrapped, tag 3
+              bytes libId, len 32, aka LibId
+              is offset, U16
           union builder, StateBuilder
             is unit, Unit, tag 0
             is typedEncoder, U256, wrapped, tag 1
             is typedFieldEncoder, U256, wrapped, tag 2
+            rec aluVm, LibSite, wrapped, tag 3
+              bytes libId, len 32, aka LibId
+              is offset, U16
           bytes witnessSemId, len 32, aka SemId
           union witnessBuilder, StateBuilder
             is unit, Unit, tag 0
             is typedEncoder, U256, wrapped, tag 1
             is typedFieldEncoder, U256, wrapped, tag 2
+            rec aluVm, LibSite, wrapped, tag 3
+              bytes libId, len 32, aka LibId
+              is offset, U16
       map aggregators, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
         union value, Aggregator
@@ -518,10 +578,16 @@ rec Issuer
               is unit, Unit, tag 0
               is typedEncoder, U256, wrapped, tag 1
               is typedFieldEncoder, U256, wrapped, tag 2
+              rec aluVm, LibSite, wrapped, tag 3
+                bytes libId, len 32, aka LibId
+                is offset, U16
             union builder, StateBuilder
               is unit, Unit, tag 0
               is typedEncoder, U256, wrapped, tag 1
               is typedFieldEncoder, U256, wrapped, tag 2
+              rec aluVm, LibSite, wrapped, tag 3
+                bytes libId, len 32, aka LibId
+                is offset, U16
             union rawConvertor, RawConvertor
               bytes strictDecode, len 32, wrapped, aka SemId, tag 0
             union rawBuilder, RawBuilder
@@ -530,20 +596,34 @@ rec Issuer
           ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
           rec value, OwnedApi
             bytes semId, len 32, aka SemId
-            enum arithmetics, StateArithm, fungible 0, nonFungible 1
+            union arithmetics, StateArithm
+              is fungible, Unit, tag 0
+              is nonFungible, Unit, tag 1
+              rec aluVm, LibSite, wrapped, tag 2
+                bytes libId, len 32, aka LibId
+                is offset, U16
             union convertor, StateConvertor
               is unit, Unit, tag 0
               is typedEncoder, U256, wrapped, tag 1
               is typedFieldEncoder, U256, wrapped, tag 2
+              rec aluVm, LibSite, wrapped, tag 3
+                bytes libId, len 32, aka LibId
+                is offset, U16
             union builder, StateBuilder
               is unit, Unit, tag 0
               is typedEncoder, U256, wrapped, tag 1
               is typedFieldEncoder, U256, wrapped, tag 2
+              rec aluVm, LibSite, wrapped, tag 3
+                bytes libId, len 32, aka LibId
+                is offset, U16
             bytes witnessSemId, len 32, aka SemId
             union witnessBuilder, StateBuilder
               is unit, Unit, tag 0
               is typedEncoder, U256, wrapped, tag 1
               is typedFieldEncoder, U256, wrapped, tag 2
+              rec aluVm, LibSite, wrapped, tag 3
+                bytes libId, len 32, aka LibId
+                is offset, U16
         map aggregators, len 0..MAX8
           ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
           union value, Aggregator
@@ -711,10 +791,16 @@ rec Articles
             is unit, Unit, tag 0
             is typedEncoder, U256, wrapped, tag 1
             is typedFieldEncoder, U256, wrapped, tag 2
+            rec aluVm, LibSite, wrapped, tag 3
+              bytes libId, len 32, aka LibId
+              is offset, U16
           union builder, StateBuilder
             is unit, Unit, tag 0
             is typedEncoder, U256, wrapped, tag 1
             is typedFieldEncoder, U256, wrapped, tag 2
+            rec aluVm, LibSite, wrapped, tag 3
+              bytes libId, len 32, aka LibId
+              is offset, U16
           union rawConvertor, RawConvertor
             bytes strictDecode, len 32, wrapped, aka SemId, tag 0
           union rawBuilder, RawBuilder
@@ -723,20 +809,34 @@ rec Articles
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
         rec value, OwnedApi
           bytes semId, len 32, aka SemId
-          enum arithmetics, StateArithm, fungible 0, nonFungible 1
+          union arithmetics, StateArithm
+            is fungible, Unit, tag 0
+            is nonFungible, Unit, tag 1
+            rec aluVm, LibSite, wrapped, tag 2
+              bytes libId, len 32, aka LibId
+              is offset, U16
           union convertor, StateConvertor
             is unit, Unit, tag 0
             is typedEncoder, U256, wrapped, tag 1
             is typedFieldEncoder, U256, wrapped, tag 2
+            rec aluVm, LibSite, wrapped, tag 3
+              bytes libId, len 32, aka LibId
+              is offset, U16
           union builder, StateBuilder
             is unit, Unit, tag 0
             is typedEncoder, U256, wrapped, tag 1
             is typedFieldEncoder, U256, wrapped, tag 2
+            rec aluVm, LibSite, wrapped, tag 3
+              bytes libId, len 32, aka LibId
+              is offset, U16
           bytes witnessSemId, len 32, aka SemId
           union witnessBuilder, StateBuilder
             is unit, Unit, tag 0
             is typedEncoder, U256, wrapped, tag 1
             is typedFieldEncoder, U256, wrapped, tag 2
+            rec aluVm, LibSite, wrapped, tag 3
+              bytes libId, len 32, aka LibId
+              is offset, U16
       map aggregators, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
         union value, Aggregator
@@ -846,10 +946,16 @@ rec Articles
               is unit, Unit, tag 0
               is typedEncoder, U256, wrapped, tag 1
               is typedFieldEncoder, U256, wrapped, tag 2
+              rec aluVm, LibSite, wrapped, tag 3
+                bytes libId, len 32, aka LibId
+                is offset, U16
             union builder, StateBuilder
               is unit, Unit, tag 0
               is typedEncoder, U256, wrapped, tag 1
               is typedFieldEncoder, U256, wrapped, tag 2
+              rec aluVm, LibSite, wrapped, tag 3
+                bytes libId, len 32, aka LibId
+                is offset, U16
             union rawConvertor, RawConvertor
               bytes strictDecode, len 32, wrapped, aka SemId, tag 0
             union rawBuilder, RawBuilder
@@ -858,20 +964,34 @@ rec Articles
           ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
           rec value, OwnedApi
             bytes semId, len 32, aka SemId
-            enum arithmetics, StateArithm, fungible 0, nonFungible 1
+            union arithmetics, StateArithm
+              is fungible, Unit, tag 0
+              is nonFungible, Unit, tag 1
+              rec aluVm, LibSite, wrapped, tag 2
+                bytes libId, len 32, aka LibId
+                is offset, U16
             union convertor, StateConvertor
               is unit, Unit, tag 0
               is typedEncoder, U256, wrapped, tag 1
               is typedFieldEncoder, U256, wrapped, tag 2
+              rec aluVm, LibSite, wrapped, tag 3
+                bytes libId, len 32, aka LibId
+                is offset, U16
             union builder, StateBuilder
               is unit, Unit, tag 0
               is typedEncoder, U256, wrapped, tag 1
               is typedFieldEncoder, U256, wrapped, tag 2
+              rec aluVm, LibSite, wrapped, tag 3
+                bytes libId, len 32, aka LibId
+                is offset, U16
             bytes witnessSemId, len 32, aka SemId
             union witnessBuilder, StateBuilder
               is unit, Unit, tag 0
               is typedEncoder, U256, wrapped, tag 1
               is typedFieldEncoder, U256, wrapped, tag 2
+              rec aluVm, LibSite, wrapped, tag 3
+                bytes libId, len 32, aka LibId
+                is offset, U16
         map aggregators, len 0..MAX8
           ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
           union value, Aggregator

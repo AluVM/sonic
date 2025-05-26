@@ -38,6 +38,8 @@ use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Identity, Issue, Op
 use crate::deed::{CallParams, DeedBuilder};
 use crate::{Articles, EffectiveState, IssueError, ProcessedState, Stock, Transition};
 
+pub const DEEDS_VERSION: u16 = 0;
+
 /// Contract with all its state and operations, supporting updates and rollbacks.
 // We need this structure to hide internal persistence methods and not to expose them.
 // We need the persistence trait (`Stock`) in order to allow different persistence storage
@@ -638,7 +640,6 @@ mod _fs {
     use super::*;
 
     pub const DEEDS_MAGIC_NUMBER: u64 = u64::from_be_bytes(*b"DEEDLDGR");
-    pub const DEEDS_VERSION: u16 = 0;
 
     impl<S: Stock> Ledger<S> {
         pub fn export_to_file(

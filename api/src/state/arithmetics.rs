@@ -23,6 +23,7 @@
 
 use core::str::FromStr;
 
+use aluvm::LibSite;
 use strict_types::value::StrictNum;
 use strict_types::StrictVal;
 
@@ -30,14 +31,22 @@ use crate::LIB_NAME_SONIC;
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONIC, tags = repr, try_from_u8, into_u8)]
+#[strict_type(lib = LIB_NAME_SONIC, tags = custom)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
-#[repr(u8)]
 pub enum StateArithm {
-    #[strict_type(dumb)]
-    Fungible = 0,
-    NonFungible = 1,
-    // In the future more arithmetics can be added, for instance, based on Tunring-complete VMs.
+    #[strict_type(tag = 0x00, dumb)]
+    Fungible,
+
+    #[strict_type(tag = 0x01)]
+    NonFungible,
+    // In the future more arithmetics can be added.
+    /// Execute a custom function.
+    #[strict_type(tag = 0xFF)]
+    AluVM(
+        /// The entry point to the script (virtual machine uses libraries from
+        /// [`crate::Semantics`]).
+        LibSite,
+    ),
 }
 
 impl StateArithm {
@@ -45,6 +54,7 @@ impl StateArithm {
         match self {
             Self::Fungible => StateCalc::Fungible(StrictVal::Number(StrictNum::Uint(0))),
             Self::NonFungible => StateCalc::NonFungible(vec![]),
+            Self::AluVM(_) => StateCalc::AluVM,
         }
     }
 }
@@ -57,13 +67,17 @@ pub enum StateCalcError {
 
     /// state cannot be computed.
     UncountableState,
+
+    /// AluVM is not yet supported for the state arithmetics.
+    Unsupported,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum StateCalc {
     NonFungible(Vec<StrictVal>),
     Fungible(StrictVal),
-    // In the future more calculators can be added, for instance, keeping a state of a Turing-complete VM.
+    // AluVM is reserved for the future. We need it here to avoid breaking changes.
+    AluVM,
 }
 
 impl StateCalc {
@@ -86,6 +100,7 @@ impl StateCalc {
                 *val = val.checked_add(add).ok_or(StateCalcError::Overflow)?;
                 Ok(())
             }
+            Self::AluVM => Err(StateCalcError::Unsupported),
         }
     }
 
@@ -115,6 +130,7 @@ impl StateCalc {
                 *val -= dec;
                 Ok(())
             }
+            Self::AluVM => Err(StateCalcError::Unsupported),
         }
     }
 
@@ -131,6 +147,7 @@ impl StateCalc {
                 }
                 _ => return Err(StateCalcError::UncountableState),
             },
+            Self::AluVM => return Err(StateCalcError::Unsupported),
         })
     }
 
@@ -150,6 +167,7 @@ impl StateCalc {
                     false
                 }
             }
+            Self::AluVM => false,
         }
     }
 }

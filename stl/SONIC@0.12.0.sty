@@ -1,5 +1,5 @@
 {-
-  Id: stl:ZxZS5Oz1-AMK_ZjX-EasLoq_-Dl~MMML-ksDdbSW-gQ_HUAY#classic-extreme-mimic
+  Id: stl:HzKD6nNX-PP5Zch2-_e5SO_n-LfRxQr7-sSfKDig-r_DTqBw#donald-june-cable
   Name: SONIC
   Version: 0.12.0
   Description: Standard library for formally-verifiable distributed contracts
@@ -137,19 +137,22 @@ data Semantics         : version U16
 @mnemonic(insect-cello-avalon)
 data SigBlob           : [Byte ^ 1..0x1000]
 
-@mnemonic(meteor-gondola-sweden)
-data StateArithm       : fungible | nonFungible
+@mnemonic(pablo-cotton-mirror)
+data StateArithm       : fungible ()
+                       | nonFungible ()
+                       | aluVm#255 AluVM.LibSite
 
-
-@mnemonic(truck-domain-viking)
+@mnemonic(reverse-delphi-camel)
 data StateBuilder      : unit ()
                        | typedEncoder#16 U256
                        | typedFieldEncoder U256
+                       | aluVm#255 AluVM.LibSite
 
-@mnemonic(random-morris-havana)
+@mnemonic(beach-congo-instant)
 data StateConvertor    : unit ()
                        | typedEncoder#16 U256
                        | typedFieldEncoder U256
+                       | aluVm#255 AluVM.LibSite
 
 @mnemonic(benny-marina-fashion)
 data StateSelector     : global (StrictTypes.VariantName, Std.Bool)
