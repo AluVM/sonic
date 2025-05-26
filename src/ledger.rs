@@ -26,7 +26,7 @@ use core::borrow::Borrow;
 use std::io;
 
 use amplify::MultiError;
-use commit_verify::StrictHash;
+use commit_verify::{ReservedBytes, StrictHash};
 use indexmap::IndexSet;
 use sonic_callreq::MethodName;
 use sonicapi::{Api, NamedState, OpBuilder, SemanticError, Semantics, SigBlob};
@@ -367,6 +367,8 @@ impl<S: Stock> Ledger<S> {
         let articles = self.articles();
         let genesis_opid = articles.genesis_opid();
 
+        // Write version number
+        writer = (DEEDS_VERSION as u8).strict_encode(writer)?;
         // Write contract id
         let contract_id = self.contract_id();
         writer = self.contract_id().strict_encode(writer)?;
@@ -400,6 +402,8 @@ impl<S: Stock> Ledger<S> {
         let count = (|| -> Result<u32, AcceptError> {
             let contract_id = ContractId::strict_decode(reader)?;
 
+            // Check version number
+            let _ = ReservedBytes::<1, { DEEDS_VERSION as u8 }>::strict_decode(reader)?;
             let semantics = Semantics::strict_decode(reader)?;
             let sig = Option::<SigBlob>::strict_decode(reader)?;
             let issue = Issue::strict_decode(reader)?;
