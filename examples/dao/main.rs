@@ -113,7 +113,7 @@ fn api() -> Api {
             vname!("parties") => Aggregator::Take(SubAggregator::MapV2U(vname!("_parties"))),
             vname!("votings") => Aggregator::Take(SubAggregator::MapV2U(vname!("_votings"))),
             vname!("votes") => Aggregator::Take(SubAggregator::SetV(vname!("_votes"))),
-            vname!("votingCount") => Aggregator::Count(vname!("_votings")),
+            vname!("votingCount") => Aggregator::Take(SubAggregator::Count(vname!("_votings"))),
         },
         verifiers: tiny_bmap! {
             vname!("setup") => 0,

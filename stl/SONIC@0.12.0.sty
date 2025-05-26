@@ -1,5 +1,5 @@
 {-
-  Id: stl:o1mAwC2V-BqvNYzm-2nSfelM-yKM5hNO-xf1gQsd-hfoQL0c#passive-phrase-accent
+  Id: stl:KYGUnSNH-gN8bCy6-OjMcF10-ddgvq94-HWVIi9I-Qh5kN9Y#orbit-driver-puma
   Name: SONIC
   Version: 0.12.0
   Description: Standard library for formally-verifiable distributed contracts
@@ -71,11 +71,10 @@ import StrictTypes#henry-heart-survive
   use TypeSystem#adrian-boris-sponsor
 
 
-@mnemonic(fiction-shine-ceramic)
+@mnemonic(roof-monkey-stand)
 data Aggregator        : take SubAggregator
-                       | const (StrictTypes.SemId, [Byte ^ ..0xff])
+                       | some SubAggregator
                        | or (SubAggregator, StrictTypes.SemId, [Byte ^ ..0xff])
-                       | count#16 StrictTypes.VariantName
                        | aluVm#255 AluVM.LibSite
 
 @mnemonic(cobra-abraham-bonus)
@@ -160,15 +159,20 @@ data StateConvertor    : unit ()
 data StateSelector     : global (StrictTypes.VariantName, Std.Bool)
                        | aggregated StrictTypes.VariantName
 
-@mnemonic(garlic-horizon-scroll)
-data SubAggregator     : unwrapOr#1 (StrictTypes.VariantName, StrictTypes.SemId, [Byte ^ ..0xff])
+@mnemonic(judge-gloria-weekend)
+data SubAggregator     : const (StrictTypes.SemId, [Byte ^ ..0xff])
+                       | theOnly StrictTypes.VariantName
+                       | copy StrictTypes.VariantName
+                       | unwrapOr (StrictTypes.VariantName, StrictTypes.SemId, [Byte ^ ..0xff])
                        | neg#16 StateSelector
                        | sum (StateSelector, StateSelector)
                        | diff (StateSelector, StateSelector)
-                       | listV#32 StrictTypes.VariantName
+                       | count#32 StrictTypes.VariantName
+                       | listV StrictTypes.VariantName
                        | setV StrictTypes.VariantName
                        | mapV2u StrictTypes.VariantName
-                       | sumV#48 StrictTypes.VariantName
+                       | sumVUnwrap#48 StrictTypes.VariantName
+                       | sumVDefault StrictTypes.VariantName
 
 @mnemonic(explore-locate-zoom)
 data Transition        : opid UltraSONIC.Opid, destroyed {UltraSONIC.CellAddr -> UltraSONIC.StateCell}

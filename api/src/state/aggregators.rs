@@ -55,7 +55,7 @@ pub enum StateSelector {
 /// A set of pre-defined top-level state aggregators (see [`crate::Api::aggregators`].
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONIC, tags = custom, dumb = Self::Count(strict_dumb!()))]
+#[strict_type(lib = LIB_NAME_SONIC, tags = custom, dumb = Self::Some(strict_dumb!()))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub enum Aggregator {
     /// Takes the underlying aggregated state and applies nothing on top.
@@ -64,19 +64,15 @@ pub enum Aggregator {
     #[strict_type(tag = 0)]
     Take(SubAggregator),
 
-    /// The aggregated state is generated with a predefined constant value.
+    /// Wrap into an optional value.
     ///
-    /// To produce a state with a unit value, use `Self::Const(SemId::unit(), none!())`.
+    /// If the underlying aggregated state fails, sets the aggregated state to `None`.
     #[strict_type(tag = 1)]
-    Const(SemId, TinyBlob),
+    Some(SubAggregator),
 
     /// If the underlying aggregated state fails, returns the provided constant value.
     #[strict_type(tag = 2)]
     Or(SubAggregator, SemId, TinyBlob),
-
-    /// Count the number of elements of the global state of a certain type.
-    #[strict_type(tag = 0x10)]
-    Count(StateName),
 
     /// Execute a custom function on the state.
     #[strict_type(tag = 0xFF)]
@@ -92,8 +88,8 @@ impl Aggregator {
     /// and which needs to be computed before running this aggregator.
     pub fn depends_on(&self) -> impl Iterator<Item = &StateName> {
         match self {
-            Self::Take(sub) | Self::Or(sub, _, _) => sub.depends_on(),
-            Self::Const(_, _) | Self::Count(_) | Self::AluVM(_) => vec![],
+            Self::Take(sub) | Self::Some(sub) | Self::Or(sub, _, _) => sub.depends_on(),
+            Self::AluVM(_) => vec![],
         }
         .into_iter()
     }
@@ -113,20 +109,14 @@ impl Aggregator {
         match self {
             Self::Take(sub) => sub.aggregate(global, aggregated, types),
 
-            Self::Const(sem_id, val) => deserialize(*sem_id, val, types),
+            Self::Some(sub) => Some(match sub.aggregate(global, aggregated, types) {
+                Some(val) => StrictVal::some(val),
+                None => StrictVal::none(),
+            }),
 
             Self::Or(sub, sem_id, val) => sub
                 .aggregate(global, aggregated, types)
                 .or_else(|| deserialize(*sem_id, val, types)),
-
-            Self::Count(name) => {
-                let count = global
-                    .get(name)
-                    .into_iter()
-                    .flat_map(BTreeMap::values)
-                    .count();
-                Some(svnum!(count as u64))
-            }
 
             Self::AluVM(entry) => {
                 let libs = libs
@@ -150,12 +140,30 @@ impl Aggregator {
 #[strict_type(lib = LIB_NAME_SONIC, tags = custom, dumb = Self::Neg(strict_dumb!()))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub enum SubAggregator {
+    /// The aggregated state is generated with a predefined constant value.
+    ///
+    /// To produce a state with a unit value, use `Self::Const(SemId::unit(), none!())`.
+    #[strict_type(tag = 0)]
+    Const(SemId, TinyBlob),
+
+    /// Takes the only element of the global state.
+    ///
+    /// Fails if the state is not defined or has more than one defined element.
+    #[strict_type(tag = 1)]
+    TheOnly(StateName),
+
+    /// Takes some other aggregated and copies it.
+    ///
+    /// Fails if the other aggregated state is not defined.
+    #[strict_type(tag = 2)]
+    Copy(StateName),
+
     /// Unwraps an optional value.
     ///
     /// If the value is `None`, sets the state to the provided constant.
     ///
-    /// If the state is not defined, or not an optional, fails.
-    #[strict_type(tag = 1)]
+    /// Fails if the state is not defined, is multiple, or not an optional.
+    #[strict_type(tag = 3)]
     UnwrapOr(StateName, SemId, TinyBlob),
 
     /// Integer-negate state.
@@ -179,12 +187,16 @@ pub enum SubAggregator {
     #[strict_type(tag = 0x12)]
     Diff(StateSelector, StateSelector),
 
+    /// Count the number of elements of the global state of a certain type.
+    #[strict_type(tag = 0x20)]
+    Count(StateName),
+
     /// Convert a verified state under the same state type into a vector.
     ///
     /// Acts only on a global state; doesn't recognize aggregated state.
     ///
     /// If the global state with the name is absent returns an empty list.
-    #[strict_type(tag = 0x20)]
+    #[strict_type(tag = 0x21)]
     ListV(StateName),
 
     /// Convert a verified state under the same state type into a sorted set.
@@ -192,7 +204,7 @@ pub enum SubAggregator {
     /// Acts only on a global state; doesn't recognize aggregated state.
     ///
     /// If the global state with the name is absent returns an empty set.
-    #[strict_type(tag = 0x21)]
+    #[strict_type(tag = 0x22)]
     SetV(StateName),
 
     /// Map from a field-based element state to a non-verifiable structured state.
@@ -200,7 +212,7 @@ pub enum SubAggregator {
     /// Acts only on a global state; doesn't recognize aggregated state.
     ///
     /// If the global state with the name is absent returns an empty map.
-    #[strict_type(tag = 0x22)]
+    #[strict_type(tag = 0x23)]
     MapV2U(StateName),
 
     /// Sums over verifiable part of a global state.
@@ -210,7 +222,10 @@ pub enum SubAggregator {
     /// Fails if the global state doesn't have any elements,
     /// or the state type is not an unsigned integer.
     #[strict_type(tag = 0x30)]
-    SumV(StateName),
+    SumVUnwrap(StateName),
+
+    #[strict_type(tag = 0x31)]
+    SumVDefault(StateName),
 }
 
 impl SubAggregator {
@@ -227,14 +242,19 @@ impl SubAggregator {
             Self::Sum(StateSelector::Aggregated(a), StateSelector::Aggregated(b))
             | Self::Diff(StateSelector::Aggregated(a), StateSelector::Aggregated(b)) => vec![a, b],
 
-            Self::Neg(_)
+            Self::Const(_, _)
+            | Self::TheOnly(_)
+            | Self::Count(_)
+            | Self::Copy(_)
+            | Self::Neg(_)
             | Self::Sum(_, _)
             | Self::Diff(_, _)
             | Self::UnwrapOr(_, _, _)
             | Self::ListV(_)
             | Self::SetV(_)
             | Self::MapV2U(_)
-            | Self::SumV(_) => vec![],
+            | Self::SumVUnwrap(_)
+            | Self::SumVDefault(_) => vec![],
         }
     }
 
@@ -268,7 +288,19 @@ impl SubAggregator {
             }
         };
 
-        Some(match self {
+        match self {
+            Self::Const(sem_id, val) => deserialize(*sem_id, val, types),
+
+            Self::TheOnly(name) => {
+                let state = global.get(name)?;
+                if state.len() != 1 {
+                    return None;
+                }
+                Some(state.first_key_value()?.1.verified.clone())
+            }
+
+            Self::Copy(name) => aggregated.get(name).cloned(),
+
             Self::UnwrapOr(name, sem_id, val) => {
                 let state = global.get(name)?;
                 if state.len() != 1 {
@@ -278,7 +310,7 @@ impl SubAggregator {
                 let StrictVal::Union(tag, sv) = &atom.verified else {
                     return None;
                 };
-                match tag {
+                Some(match tag {
                     EnumTag::Name(name) if name.as_str() == "none" && sv.as_ref() == &StrictVal::Unit => {
                         return deserialize(*sem_id, val, types)
                     }
@@ -286,35 +318,44 @@ impl SubAggregator {
                     EnumTag::Name(name) if name.as_str() == "some" => sv.as_ref().clone(),
                     EnumTag::Ord(1) => sv.as_ref().clone(),
                     _ => return None,
-                }
+                })
             }
 
             Self::Neg(name) => {
                 let val = get_u64(name)?;
                 let neg = (val as i64).checked_neg()?;
-                svnum!(neg)
+                Some(svnum!(neg))
             }
             Self::Sum(a, b) => {
                 let a = get_u64(a)?;
                 let b = get_u64(b)?;
                 let sum = a.checked_add(b)?;
-                svnum!(sum)
+                Some(svnum!(sum))
             }
             Self::Diff(a, b) => {
                 let a = get_u64(a)?;
                 let b = get_u64(b)?;
                 let sub = a.checked_sub(b)?;
-                svnum!(sub)
+                Some(svnum!(sub))
             }
 
-            Self::ListV(name) => StrictVal::List(
+            Self::Count(name) => {
+                let count = global
+                    .get(name)
+                    .into_iter()
+                    .flat_map(BTreeMap::values)
+                    .count();
+                Some(svnum!(count as u64))
+            }
+
+            Self::ListV(name) => Some(StrictVal::List(
                 global
                     .get(name)
                     .into_iter()
                     .flat_map(BTreeMap::values)
                     .map(|atom| atom.verified.clone())
                     .collect(),
-            ),
+            )),
             Self::SetV(name) => {
                 let mut set = Vec::new();
                 for state in global.get(name).into_iter().flat_map(BTreeMap::values) {
@@ -322,7 +363,7 @@ impl SubAggregator {
                         set.push(state.verified.clone());
                     }
                 }
-                StrictVal::Set(set)
+                Some(StrictVal::Set(set))
             }
             Self::MapV2U(name) => {
                 let mut map = Vec::new();
@@ -333,10 +374,10 @@ impl SubAggregator {
                     }
                     map.push((atom.verified.clone(), val.clone()));
                 }
-                StrictVal::Map(map)
+                Some(StrictVal::Map(map))
             }
 
-            Self::SumV(name) => {
+            Self::SumVUnwrap(name) => {
                 let sum = global
                     .get(name)
                     .into_iter()
@@ -345,9 +386,22 @@ impl SubAggregator {
                         StrictVal::Number(StrictNum::Uint(val)) => Some(sum + *val),
                         _ => None,
                     })?;
-                svnum!(sum)
+                Some(svnum!(sum))
             }
-        })
+
+            Self::SumVDefault(name) => {
+                let sum = global
+                    .get(name)
+                    .into_iter()
+                    .flat_map(BTreeMap::values)
+                    .filter_map(|val| match &val.verified {
+                        StrictVal::Number(StrictNum::Uint(val)) => Some(*val),
+                        _ => None,
+                    })
+                    .sum::<u64>();
+                Some(svnum!(sum))
+            }
+        }
     }
 }
 
@@ -398,8 +452,11 @@ mod test {
 
     #[test]
     fn verified_readers() {
-        assert_eq!(call(Aggregator::Count(vname!("verified"))), svnum!(6u64));
-        assert_eq!(call(Aggregator::Take(SubAggregator::SumV(vname!("verified")))), svnum!(5u64 + 1 + 2 + 3 + 4 + 5));
+        assert_eq!(call(Aggregator::Take(SubAggregator::Count(vname!("verified")))), svnum!(6u64));
+        assert_eq!(
+            call(Aggregator::Take(SubAggregator::SumVUnwrap(vname!("verified")))),
+            svnum!(5u64 + 1 + 2 + 3 + 4 + 5)
+        );
         assert_eq!(
             call(Aggregator::Take(SubAggregator::ListV(vname!("verified")))),
             svlist!([5u64, 1u64, 2u64, 3u64, 4u64, 5u64])
@@ -413,7 +470,7 @@ mod test {
 
     #[test]
     fn unverified_readers() {
-        assert_eq!(call(Aggregator::Count(vname!("unverified"))), svnum!(6u64));
+        assert_eq!(call(Aggregator::Take(SubAggregator::Count(vname!("verified")))), svnum!(6u64));
         assert_eq!(
             call(Aggregator::Take(SubAggregator::ListV(vname!("unverified")))),
             svlist!([(), (), (), (), (), ()])
@@ -427,12 +484,15 @@ mod test {
 
     #[test]
     #[should_panic]
-    fn unverified_sum() { call(Aggregator::Take(SubAggregator::SumV(vname!("unverified")))); }
+    fn unverified_sum() { call(Aggregator::Take(SubAggregator::SumVUnwrap(vname!("unverified")))); }
 
     #[test]
     fn pair_readers() {
-        assert_eq!(call(Aggregator::Count(vname!("pairs"))), svnum!(6u64));
-        assert_eq!(call(Aggregator::Take(SubAggregator::SumV(vname!("pairs")))), svnum!(5u64 + 1 + 2 + 3 + 4 + 5));
+        assert_eq!(call(Aggregator::Take(SubAggregator::Count(vname!("verified")))), svnum!(6u64));
+        assert_eq!(
+            call(Aggregator::Take(SubAggregator::SumVUnwrap(vname!("pairs")))),
+            svnum!(5u64 + 1 + 2 + 3 + 4 + 5)
+        );
         assert_eq!(
             call(Aggregator::Take(SubAggregator::ListV(vname!("pairs")))),
             svlist!([5u64, 1u64, 2u64, 3u64, 4u64, 5u64])
