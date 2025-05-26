@@ -277,7 +277,7 @@ impl<S: Stock> Ledger<S> {
 
     /// Exports contract with all known operations
     pub fn export_all(&self, writer: StrictWriter<impl WriteRaw>) -> io::Result<()> {
-        self.export_internal(self.0.operation_count(), writer, |_| true, |_, _, w| Ok(w))
+        self.export_internal(self.0.operation_count() as u32, writer, |_| true, |_, _, w| Ok(w))
     }
 
     /// Export a part of a contract history: a graph between set of terminals and genesis.
@@ -337,7 +337,7 @@ impl<S: Stock> Ledger<S> {
         }
         opids.remove(&genesis_opid);
 
-        self.export_internal(opids.len() as u64, writer, |opid| opids.remove(opid), aux)?;
+        self.export_internal(opids.len() as u32, writer, |opid| opids.remove(opid), aux)?;
 
         debug_assert!(
             opids.is_empty(),
@@ -359,7 +359,7 @@ impl<S: Stock> Ledger<S> {
     /// Does not write the contract id.
     pub fn export_internal<W: WriteRaw>(
         &self,
-        count: u64,
+        count: u32,
         mut writer: StrictWriter<W>,
         mut should_include: impl FnMut(&Opid) -> bool,
         mut aux: impl FnMut(Opid, &Operation, StrictWriter<W>) -> io::Result<StrictWriter<W>>,
@@ -370,11 +370,11 @@ impl<S: Stock> Ledger<S> {
         // Write contract id
         let contract_id = self.contract_id();
         writer = self.contract_id().strict_encode(writer)?;
-        // Write no of operations
-        writer = count.strict_encode(writer)?;
         // Write articles
         writer = articles.strict_encode(writer)?;
         writer = aux(genesis_opid, &articles.genesis().to_operation(contract_id), writer)?;
+        // Write no of operations
+        writer = count.strict_encode(writer)?;
         // Stream operations
         for (opid, op) in self.0.operations() {
             if !should_include(&opid) {
@@ -397,9 +397,8 @@ impl<S: Stock> Ledger<S> {
         sig_validator: impl FnOnce(StrictHash, &Identity, &SigBlob) -> Result<(), E>,
     ) -> Result<(), MultiError<AcceptError, S::Error>> {
         // We need this closure to avoid multiple `map_err`.
-        let count = (|| -> Result<u64, AcceptError> {
+        let count = (|| -> Result<u32, AcceptError> {
             let contract_id = ContractId::strict_decode(reader)?;
-            let count = u64::strict_decode(reader)?;
 
             let semantics = Semantics::strict_decode(reader)?;
             let sig = Option::<SigBlob>::strict_decode(reader)?;
@@ -411,6 +410,8 @@ impl<S: Stock> Ledger<S> {
 
             self.upgrade_apis(articles)
                 .map_err(|e| AcceptError::Persistence(e.to_string()))?;
+
+            let count = u32::strict_decode(reader)?;
             Ok(count)
         })()
         .map_err(MultiError::A)?;
