@@ -258,8 +258,11 @@ impl CommitEncode for Semantics {
     type CommitmentId = ApisChecksum;
     fn commit_encode(&self, e: &mut CommitEngine) {
         e.commit_to_serialized(&self.version);
-        // We do not commit to the codex_libs since thea are not a part of APIs and are commit to inside the
-        // codex. The fact that there are no other libs is verified in the Articles and Issuer constructors.
+        e.commit_to_hash(&self.default);
+        // We do not commit to the codex_libs since they are not a part of APIs
+        // and are commit to inside the codex.
+        // The fact that there are no other libs
+        // is verified in the Articles and Issuer constructors.
         let apis = SmallOrdMap::from_iter_checked(
             self.custom
                 .iter()
