@@ -51,8 +51,14 @@ rec Semantics
             is offset, U16
         union rawConvertor, RawConvertor
           bytes strictDecode, len 32, wrapped, aka SemId, tag 0
+          rec aluVm, LibSite, wrapped, tag 1
+            bytes libId, len 32, aka LibId
+            is offset, U16
         union rawBuilder, RawBuilder
           bytes strictEncode, len 32, wrapped, aka SemId, tag 0
+          rec aluVm, LibSite, wrapped, tag 1
+            bytes libId, len 32, aka LibId
+            is offset, U16
     map owned, len 0..MAX8
       ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
       rec value, OwnedApi
@@ -206,8 +212,14 @@ rec Semantics
               is offset, U16
           union rawConvertor, RawConvertor
             bytes strictDecode, len 32, wrapped, aka SemId, tag 0
+            rec aluVm, LibSite, wrapped, tag 1
+              bytes libId, len 32, aka LibId
+              is offset, U16
           union rawBuilder, RawBuilder
             bytes strictEncode, len 32, wrapped, aka SemId, tag 0
+            rec aluVm, LibSite, wrapped, tag 1
+              bytes libId, len 32, aka LibId
+              is offset, U16
       map owned, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
         rec value, OwnedApi
@@ -435,8 +447,14 @@ rec Issuer
               is offset, U16
           union rawConvertor, RawConvertor
             bytes strictDecode, len 32, wrapped, aka SemId, tag 0
+            rec aluVm, LibSite, wrapped, tag 1
+              bytes libId, len 32, aka LibId
+              is offset, U16
           union rawBuilder, RawBuilder
             bytes strictEncode, len 32, wrapped, aka SemId, tag 0
+            rec aluVm, LibSite, wrapped, tag 1
+              bytes libId, len 32, aka LibId
+              is offset, U16
       map owned, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
         rec value, OwnedApi
@@ -590,8 +608,14 @@ rec Issuer
                 is offset, U16
             union rawConvertor, RawConvertor
               bytes strictDecode, len 32, wrapped, aka SemId, tag 0
+              rec aluVm, LibSite, wrapped, tag 1
+                bytes libId, len 32, aka LibId
+                is offset, U16
             union rawBuilder, RawBuilder
               bytes strictEncode, len 32, wrapped, aka SemId, tag 0
+              rec aluVm, LibSite, wrapped, tag 1
+                bytes libId, len 32, aka LibId
+                is offset, U16
         map owned, len 0..MAX8
           ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
           rec value, OwnedApi
@@ -803,8 +827,14 @@ rec Articles
               is offset, U16
           union rawConvertor, RawConvertor
             bytes strictDecode, len 32, wrapped, aka SemId, tag 0
+            rec aluVm, LibSite, wrapped, tag 1
+              bytes libId, len 32, aka LibId
+              is offset, U16
           union rawBuilder, RawBuilder
             bytes strictEncode, len 32, wrapped, aka SemId, tag 0
+            rec aluVm, LibSite, wrapped, tag 1
+              bytes libId, len 32, aka LibId
+              is offset, U16
       map owned, len 0..MAX8
         ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
         rec value, OwnedApi
@@ -958,8 +988,14 @@ rec Articles
                 is offset, U16
             union rawConvertor, RawConvertor
               bytes strictDecode, len 32, wrapped, aka SemId, tag 0
+              rec aluVm, LibSite, wrapped, tag 1
+                bytes libId, len 32, aka LibId
+                is offset, U16
             union rawBuilder, RawBuilder
               bytes strictEncode, len 32, wrapped, aka SemId, tag 0
+              rec aluVm, LibSite, wrapped, tag 1
+                bytes libId, len 32, aka LibId
+                is offset, U16
         map owned, len 0..MAX8
           ascii key, aka VariantName, first AlphaSmallLodash, rest AlphaNumLodash, len 1..100
           rec value, OwnedApi

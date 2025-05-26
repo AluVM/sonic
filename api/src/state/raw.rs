@@ -21,6 +21,7 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+use aluvm::LibSite;
 use amplify::confinement::{SmallBlob, U24 as U24MAX};
 use strict_encoding::StreamReader;
 use strict_types::{SemId, StrictVal, TypeSystem};
@@ -41,13 +42,21 @@ pub enum RawConvertor {
     // In the future we can add more adaptors:
     // - using just a specific range of raw bytes, not a full value - such that multiple APIs may read different parts
     //   of the same data;
-    // - using a Turing complete grammar with some VM (AluVM? RISC-V? WASM?).
+    /// Execute a custom function.
+    // AluVM is reserved for the future. We need it here to avoid breaking changes.
+    #[strict_type(tag = 0xFF)]
+    AluVM(
+        /// The entry point to the script (virtual machine uses libraries from
+        /// [`crate::Semantics`]).
+        LibSite,
+    ),
 }
 
 impl RawConvertor {
     pub fn convert(&self, raw: &RawData, sys: &TypeSystem) -> Result<StrictVal, StateConvertError> {
         match self {
             Self::StrictDecode(sem_id) => strict_convert(*sem_id, raw, sys),
+            Self::AluVM(_) => Err(StateConvertError::Unsupported),
         }
     }
 }
@@ -60,8 +69,15 @@ pub enum RawBuilder {
     /// Convert strict value into raw bytes using strict encoding.
     #[strict_type(tag = 0x00)]
     StrictEncode(SemId),
-    // In the future we can add more adaptors:
-    // - using a Turing complete grammar with some VM (AluVM? RISC-V? WASM?).
+
+    /// Execute a custom function.
+    // AluVM is reserved for the future. We need it here to avoid breaking changes.
+    #[strict_type(tag = 0xFF)]
+    AluVM(
+        /// The entry point to the script (virtual machine uses libraries from
+        /// [`crate::Semantics`]).
+        LibSite,
+    ),
 }
 
 impl RawBuilder {
@@ -69,6 +85,7 @@ impl RawBuilder {
     pub fn build(&self, val: StrictVal, sys: &TypeSystem) -> Result<RawData, StateBuildError> {
         match self {
             Self::StrictEncode(sem_id) => strict_build(*sem_id, val, sys),
+            Self::AluVM(_) => Err(StateBuildError::Unsupported),
         }
     }
 }
