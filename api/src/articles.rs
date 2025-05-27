@@ -23,10 +23,15 @@
 
 #![allow(unused_braces)]
 
+use core::fmt;
+use core::fmt::{Display, Formatter};
+use core::str::FromStr;
+
 use aluvm::{Lib, LibId};
 use amplify::confinement::NonEmptyBlob;
 use amplify::Wrapper;
-use commit_verify::{CommitId, StrictHash};
+use baid64::DisplayBaid64;
+use commit_verify::{CommitEncode, CommitId, StrictHash};
 use sonic_callreq::MethodName;
 use strict_encoding::TypeName;
 use strict_types::TypeSystem;
@@ -34,10 +39,59 @@ use ultrasonic::{
     CallId, Codex, CodexId, ContractId, ContractMeta, ContractName, Genesis, Identity, Issue, LibRepo, Opid,
 };
 
-use crate::{Api, SemanticError, Semantics, Versioned, LIB_NAME_SONIC};
+use crate::{Api, ApisChecksum, ParseVersionedError, SemanticError, Semantics, LIB_NAME_SONIC};
 
-/// Articles id is a versioned variant for the contract id.
-pub type ArticlesId = Versioned<ContractId>;
+/// Articles id is a versioned variant for the contract id, which includes information about a
+/// specific API version.
+///
+/// Contracts may have multiple API implementations, which may be versioned.
+/// Articles include a specific version of the contract APIs.
+/// This structure provides the necessary information for the user about a specific API version
+/// known and used by a system, so a user may avoid confusion when an API change due to upgrade
+/// happens.
+///
+/// # See also
+///
+/// - [`ContractId`]
+/// - [`crate::IssuerId`]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONIC)]
+#[derive(CommitEncode)]
+#[commit_encode(strategy = strict, id = StrictHash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
+pub struct ArticlesId {
+    /// An identifier of the contract.
+    pub contract_id: ContractId,
+    /// Version number of the API.
+    pub version: u16,
+    /// A checksum for the APIs from the Semantics structure.
+    pub checksum: ApisChecksum,
+}
+
+impl Display for ArticlesId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}#", self.contract_id, self.version)?;
+        self.checksum.fmt_baid64(f)
+    }
+}
+
+impl FromStr for ArticlesId {
+    type Err = ParseVersionedError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (id, remnant) = s
+            .split_once('/')
+            .ok_or_else(|| ParseVersionedError::NoVersion(s.to_string()))?;
+        let (version, api_id) = remnant
+            .split_once('#')
+            .ok_or_else(|| ParseVersionedError::NoChecksum(s.to_string()))?;
+        Ok(Self {
+            contract_id: id.parse().map_err(ParseVersionedError::Id)?,
+            version: version.parse().map_err(ParseVersionedError::Version)?,
+            checksum: api_id.parse().map_err(ParseVersionedError::Checksum)?,
+        })
+    }
+}
 
 /// Articles contain the contract and all related codex and API information for interacting with it.
 ///
@@ -90,7 +144,7 @@ impl Articles {
     /// checksum.
     pub fn articles_id(&self) -> ArticlesId {
         ArticlesId {
-            id: self.issue.contract_id(),
+            contract_id: self.issue.contract_id(),
             version: self.semantics.version,
             checksum: self.semantics.apis_checksum(),
         }

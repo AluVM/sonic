@@ -57,9 +57,7 @@ mod articles;
 mod builders;
 mod state;
 
-pub use api::{
-    Api, ApisChecksum, GlobalApi, OwnedApi, ParseVersionedError, SemanticError, Semantics, StateUnknown, Versioned,
-};
+pub use api::{Api, ApisChecksum, GlobalApi, OwnedApi, ParseVersionedError, SemanticError, Semantics, StateUnknown};
 pub use articles::{Articles, ArticlesId, SigBlob};
 pub use builders::{
     Builder, BuilderRef, CoreParams, IssueParams, IssuerSpec, NamedState, OpBuilder, OpBuilderRef, VersionRange,

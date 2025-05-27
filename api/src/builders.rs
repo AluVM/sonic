@@ -35,7 +35,7 @@ use ultrasonic::{
     Input, Issue, Operation, StateCell, StateData, StateValue,
 };
 
-use crate::{Api, ApisChecksum, Articles, DataCell, Issuer, IssuerId, MethodName, StateAtom, StateName};
+use crate::{Api, Articles, DataCell, Issuer, IssuerId, MethodName, StateAtom, StateName};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -82,9 +82,9 @@ impl CoreParams {
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase", untagged))]
 pub enum VersionRange {
+    Range { min: u16, max: u16 },
     After { min: u16 },
     Before { max: u16 },
-    Range { min: u16, max: u16 },
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, From)]
@@ -96,43 +96,36 @@ pub enum IssuerSpec {
     #[from]
     Latest(CodexId),
 
-    ExactVer {
-        codex_id: CodexId,
-        version: u16,
-        api: Option<ApisChecksum>,
-    },
-    VersionRange {
-        codex_id: CodexId,
-        version: VersionRange,
-    },
+    #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+    ExactVer { codex_id: CodexId, version: u16 },
+
+    #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+    VersionRange { codex_id: CodexId, version: VersionRange },
 }
 
 impl IssuerSpec {
     pub fn check(&self, issuer_id: IssuerId) -> bool {
         match self {
             IssuerSpec::Exact(id) => *id == issuer_id,
-            IssuerSpec::Latest(codex_id) => *codex_id == issuer_id.id,
-            IssuerSpec::ExactVer { codex_id, version, api: Some(checksum) } => {
-                *codex_id == issuer_id.id && *version == issuer_id.version && *checksum == issuer_id.checksum
-            }
-            IssuerSpec::ExactVer { codex_id, version, api: _ } => {
-                *codex_id == issuer_id.id && *version == issuer_id.version
+            IssuerSpec::Latest(codex_id) => *codex_id == issuer_id.codex_id,
+            IssuerSpec::ExactVer { codex_id, version } => {
+                *codex_id == issuer_id.codex_id && *version == issuer_id.version
             }
             IssuerSpec::VersionRange { codex_id, version: VersionRange::After { min } } => {
-                *codex_id == issuer_id.id && issuer_id.version >= *min
+                *codex_id == issuer_id.codex_id && issuer_id.version >= *min
             }
             IssuerSpec::VersionRange { codex_id, version: VersionRange::Before { max } } => {
-                *codex_id == issuer_id.id && issuer_id.version < *max
+                *codex_id == issuer_id.codex_id && issuer_id.version < *max
             }
             IssuerSpec::VersionRange { codex_id, version: VersionRange::Range { min, max } } => {
-                *codex_id == issuer_id.id && (*min..*max).contains(&issuer_id.version)
+                *codex_id == issuer_id.codex_id && (*min..*max).contains(&issuer_id.version)
             }
         }
     }
 
     pub fn codex_id(&self) -> CodexId {
         match self {
-            IssuerSpec::Exact(id) => id.id,
+            IssuerSpec::Exact(id) => id.codex_id,
             IssuerSpec::Latest(codex_id) => *codex_id,
             IssuerSpec::ExactVer { codex_id, .. } => *codex_id,
             IssuerSpec::VersionRange { codex_id, .. } => *codex_id,
@@ -499,4 +492,89 @@ impl<'c> OpBuilderRef<'c> {
     }
 
     pub fn finalize(self) -> Operation { self.inner.finalize() }
+}
+
+#[cfg(test)]
+mod test {
+    #![cfg_attr(coverage_nightly, coverage(off))]
+
+    use super::*;
+
+    #[test]
+    fn issuer_spec_yaml_latest() {
+        let val = IssuerSpec::Latest(strict_dumb!());
+        let s = "AAAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA#origami-bruno-life
+";
+        assert_eq!(serde_yaml::to_string(&val).unwrap(), s);
+        assert_eq!(serde_yaml::from_str::<IssuerSpec>(s).unwrap(), val);
+    }
+
+    #[test]
+    fn issuer_spec_yaml_exact() {
+        let val = IssuerSpec::Exact(strict_dumb!());
+        let s = "\
+codexId: AAAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA#origami-bruno-life
+version: 0
+checksum: AAAAAA
+";
+        assert_eq!(serde_yaml::to_string(&val).unwrap(), s);
+        assert_eq!(serde_yaml::from_str::<IssuerSpec>(s).unwrap(), val);
+    }
+
+    #[test]
+    fn issuer_spec_yaml_ver_nosum() {
+        let val = IssuerSpec::ExactVer { codex_id: strict_dumb!(), version: 0 };
+        let s = "\
+codexId: AAAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA#origami-bruno-life
+version: 0
+";
+        assert_eq!(serde_yaml::to_string(&val).unwrap(), s);
+        assert_eq!(serde_yaml::from_str::<IssuerSpec>(s).unwrap(), val);
+    }
+
+    #[test]
+    fn issuer_spec_yaml_min() {
+        let val = IssuerSpec::VersionRange {
+            codex_id: strict_dumb!(),
+            version: VersionRange::After { min: 0 },
+        };
+        let s = "\
+codexId: AAAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA#origami-bruno-life
+version:
+  min: 0
+";
+        assert_eq!(serde_yaml::to_string(&val).unwrap(), s);
+        assert_eq!(serde_yaml::from_str::<IssuerSpec>(s).unwrap(), val);
+    }
+
+    #[test]
+    fn issuer_spec_yaml_max() {
+        let val = IssuerSpec::VersionRange {
+            codex_id: strict_dumb!(),
+            version: VersionRange::Before { max: 1 },
+        };
+        let s = "\
+codexId: AAAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA#origami-bruno-life
+version:
+  max: 1
+";
+        assert_eq!(serde_yaml::to_string(&val).unwrap(), s);
+        assert_eq!(serde_yaml::from_str::<IssuerSpec>(s).unwrap(), val);
+    }
+
+    #[test]
+    fn issuer_spec_yaml_range() {
+        let val = IssuerSpec::VersionRange {
+            codex_id: strict_dumb!(),
+            version: VersionRange::Range { min: 0, max: 1 },
+        };
+        let s = "\
+codexId: AAAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA#origami-bruno-life
+version:
+  min: 0
+  max: 1
+";
+        assert_eq!(serde_yaml::to_string(&val).unwrap(), s);
+        assert_eq!(serde_yaml::from_str::<IssuerSpec>(s).unwrap(), val);
+    }
 }

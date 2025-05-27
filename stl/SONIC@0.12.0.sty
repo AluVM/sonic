@@ -1,5 +1,5 @@
 {-
-  Id: stl:KYGUnSNH-gN8bCy6-OjMcF10-ddgvq94-HWVIi9I-Qh5kN9Y#orbit-driver-puma
+  Id: stl:IZESgPaS-pEn7ARQ-NtwBcdr-BDIZhkR-8NbxOPk-RjmzsMI#conduct-initial-fluid
   Name: SONIC
   Version: 0.12.0
   Description: Standard library for formally-verifiable distributed contracts
@@ -95,6 +95,11 @@ data Articles          : semantics Semantics
                        , sig SigBlob?
                        , issue UltraSONIC.Issue
 
+@mnemonic(pigment-melon-smart)
+data ArticlesId        : contractId UltraSONIC.ContractId
+                       , version U16
+                       , checksum ApisChecksum
+
 @mnemonic(sparta-ginger-analyze)
 data CallState         : method StrictTypes.VariantName, owned StrictTypes.VariantName?
 
@@ -110,6 +115,11 @@ data GlobalApi         : semId StrictTypes.SemId
 data Issuer            : codex UltraSONIC.Codex
                        , semantics Semantics
                        , sig SigBlob?
+
+@mnemonic(laser-george-europe)
+data IssuerId          : codexId UltraSONIC.CodexId
+                       , version U16
+                       , checksum ApisChecksum
 
 @mnemonic(history-support-manual)
 data OwnedApi          : semId StrictTypes.SemId
@@ -176,15 +186,5 @@ data SubAggregator     : const (StrictTypes.SemId, [Byte ^ ..0xff])
 
 @mnemonic(explore-locate-zoom)
 data Transition        : opid UltraSONIC.Opid, destroyed {UltraSONIC.CellAddr -> UltraSONIC.StateCell}
-
-@mnemonic(sabrina-exit-marina)
-data VersionedCodexId  : id UltraSONIC.CodexId
-                       , version U16
-                       , checksum ApisChecksum
-
-@mnemonic(miller-alien-comrade)
-data VersionedContractId : id UltraSONIC.ContractId
-                       , version U16
-                       , checksum ApisChecksum
 
 

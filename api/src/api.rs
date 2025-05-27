@@ -34,18 +34,16 @@
 //! performed directly, so these two are not covered by an API.
 
 use core::cmp::Ordering;
-use core::fmt;
-use core::fmt::{Debug, Display, Formatter};
+use core::fmt::Debug;
 use core::hash::{Hash, Hasher};
 use core::num::ParseIntError;
-use core::str::FromStr;
 
 use aluvm::{Lib, LibId};
 use amplify::confinement::{SmallOrdMap, SmallOrdSet, TinyOrdMap, TinyOrdSet, TinyString};
 use amplify::num::u256;
 use amplify::Bytes4;
-use baid64::{Baid64ParseError, DisplayBaid64};
-use commit_verify::{CommitEncode, CommitEngine, CommitId, CommitmentId, StrictHash};
+use baid64::Baid64ParseError;
+use commit_verify::{CommitEncode, CommitEngine, CommitId, StrictHash};
 use indexmap::{indexset, IndexMap, IndexSet};
 use sonic_callreq::{CallState, MethodName, StateName};
 use strict_encoding::TypeName;
@@ -56,68 +54,6 @@ use crate::{
     Aggregator, RawBuilder, RawConvertor, StateArithm, StateAtom, StateBuildError, StateBuilder, StateCalc,
     StateConvertError, StateConvertor, LIB_NAME_SONIC,
 };
-
-/// Create a versioned variant of a commitment ID (contract or codex), so information about a
-/// specific API version is added.
-///
-/// Both contracts and codexes may have multiple API implementations, which may be versioned.
-/// Issuers and articles include a specific version of the codex and contract APIs.
-/// This structure provides the necessary information for the user about a specific API version
-/// known and used by a system, so a user may avoid confusion when an API change due to upgrade
-/// happens.
-///
-/// # See also
-///
-/// - [`ContractId`]
-/// - [`CodexId`]
-/// - [`crate::ArticlesId`]
-/// - [`crate::IssuerId`]
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug)]
-#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
-#[strict_type(lib = LIB_NAME_SONIC)]
-#[derive(CommitEncode)]
-#[commit_encode(strategy = strict, id = StrictHash)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
-pub struct Versioned<Id: CommitmentId + StrictDumb + StrictEncode + StrictDecode> {
-    /// An identifier of the contract or codex.
-    pub id: Id,
-    /// Version number of the API.
-    pub version: u16,
-    /// A checksum for the APIs from the Semantics structure.
-    pub checksum: ApisChecksum,
-}
-
-impl<Id> Display for Versioned<Id>
-where Id: CommitmentId + StrictDumb + StrictEncode + StrictDecode + Display + DisplayBaid64
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if Id::MNEMONIC {
-            write!(f, "{:#}/{}#", self.id, self.version)?;
-        } else {
-            write!(f, "{}/{}#", self.id, self.version)?;
-        }
-        self.checksum.fmt_baid64(f)
-    }
-}
-
-impl<Id> FromStr for Versioned<Id>
-where Id: CommitmentId + StrictDumb + StrictEncode + StrictDecode + FromStr<Err = Baid64ParseError>
-{
-    type Err = ParseVersionedError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (id, remnant) = s
-            .split_once('/')
-            .ok_or_else(|| ParseVersionedError::NoVersion(s.to_string()))?;
-        let (version, api_id) = remnant
-            .split_once('#')
-            .ok_or_else(|| ParseVersionedError::NoChecksum(s.to_string()))?;
-        Ok(Self {
-            id: id.parse().map_err(ParseVersionedError::Id)?,
-            version: version.parse().map_err(ParseVersionedError::Version)?,
-            checksum: api_id.parse().map_err(ParseVersionedError::Checksum)?,
-        })
-    }
-}
 
 /// Errors happening during parsing of a versioned contract or codex ID.
 #[derive(Debug, Display, Error, From)]

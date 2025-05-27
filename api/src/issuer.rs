@@ -21,18 +21,72 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+use core::fmt;
+use core::fmt::{Display, Formatter};
+use core::str::FromStr;
+
 use aluvm::{Lib, LibId};
 use amplify::confinement::TinyString;
-use commit_verify::{CommitId, StrictHash};
+use baid64::DisplayBaid64;
+use commit_verify::{CommitEncode, CommitId, StrictHash};
 use sonic_callreq::MethodName;
-use strict_encoding::TypeName;
+use strict_encoding::{StrictDecode, StrictDumb, StrictEncode, TypeName};
 use strict_types::TypeSystem;
 use ultrasonic::{CallId, Codex, CodexId, Identity, LibRepo};
 
-use crate::{Api, SemanticError, Semantics, SigBlob, Versioned, LIB_NAME_SONIC};
+use crate::{Api, ApisChecksum, ParseVersionedError, SemanticError, Semantics, SigBlob, LIB_NAME_SONIC};
 
-/// Articles id is a versioned variant for the contract id.
-pub type IssuerId = Versioned<CodexId>;
+/// Issuer id is a versioned variant for the codex id, which includes information about a
+/// specific API version.
+///
+/// Codexes may have multiple API implementations, which may be versioned.
+/// Issuers include a specific version of the codex APIs.
+/// This structure provides the necessary information for the user about a specific API version
+/// known and used by a system, so a user may avoid confusion when an API change due to upgrade
+/// happens.
+///
+/// # See also
+///
+/// - [`CodexId`]
+/// - [`crate::ArticlesId`]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Debug)]
+#[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
+#[strict_type(lib = LIB_NAME_SONIC)]
+#[derive(CommitEncode)]
+#[commit_encode(strategy = strict, id = StrictHash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
+pub struct IssuerId {
+    /// An identifier of the codex.
+    pub codex_id: CodexId,
+    /// Version number of the API.
+    pub version: u16,
+    /// A checksum for the APIs from the Semantics structure.
+    pub checksum: ApisChecksum,
+}
+
+impl Display for IssuerId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{:#}/{}#", self.codex_id, self.version)?;
+        self.checksum.fmt_baid64(f)
+    }
+}
+
+impl FromStr for IssuerId {
+    type Err = ParseVersionedError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (id, remnant) = s
+            .split_once('/')
+            .ok_or_else(|| ParseVersionedError::NoVersion(s.to_string()))?;
+        let (version, api_id) = remnant
+            .split_once('#')
+            .ok_or_else(|| ParseVersionedError::NoChecksum(s.to_string()))?;
+        Ok(Self {
+            codex_id: id.parse().map_err(ParseVersionedError::Id)?,
+            version: version.parse().map_err(ParseVersionedError::Version)?,
+            checksum: api_id.parse().map_err(ParseVersionedError::Checksum)?,
+        })
+    }
+}
 
 /// An issuer contains information required for the creation of a contract and interaction with an
 /// existing contract.
@@ -86,7 +140,7 @@ impl Issuer {
     /// checksum.
     pub fn issuer_id(&self) -> IssuerId {
         IssuerId {
-            id: self.codex.codex_id(),
+            codex_id: self.codex.codex_id(),
             version: self.semantics.version,
             checksum: self.semantics.apis_checksum(),
         }
