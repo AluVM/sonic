@@ -35,7 +35,7 @@ use ultrasonic::{
     Input, Issue, Operation, StateCell, StateData, StateValue,
 };
 
-use crate::{Api, Articles, DataCell, Issuer, MethodName, StateAtom, StateName};
+use crate::{Api, ApisChecksum, Articles, DataCell, Issuer, IssuerId, MethodName, StateAtom, StateName};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -79,10 +79,71 @@ impl CoreParams {
     }
 }
 
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase", untagged))]
+pub enum VersionRange {
+    After { min: u16 },
+    Before { max: u16 },
+    Range { min: u16, max: u16 },
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, From)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase", untagged))]
+pub enum IssuerSpec {
+    #[from]
+    Exact(IssuerId),
+
+    #[from]
+    Latest(CodexId),
+
+    ExactVer {
+        codex_id: CodexId,
+        version: u16,
+        api: Option<ApisChecksum>,
+    },
+    VersionRange {
+        codex_id: CodexId,
+        version: VersionRange,
+    },
+}
+
+impl IssuerSpec {
+    pub fn check(&self, issuer_id: IssuerId) -> bool {
+        match self {
+            IssuerSpec::Exact(id) => *id == issuer_id,
+            IssuerSpec::Latest(codex_id) => *codex_id == issuer_id.id,
+            IssuerSpec::ExactVer { codex_id, version, api: Some(checksum) } => {
+                *codex_id == issuer_id.id && *version == issuer_id.version && *checksum == issuer_id.checksum
+            }
+            IssuerSpec::ExactVer { codex_id, version, api: _ } => {
+                *codex_id == issuer_id.id && *version == issuer_id.version
+            }
+            IssuerSpec::VersionRange { codex_id, version: VersionRange::After { min } } => {
+                *codex_id == issuer_id.id && issuer_id.version >= *min
+            }
+            IssuerSpec::VersionRange { codex_id, version: VersionRange::Before { max } } => {
+                *codex_id == issuer_id.id && issuer_id.version < *max
+            }
+            IssuerSpec::VersionRange { codex_id, version: VersionRange::Range { min, max } } => {
+                *codex_id == issuer_id.id && (*min..*max).contains(&issuer_id.version)
+            }
+        }
+    }
+
+    pub fn codex_id(&self) -> CodexId {
+        match self {
+            IssuerSpec::Exact(id) => id.id,
+            IssuerSpec::Latest(codex_id) => *codex_id,
+            IssuerSpec::ExactVer { codex_id, .. } => *codex_id,
+            IssuerSpec::VersionRange { codex_id, .. } => *codex_id,
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct IssueParams {
-    // TODO: Add issuer id checking
+    pub issuer: IssuerSpec,
     pub name: TypeName,
     pub consensus: Consensus,
     pub testnet: bool,
@@ -102,8 +163,9 @@ impl DerefMut for IssueParams {
 }
 
 impl IssueParams {
-    pub fn new_testnet(name: impl Into<TypeName>, consensus: Consensus) -> Self {
+    pub fn new_testnet(codex_id: CodexId, name: impl Into<TypeName>, consensus: Consensus) -> Self {
         Self {
+            issuer: IssuerSpec::Latest(codex_id),
             name: name.into(),
             consensus,
             testnet: true,
@@ -131,6 +193,10 @@ impl Issuer {
     }
 
     pub fn issue(self, params: IssueParams) -> Articles {
+        if !params.issuer.check(self.issuer_id()) {
+            panic!("issuer version does not match requested version");
+        }
+
         let mut builder = self.start_issue(params.core.method, params.consensus, params.testnet);
 
         for NamedState { name, state } in params.core.global {

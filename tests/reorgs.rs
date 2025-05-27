@@ -189,7 +189,7 @@ fn setup(name: &str) -> LedgerDir {
         AuthToken::from(buf)
     };
 
-    let mut issue = IssueParams::new_testnet("FungibleTest", Consensus::None);
+    let mut issue = IssueParams::new_testnet(issuer.codex_id(), "FungibleTest", Consensus::None);
     for _ in 0u16..10 {
         issue.push_owned_unlocked("amount", next_auth(), svnum!(100u64));
         issue.push_owned_unlocked("amount", next_auth(), svnum!(100u64));

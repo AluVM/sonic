@@ -61,7 +61,9 @@ pub use api::{
     Api, ApisChecksum, GlobalApi, OwnedApi, ParseVersionedError, SemanticError, Semantics, StateUnknown, Versioned,
 };
 pub use articles::{Articles, ArticlesId, SigBlob};
-pub use builders::{Builder, BuilderRef, CoreParams, IssueParams, NamedState, OpBuilder, OpBuilderRef};
+pub use builders::{
+    Builder, BuilderRef, CoreParams, IssueParams, IssuerSpec, NamedState, OpBuilder, OpBuilderRef, VersionRange,
+};
 pub use issuer::{Issuer, IssuerId, ISSUER_MAGIC_NUMBER, ISSUER_VERSION};
 pub use sonic_callreq::*;
 pub use state::*;
