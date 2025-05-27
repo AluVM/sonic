@@ -62,17 +62,21 @@ pub enum Aggregator {
     ///
     /// If the underlying aggregator fails, the aggregated state is not produced.
     #[strict_type(tag = 0)]
+    // https://github.com/dtolnay/serde-yaml/issues/363
+    // We should repeat this if we encounter any other nested enums.
+    #[cfg_attr(feature = "serde", serde(with = "serde_yaml::with::singleton_map"))]
     Take(SubAggregator),
 
     /// Wrap into an optional value.
     ///
     /// If the underlying aggregated state fails, sets the aggregated state to `None`.
     #[strict_type(tag = 1)]
+    #[cfg_attr(feature = "serde", serde(with = "serde_yaml::with::singleton_map"))]
     Some(SubAggregator),
 
     /// If the underlying aggregated state fails, returns the provided constant value.
     #[strict_type(tag = 2)]
-    Or(SubAggregator, SemId, TinyBlob),
+    Or(#[cfg_attr(feature = "serde", serde(with = "serde_yaml::with::singleton_map"))] SubAggregator, SemId, TinyBlob),
 
     /// Execute a custom function on the state.
     #[strict_type(tag = 0xFF)]

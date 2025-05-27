@@ -847,6 +847,7 @@ dependencies = [
  "indexmap",
  "rand",
  "serde",
+ "serde_yaml",
  "sonic-callreq",
  "strict_encoding",
  "strict_types",

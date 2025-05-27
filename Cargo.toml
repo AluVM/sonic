@@ -31,8 +31,8 @@ baid64 = "0.4.1"
 indexmap = "2.9.0"
 chrono = "0.4.38"
 serde = { version = "1", features = ["derive"] }
-toml = "0.8.22"
 serde_yaml = "0.9.34"
+toml = "0.8.22"
 
 [package]
 name = "hypersonic"
