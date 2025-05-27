@@ -82,6 +82,7 @@ impl CoreParams {
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct IssueParams {
+    // TODO: Add issuer id checking
     pub name: TypeName,
     pub consensus: Consensus,
     pub testnet: bool,

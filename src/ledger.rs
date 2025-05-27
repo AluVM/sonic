@@ -277,12 +277,22 @@ impl<S: Stock> Ledger<S> {
         chain.into_iter()
     }
 
-    /// Exports contract with all known operations
+    /// Exports contract with all known operations.
     pub fn export_all(&self, writer: StrictWriter<impl WriteRaw>) -> io::Result<()> {
         self.export_internal(self.0.operation_count() as u32, writer, |_| true, |_, _, w| Ok(w))
     }
 
-    /// Export a part of a contract history: a graph between set of terminals and genesis.
+    /// Exports contract with all known operations with some auxiliary information returned by
+    /// `aux`.
+    pub fn export_all_aux<W: WriteRaw>(
+        &self,
+        writer: StrictWriter<W>,
+        aux: impl FnMut(Opid, &Operation, StrictWriter<W>) -> io::Result<StrictWriter<W>>,
+    ) -> io::Result<()> {
+        self.export_internal(self.0.operation_count() as u32, writer, |_| true, aux)
+    }
+
+    /// Export a part of a contract history: a graph between a set of terminals and genesis.
     pub fn export(
         &self,
         terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
@@ -293,7 +303,6 @@ impl<S: Stock> Ledger<S> {
 
     /// Exports contract and operations to a stream, extending operation data with some auxiliary
     /// information returned by `aux`.
-    // TODO: (v0.13) Return statistics
     pub fn export_aux<W: WriteRaw>(
         &self,
         terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
