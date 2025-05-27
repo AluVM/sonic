@@ -164,11 +164,43 @@ pub enum SubAggregator {
 
     /// Unwraps an optional value.
     ///
-    /// If the value is `None`, sets the state to the provided constant.
-    ///
-    /// Fails if the state is not defined, is multiple, or not an optional.
+    /// Fails if the value is `None`, is not defined, multiple, or not an optional.
     #[strict_type(tag = 3)]
-    UnwrapOr(StateName, SemId, TinyBlob),
+    Unwrap(StateName),
+
+    /// Takes the first element of the global state.
+    ///
+    /// Fails if the global state is not defined, i.e., has zero elements.
+    ///
+    /// # Nota bene
+    ///
+    /// The global state does not have only a partial ordering (it is a lattice).
+    ///
+    /// It is only in the case when one operation depends on outputs of another
+    /// (via global or owned state) there is a guarantee that the global state
+    /// defined by the second operation will always follow the first one.
+    ///
+    /// It is the responsibility of the codex developer
+    /// to ensure non-ambiguity when this aggregator is used.
+    #[strict_type(tag = 4)]
+    First(StateName),
+
+    /// Takes the last element of the global state.
+    ///
+    /// Fails if the global state is not defined, i.e., has zero elements.
+    ///
+    /// # Nota bene
+    ///
+    /// The global state does not have only a partial ordering (it is a lattice).
+    ///
+    /// It is only in the case when one operation depends on outputs of another
+    /// (via global or owned state) there is a guarantee that the global state
+    /// defined by the second operation will always follow the first one.
+    ///
+    /// It is the responsibility of the codex developer
+    /// to ensure non-ambiguity when this aggregator is used.
+    #[strict_type(tag = 5)]
+    Last(StateName),
 
     /// Integer-negate state.
     ///
@@ -250,10 +282,12 @@ impl SubAggregator {
             | Self::TheOnly(_)
             | Self::Count(_)
             | Self::Copy(_)
+            | Self::Unwrap(_)
+            | Self::First(_)
+            | Self::Last(_)
             | Self::Neg(_)
             | Self::Sum(_, _)
             | Self::Diff(_, _)
-            | Self::UnwrapOr(_, _, _)
             | Self::ListV(_)
             | Self::SetV(_)
             | Self::MapV2U(_)
@@ -305,7 +339,7 @@ impl SubAggregator {
 
             Self::Copy(name) => aggregated.get(name).cloned(),
 
-            Self::UnwrapOr(name, sem_id, val) => {
+            Self::Unwrap(name) => {
                 let state = global.get(name)?;
                 if state.len() != 1 {
                     return None;
@@ -315,14 +349,26 @@ impl SubAggregator {
                     return None;
                 };
                 Some(match tag {
-                    EnumTag::Name(name) if name.as_str() == "none" && sv.as_ref() == &StrictVal::Unit => {
-                        return deserialize(*sem_id, val, types)
-                    }
-                    EnumTag::Ord(0) if sv.as_ref() == &StrictVal::Unit => return deserialize(*sem_id, val, types),
                     EnumTag::Name(name) if name.as_str() == "some" => sv.as_ref().clone(),
                     EnumTag::Ord(1) => sv.as_ref().clone(),
                     _ => return None,
                 })
+            }
+
+            Self::First(name) => {
+                let state = global.get(name)?;
+                if state.is_empty() {
+                    return None;
+                }
+                Some(state.first_key_value()?.1.verified.clone())
+            }
+
+            Self::Last(name) => {
+                let state = global.get(name)?;
+                if state.is_empty() {
+                    return None;
+                }
+                Some(state.last_key_value()?.1.verified.clone())
             }
 
             Self::Neg(name) => {

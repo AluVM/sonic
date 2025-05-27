@@ -1,5 +1,5 @@
 {-
-  Id: stl:IZESgPaS-pEn7ARQ-NtwBcdr-BDIZhkR-8NbxOPk-RjmzsMI#conduct-initial-fluid
+  Id: stl:XYSvyYlE-exuTRwa-LExvrDM-Emv6Mek-AoHY1bX-K2iwJ9M#escort-betty-grace
   Name: SONIC
   Version: 0.12.0
   Description: Standard library for formally-verifiable distributed contracts
@@ -169,11 +169,13 @@ data StateConvertor    : unit ()
 data StateSelector     : global (StrictTypes.VariantName, Std.Bool)
                        | aggregated StrictTypes.VariantName
 
-@mnemonic(judge-gloria-weekend)
+@mnemonic(table-origami-shrink)
 data SubAggregator     : const (StrictTypes.SemId, [Byte ^ ..0xff])
                        | theOnly StrictTypes.VariantName
                        | copy StrictTypes.VariantName
-                       | unwrapOr (StrictTypes.VariantName, StrictTypes.SemId, [Byte ^ ..0xff])
+                       | unwrap StrictTypes.VariantName
+                       | first StrictTypes.VariantName
+                       | last StrictTypes.VariantName
                        | neg#16 StateSelector
                        | sum (StateSelector, StateSelector)
                        | diff (StateSelector, StateSelector)
