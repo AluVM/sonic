@@ -22,7 +22,6 @@
 // the License.
 
 use alloc::collections::BTreeMap;
-use core::mem;
 
 use aluvm::Lib;
 use amplify::confinement::{LargeOrdMap, SmallOrdMap, SmallOrdSet};
@@ -201,16 +200,8 @@ impl RawState {
     pub(self) fn rollback(&mut self, transition: Transition) {
         let opid = transition.opid;
 
-        let mut global = mem::take(&mut self.global);
-        let mut owned = mem::take(&mut self.owned);
-        global = LargeOrdMap::from_iter_checked(global.into_iter().filter(|(addr, _)| addr.opid != opid));
-        owned = LargeOrdMap::from_iter_checked(owned.into_iter().filter(|(addr, _)| addr.opid != opid));
-        self.global = global;
-        self.owned = owned;
-
-        // TODO: Use `retain` instead of the above workaround once supported by amplify
-        // self.immutable.retain(|addr, _| addr.opid != opid);
-        // self.owned.retain(|addr, _| addr.opid != opid);
+        self.global.retain(|addr, _| addr.opid != opid);
+        self.owned.retain(|addr, _| addr.opid != opid);
 
         for (addr, cell) in transition.destroyed {
             self.owned
