@@ -498,7 +498,10 @@ impl<'c> OpBuilderRef<'c> {
 mod test {
     #![cfg_attr(coverage_nightly, coverage(off))]
 
+    use core::str::FromStr;
+
     use super::*;
+    use crate::ApisChecksum;
 
     #[test]
     fn issuer_spec_yaml_latest() {
@@ -576,5 +579,34 @@ version:
 ";
         assert_eq!(serde_yaml::to_string(&val).unwrap(), s);
         assert_eq!(serde_yaml::from_str::<IssuerSpec>(s).unwrap(), val);
+    }
+
+    #[test]
+    fn issuer_display_fromstr() {
+        let s = "nmThRWDr-0hOJgJt-OFVCZTA-XX8aOWj-bkqWzK7-_jAtdhQ/0#NRIsWA";
+        let issuer_id = IssuerId::from_str(s).unwrap();
+        assert_eq!(issuer_id.to_string(), s);
+        assert_eq!(issuer_id.codex_id, CodexId::from_str(s.split_once("/").unwrap().0).unwrap());
+        assert_eq!(issuer_id.checksum, ApisChecksum::from_str(s.split_once("#").unwrap().1).unwrap());
+        assert_eq!(issuer_id.version, 0);
+    }
+
+    #[test]
+    fn issuer_check() {
+        let s = "nmThRWDr-0hOJgJt-OFVCZTA-XX8aOWj-bkqWzK7-_jAtdhQ/0#NRIsWA";
+        let issuer_id = IssuerId::from_str(s).unwrap();
+        assert!(IssuerSpec::Exact(issuer_id).check(issuer_id));
+
+        let mut changed_ver = issuer_id;
+        changed_ver.version += 1;
+        assert!(!IssuerSpec::Exact(issuer_id).check(changed_ver));
+        assert!(IssuerSpec::Latest(issuer_id.codex_id).check(changed_ver));
+        assert!(!IssuerSpec::ExactVer { codex_id: issuer_id.codex_id, version: issuer_id.version }.check(changed_ver));
+
+        let mut changed_sum = issuer_id;
+        changed_sum.checksum = ApisChecksum::from_str("rLAuRQ").unwrap();
+        assert!(!IssuerSpec::Exact(issuer_id).check(changed_sum));
+        assert!(IssuerSpec::Latest(issuer_id.codex_id).check(changed_sum));
+        assert!(IssuerSpec::ExactVer { codex_id: issuer_id.codex_id, version: issuer_id.version }.check(changed_sum));
     }
 }
