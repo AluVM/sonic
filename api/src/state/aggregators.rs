@@ -67,6 +67,7 @@ pub enum Aggregator {
     #[cfg_attr(feature = "serde", serde(with = "serde_yaml::with::singleton_map"))]
     Take(SubAggregator),
 
+    // TODO: Add `None`
     /// Wrap into an optional value.
     ///
     /// If the underlying aggregated state fails, sets the aggregated state to `None`.
@@ -185,6 +186,7 @@ pub enum SubAggregator {
     #[strict_type(tag = 4)]
     First(StateName),
 
+    // TODO: Add `Nth`
     /// Takes the last element of the global state.
     ///
     /// Fails if the global state is not defined, i.e., has zero elements.
@@ -202,6 +204,7 @@ pub enum SubAggregator {
     #[strict_type(tag = 5)]
     Last(StateName),
 
+    // TODO: Add `ReversedNth`
     /// Integer-negate state.
     ///
     /// Fails if the state is not defined or contains multiple elements.
@@ -223,19 +226,15 @@ pub enum SubAggregator {
     #[strict_type(tag = 0x12)]
     Diff(StateSelector, StateSelector),
 
+    // TODO: Add `Product`(aggregated, aggregated)
+    // TODO: Add `Pow`(selector, int)
+    // TODO: Add `Root`(selector, int)
     /// Count the number of elements of the global state of a certain type.
     #[strict_type(tag = 0x20)]
     Count(StateName),
 
-    /// Convert a verified state under the same state type into a vector.
-    ///
-    /// Acts only on a global state; doesn't recognize aggregated state.
-    ///
-    /// If the global state with the name is absent returns an empty list.
-    #[strict_type(tag = 0x21)]
-    ListV(StateName),
-
-    /// Convert a verified state under the same state type into a sorted set.
+    // TODO: Add `CountUnique`
+    /// Convert a verified state under the same state type into an ordered set.
     ///
     /// Acts only on a global state; doesn't recognize aggregated state.
     ///
@@ -251,6 +250,7 @@ pub enum SubAggregator {
     #[strict_type(tag = 0x23)]
     MapV2U(StateName),
 
+    // TODO: Add MapV2AU
     /// Sums over verifiable part of a global state.
     ///
     /// Acts only on a global state; doesn't recognize aggregated state.
