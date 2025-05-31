@@ -1,5 +1,5 @@
 {-
-  Id: stl:jz79GIWx-fsM_d91-~0Gu9QU-hNYoCB1-OJzgvyt-PVenb5o#station-america-quiz
+  Id: stl:ZjN~OAtq-GmQ7Pzx-eA7muEd-P_~nowb-HM0GJ8W-WQ7vY8o#isabel-husband-rubber
   Name: SONIC
   Version: 0.12.0
   Description: Standard library for formally-verifiable distributed contracts
@@ -173,21 +173,32 @@ data StateConvertor    : unit ()
 data StateSelector     : global (StrictTypes.VariantName, Std.Bool)
                        | aggregated StrictTypes.VariantName
 
-@mnemonic(panel-permit-distant)
+@mnemonic(archer-metal-bison)
 data SubAggregator     : const (StrictTypes.SemId, [Byte ^ ..0xff])
                        | theOnly StrictTypes.VariantName
                        | copy StrictTypes.VariantName
                        | unwrap StrictTypes.VariantName
                        | first StrictTypes.VariantName
+                       | nth (StrictTypes.VariantName, U16)
                        | last StrictTypes.VariantName
+                       | nthBack (StrictTypes.VariantName, U16)
                        | neg#16 StateSelector
-                       | sum (StateSelector, StateSelector)
-                       | diff (StateSelector, StateSelector)
+                       | add (StateSelector, StateSelector)
+                       | sub (StateSelector, StateSelector)
+                       | mul (StateSelector, StateSelector)
+                       | div (StateSelector, StateSelector)
+                       | rem (StateSelector, StateSelector)
+                       | exp (StateSelector, StateSelector)
                        | count#32 StrictTypes.VariantName
-                       | setV#34 StrictTypes.VariantName
+                       | countUnique StrictTypes.VariantName
+                       | setV StrictTypes.VariantName
                        | mapV2u StrictTypes.VariantName
-                       | sumVUnwrap#48 StrictTypes.VariantName
-                       | sumVDefault StrictTypes.VariantName
+                       | mapV2ListU StrictTypes.VariantName
+                       | mapV2SetU StrictTypes.VariantName
+                       | sumUnwrap#48 StrictTypes.VariantName
+                       | sumOrDefault StrictTypes.VariantName
+                       | prodUnwrap StrictTypes.VariantName
+                       | prodOrDefault StrictTypes.VariantName
 
 @mnemonic(weekend-street-channel)
 data Transition        : opid UltraSONIC.Opid, destroyed {UltraSONIC.CellAddr -> UltraSONIC.StateCell}

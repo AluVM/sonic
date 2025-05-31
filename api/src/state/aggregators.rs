@@ -191,7 +191,24 @@ pub enum SubAggregator {
     #[strict_type(tag = 4)]
     First(StateName),
 
-    // TODO: Add `Nth`
+    /// Takes the nth element of the global state.
+    ///
+    /// Fails if the global state is not defined, i.e., has zero elements,
+    /// or if the nth-element is empty.
+    ///
+    /// # Nota bene
+    ///
+    /// The global state does not have only a partial ordering (it is a lattice).
+    ///
+    /// It is only in the case when one operation depends on outputs of another
+    /// (via global or owned state) there is a guarantee that the global state
+    /// defined by the second operation will always follow the first one.
+    ///
+    /// It is the responsibility of the codex developer
+    /// to ensure non-ambiguity when this aggregator is used.
+    #[strict_type(tag = 5)]
+    Nth(StateName, u16),
+
     /// Takes the last element of the global state.
     ///
     /// Fails if the global state is not defined, i.e., has zero elements.
@@ -206,10 +223,27 @@ pub enum SubAggregator {
     ///
     /// It is the responsibility of the codex developer
     /// to ensure non-ambiguity when this aggregator is used.
-    #[strict_type(tag = 5)]
+    #[strict_type(tag = 6)]
     Last(StateName),
 
-    // TODO: Add `ReversedNth`
+    /// Takes the nth element of the global state, counting from the end of the list.
+    ///
+    /// Fails if the global state is not defined, i.e., has zero elements,
+    /// or if the nth-element is empty.
+    ///
+    /// # Nota bene
+    ///
+    /// The global state does not have only a partial ordering (it is a lattice).
+    ///
+    /// It is only in the case when one operation depends on outputs of another
+    /// (via global or owned state) there is a guarantee that the global state
+    /// defined by the second operation will always follow the first one.
+    ///
+    /// It is the responsibility of the codex developer
+    /// to ensure non-ambiguity when this aggregator is used.
+    #[strict_type(tag = 7)]
+    NthBack(StateName, u16),
+
     /// Integer-negate state.
     ///
     /// Fails if the state is not defined or contains multiple elements.
@@ -222,23 +256,54 @@ pub enum SubAggregator {
     /// Fails if any of the state is not defined or contains multiple elements.
     /// Also fails if the state is not an unsigned 64-bit integer or there is an overflow.
     #[strict_type(tag = 0x11)]
-    Sum(StateSelector, StateSelector),
+    Add(StateSelector, StateSelector),
 
     /// Substracts the second state from the first state, expecting both to be integers.
     ///
     /// Fails if any of the state is not defined or contains multiple elements.
     /// Also fails if the state is not an unsigned 64-bit integer or there is an overflow.
     #[strict_type(tag = 0x12)]
-    Diff(StateSelector, StateSelector),
+    Sub(StateSelector, StateSelector),
 
-    // TODO: Add `Product`(aggregated, aggregated)
-    // TODO: Add `Pow`(selector, int)
-    // TODO: Add `Root`(selector, int)
+    /// Product two states of different types, expecting them to be integers.
+    ///
+    /// Fails if any of the state is not defined or contains multiple elements.
+    /// Also fails if the state is not an unsigned 64-bit integer or there is an overflow.
+    #[strict_type(tag = 0x13)]
+    Mul(StateSelector, StateSelector),
+
+    /// Divide the first state on the second state, expecting them to be integers.
+    /// The resulting value is rounded towards zero.
+    ///
+    /// Fails if any of the state is not defined or contains multiple elements.
+    /// Also fails if the state is not an unsigned 64-bit integer, or the second state is zero.
+    #[strict_type(tag = 0x14)]
+    Div(StateSelector, StateSelector),
+
+    /// Modulo-divide the first state on the second state, expecting them to be integers.
+    ///
+    /// Fails if any of the state is not defined or contains multiple elements.
+    /// Also fails if the state is not an unsigned 64-bit integer, or the second state is zero.
+    #[strict_type(tag = 0x15)]
+    Rem(StateSelector, StateSelector),
+
+    /// Exponentiates the first state with the second state, expecting them to be integers.
+    /// The resulting value is rounded towards zero.
+    ///
+    /// Fails if any of the state is not defined or contains multiple elements.
+    /// Also fails if the first state is not an unsigned 64-bit integer,
+    /// the second state is not an unsigned 32-bit integer, or there is an overflow.
+    #[strict_type(tag = 0x16)]
+    Exp(StateSelector, StateSelector),
+
     /// Count the number of elements of the global state of a certain type.
     #[strict_type(tag = 0x20)]
     Count(StateName),
 
-    // TODO: Add `CountUnique`
+    /// Count the number of unique elements of the global state of a certain type.
+    #[strict_type(tag = 0x21)]
+    CountUnique(StateName),
+
     /// Convert a verified state under the same state type into an ordered set.
     ///
     /// Acts only on a global state; doesn't recognize aggregated state.
@@ -247,26 +312,112 @@ pub enum SubAggregator {
     #[strict_type(tag = 0x22)]
     SetV(StateName),
 
-    /// Map from a field-based element state to a non-verifiable structured state.
+    /// Map from a field-based element state to a non-verifiable structured state;
+    /// when the field-based element state repeats, it is ignored and only the initial state is
+    /// kept.
+    ///
+    /// The map is sorted by its values, lexicographically.
     ///
     /// Acts only on a global state; doesn't recognize aggregated state.
     ///
     /// If the global state with the name is absent returns an empty map.
+    ///
+    /// # Nota bene
+    ///
+    /// The global state does not have only a partial ordering (it is a lattice).
+    ///
+    /// It is only in the case when one operation depends on outputs of another
+    /// (via global or owned state) there is a guarantee that the global state
+    /// defined by the second operation will always follow the first one.
+    ///
+    /// It is the responsibility of the codex developer
+    /// to ensure non-ambiguity when this aggregator is used.
     #[strict_type(tag = 0x23)]
     MapV2U(StateName),
 
-    // TODO: Add MapV2AU
+    /// Map from a field-based element state to a list of non-verifiable structured state;
+    /// when the field-based element state repeats, the list is extended with the non-verifiable
+    /// state.
+    ///
+    /// The map is ordered according to the global state element order.
+    ///
+    /// Acts only on a global state; doesn't recognize aggregated state.
+    ///
+    /// If the global state with the name is absent returns an empty map.
+    ///
+    /// # Nota bene
+    ///
+    /// The global state does not have only a partial ordering (it is a lattice).
+    ///
+    /// It is only in the case when one operation depends on outputs of another
+    /// (via global or owned state) there is a guarantee that the global state
+    /// defined by the second operation will always follow the first one.
+    ///
+    /// It is the responsibility of the codex developer
+    /// to ensure non-ambiguity when this aggregator is used.
+    #[strict_type(tag = 0x24)]
+    MapV2ListU(StateName),
+
+    /// Map from a field-based element state to a set of non-verifiable structured state;
+    /// when the field-based element state repeats, the set is extended with the non-verifiable
+    /// state.
+    ///
+    /// The map is ordered according to the global state element order.
+    ///
+    /// Acts only on a global state; doesn't recognize aggregated state.
+    ///
+    /// If the global state with the name is absent returns an empty map.
+    ///
+    /// # Nota bene
+    ///
+    /// The global state does not have only a partial ordering (it is a lattice).
+    ///
+    /// It is only in the case when one operation depends on outputs of another
+    /// (via global or owned state) there is a guarantee that the global state
+    /// defined by the second operation will always follow the first one.
+    ///
+    /// It is the responsibility of the codex developer
+    /// to ensure non-ambiguity when this aggregator is used.
+    #[strict_type(tag = 0x25)]
+    MapV2SetU(StateName),
+
     /// Sums over verifiable part of a global state.
     ///
     /// Acts only on a global state; doesn't recognize aggregated state.
     ///
-    /// Fails if the global state doesn't have any elements,
+    /// Fails if the global state doesn't have any elements, or if there is an overflow,
     /// or the state type is not an unsigned integer.
     #[strict_type(tag = 0x30)]
-    SumVUnwrap(StateName),
+    SumUnwrap(StateName),
 
+    /// Sums over verifiable part of a global state.
+    ///
+    /// Acts only on a global state; doesn't recognize aggregated state.
+    ///
+    /// Produces zero f the global state doesn't have any elements, or if there is an overflow.
+    ///
+    /// If any of the elements of the global state are not an unsigner integer, treats them as zero.
     #[strict_type(tag = 0x31)]
-    SumVDefault(StateName),
+    SumOrDefault(StateName),
+
+    /// Takes a product of the elements of a global state, taking their verifiable part.
+    ///
+    /// Acts only on a global state; doesn't recognize aggregated state.
+    ///
+    /// Fails if the global state doesn't have any elements, or if there is an overflow,
+    /// or the state type is not an unsigned integer.
+    #[strict_type(tag = 0x32)]
+    ProdUnwrap(StateName),
+
+    /// Takes a product of the elements of a global state, taking their verifiable part.
+    ///
+    /// Acts only on a global state; doesn't recognize aggregated state.
+    ///
+    /// Produces zero f the global state doesn't have any elements, or if there is an overflow.
+    ///
+    /// If any of the elements of the global state are not an unsigner integer, treats them as one.
+    #[strict_type(tag = 0x33)]
+    ProdOrDefault(StateName),
 }
 
 impl SubAggregator {
@@ -275,28 +426,51 @@ impl SubAggregator {
     pub fn depends_on(&self) -> Vec<&StateName> {
         match self {
             Self::Neg(StateSelector::Aggregated(state))
-            | Self::Sum(StateSelector::Global(_, _), StateSelector::Aggregated(state))
-            | Self::Diff(StateSelector::Global(_, _), StateSelector::Aggregated(state))
-            | Self::Sum(StateSelector::Aggregated(state), StateSelector::Global(_, _))
-            | Self::Diff(StateSelector::Aggregated(state), StateSelector::Global(_, _)) => vec![state],
+            | Self::Add(StateSelector::Global(_, _), StateSelector::Aggregated(state))
+            | Self::Sub(StateSelector::Global(_, _), StateSelector::Aggregated(state))
+            | Self::Mul(StateSelector::Global(_, _), StateSelector::Aggregated(state))
+            | Self::Div(StateSelector::Global(_, _), StateSelector::Aggregated(state))
+            | Self::Rem(StateSelector::Global(_, _), StateSelector::Aggregated(state))
+            | Self::Exp(StateSelector::Global(_, _), StateSelector::Aggregated(state))
+            | Self::Add(StateSelector::Aggregated(state), StateSelector::Global(_, _))
+            | Self::Sub(StateSelector::Aggregated(state), StateSelector::Global(_, _))
+            | Self::Mul(StateSelector::Aggregated(state), StateSelector::Global(_, _))
+            | Self::Div(StateSelector::Aggregated(state), StateSelector::Global(_, _))
+            | Self::Rem(StateSelector::Aggregated(state), StateSelector::Global(_, _))
+            | Self::Exp(StateSelector::Aggregated(state), StateSelector::Global(_, _)) => vec![state],
 
-            Self::Sum(StateSelector::Aggregated(a), StateSelector::Aggregated(b))
-            | Self::Diff(StateSelector::Aggregated(a), StateSelector::Aggregated(b)) => vec![a, b],
+            Self::Add(StateSelector::Aggregated(a), StateSelector::Aggregated(b))
+            | Self::Sub(StateSelector::Aggregated(a), StateSelector::Aggregated(b))
+            | Self::Mul(StateSelector::Aggregated(a), StateSelector::Aggregated(b))
+            | Self::Div(StateSelector::Aggregated(a), StateSelector::Aggregated(b))
+            | Self::Rem(StateSelector::Aggregated(a), StateSelector::Aggregated(b))
+            | Self::Exp(StateSelector::Aggregated(a), StateSelector::Aggregated(b)) => vec![a, b],
 
             Self::Const(_, _)
             | Self::TheOnly(_)
             | Self::Count(_)
+            | Self::CountUnique(_)
             | Self::Copy(_)
             | Self::Unwrap(_)
             | Self::First(_)
+            | Self::Nth(_, _)
             | Self::Last(_)
+            | Self::NthBack(_, _)
             | Self::Neg(_)
-            | Self::Sum(_, _)
-            | Self::Diff(_, _)
+            | Self::Add(_, _)
+            | Self::Sub(_, _)
+            | Self::Mul(_, _)
+            | Self::Div(_, _)
+            | Self::Rem(_, _)
+            | Self::Exp(_, _)
             | Self::SetV(_)
             | Self::MapV2U(_)
-            | Self::SumVUnwrap(_)
-            | Self::SumVDefault(_) => vec![],
+            | Self::MapV2ListU(_)
+            | Self::MapV2SetU(_)
+            | Self::SumUnwrap(_)
+            | Self::SumOrDefault(_)
+            | Self::ProdUnwrap(_)
+            | Self::ProdOrDefault(_) => vec![],
         }
     }
 
@@ -361,18 +535,22 @@ impl SubAggregator {
 
             Self::First(name) => {
                 let state = global.get(name)?;
-                if state.is_empty() {
-                    return None;
-                }
                 Some(state.first_key_value()?.1.verified.clone())
+            }
+
+            Self::Nth(name, pos) => {
+                let state = global.get(name)?;
+                Some(state.iter().nth(*pos as usize)?.1.verified.clone())
             }
 
             Self::Last(name) => {
                 let state = global.get(name)?;
-                if state.is_empty() {
-                    return None;
-                }
                 Some(state.last_key_value()?.1.verified.clone())
+            }
+
+            Self::NthBack(name, pos) => {
+                let state = global.get(name)?;
+                Some(state.iter().nth_back(*pos as usize)?.1.verified.clone())
             }
 
             Self::Neg(name) => {
@@ -380,16 +558,40 @@ impl SubAggregator {
                 let neg = (val as i64).checked_neg()?;
                 Some(svnum!(neg))
             }
-            Self::Sum(a, b) => {
+            Self::Add(a, b) => {
                 let a = get_u64(a)?;
                 let b = get_u64(b)?;
                 let sum = a.checked_add(b)?;
                 Some(svnum!(sum))
             }
-            Self::Diff(a, b) => {
+            Self::Sub(a, b) => {
                 let a = get_u64(a)?;
                 let b = get_u64(b)?;
                 let sub = a.checked_sub(b)?;
+                Some(svnum!(sub))
+            }
+            Self::Mul(a, b) => {
+                let a = get_u64(a)?;
+                let b = get_u64(b)?;
+                let sub = a.checked_mul(b)?;
+                Some(svnum!(sub))
+            }
+            Self::Div(a, b) => {
+                let a = get_u64(a)?;
+                let b = get_u64(b)?;
+                let sub = a.checked_div(b)?;
+                Some(svnum!(sub))
+            }
+            Self::Rem(a, b) => {
+                let a = get_u64(a)?;
+                let b = get_u64(b)?;
+                let sub = a.checked_rem(b)?;
+                Some(svnum!(sub))
+            }
+            Self::Exp(a, b) => {
+                let a = get_u64(a)?;
+                let b = get_u64(b)?;
+                let sub = a.checked_pow(b.try_into().ok()?)?;
                 Some(svnum!(sub))
             }
 
@@ -402,6 +604,16 @@ impl SubAggregator {
                 Some(svnum!(count as u64))
             }
 
+            Self::CountUnique(name) => {
+                let mut unique = Vec::new();
+                for item in global.get(name)?.values() {
+                    if !unique.contains(&item) {
+                        unique.push(item);
+                    }
+                }
+                Some(svnum!(unique.len() as u64))
+            }
+
             Self::SetV(name) => {
                 let mut set = Vec::new();
                 for state in global.get(name).into_iter().flat_map(BTreeMap::values) {
@@ -411,6 +623,7 @@ impl SubAggregator {
                 }
                 Some(StrictVal::Set(set))
             }
+
             Self::MapV2U(name) => {
                 let mut map = Vec::new();
                 for atom in global.get(name)?.values() {
@@ -423,28 +636,85 @@ impl SubAggregator {
                 Some(StrictVal::Map(map))
             }
 
-            Self::SumVUnwrap(name) => {
+            Self::MapV2ListU(name) => {
+                let mut map = Vec::<(StrictVal, StrictVal)>::new();
+                for atom in global.get(name)?.values() {
+                    let Some(val) = &atom.unverified else { continue };
+                    if let Some((_key, list)) = map.iter_mut().find(|(key, _)| &atom.verified == key) {
+                        let StrictVal::List(list) = list else {
+                            unreachable!();
+                        };
+                        list.push(val.clone());
+                    } else {
+                        map.push((atom.verified.clone(), StrictVal::List(vec![val.clone()])));
+                    }
+                }
+                Some(StrictVal::Map(map))
+            }
+
+            Self::MapV2SetU(name) => {
+                let mut map = Vec::<(StrictVal, StrictVal)>::new();
+                for atom in global.get(name)?.values() {
+                    let Some(val) = &atom.unverified else { continue };
+                    if let Some((_key, list)) = map.iter_mut().find(|(key, _)| &atom.verified == key) {
+                        let StrictVal::List(list) = list else {
+                            unreachable!();
+                        };
+                        if !list.contains(val) {
+                            list.push(val.clone());
+                        }
+                    } else {
+                        map.push((atom.verified.clone(), StrictVal::Set(vec![val.clone()])));
+                    }
+                }
+                Some(StrictVal::Map(map))
+            }
+
+            Self::SumUnwrap(name) => {
                 let sum = global
                     .get(name)
                     .into_iter()
                     .flat_map(BTreeMap::values)
                     .try_fold(0u64, |sum, val| match &val.verified {
-                        StrictVal::Number(StrictNum::Uint(val)) => Some(sum + *val),
+                        StrictVal::Number(StrictNum::Uint(val)) => sum.checked_add(*val),
                         _ => None,
                     })?;
                 Some(svnum!(sum))
             }
 
-            Self::SumVDefault(name) => {
+            Self::SumOrDefault(name) => {
                 let sum = global
                     .get(name)
                     .into_iter()
                     .flat_map(BTreeMap::values)
-                    .filter_map(|val| match &val.verified {
-                        StrictVal::Number(StrictNum::Uint(val)) => Some(*val),
+                    .try_fold(0u64, |sum, val| match &val.verified {
+                        StrictVal::Number(StrictNum::Uint(val)) => sum.checked_add(*val),
+                        _ => Some(sum),
+                    })?;
+                Some(svnum!(sum))
+            }
+
+            Self::ProdUnwrap(name) => {
+                let sum = global
+                    .get(name)
+                    .into_iter()
+                    .flat_map(BTreeMap::values)
+                    .try_fold(0u64, |prod, val| match &val.verified {
+                        StrictVal::Number(StrictNum::Uint(val)) => prod.checked_mul(*val),
                         _ => None,
-                    })
-                    .sum::<u64>();
+                    })?;
+                Some(svnum!(sum))
+            }
+
+            Self::ProdOrDefault(name) => {
+                let sum = global
+                    .get(name)
+                    .into_iter()
+                    .flat_map(BTreeMap::values)
+                    .try_fold(0u64, |prod, val| match &val.verified {
+                        StrictVal::Number(StrictNum::Uint(val)) => prod.checked_mul(*val),
+                        _ => Some(prod),
+                    })?;
                 Some(svnum!(sum))
             }
         }
@@ -500,7 +770,7 @@ mod test {
     fn verified_readers() {
         assert_eq!(call(Aggregator::Take(SubAggregator::Count(vname!("verified")))), svnum!(6u64));
         assert_eq!(
-            call(Aggregator::Take(SubAggregator::SumVUnwrap(vname!("verified")))),
+            call(Aggregator::Take(SubAggregator::SumUnwrap(vname!("verified")))),
             svnum!(5u64 + 1 + 2 + 3 + 4 + 5)
         );
         assert_eq!(
@@ -522,15 +792,12 @@ mod test {
 
     #[test]
     #[should_panic]
-    fn unverified_sum() { call(Aggregator::Take(SubAggregator::SumVUnwrap(vname!("unverified")))); }
+    fn unverified_sum() { call(Aggregator::Take(SubAggregator::SumUnwrap(vname!("unverified")))); }
 
     #[test]
     fn pair_readers() {
         assert_eq!(call(Aggregator::Take(SubAggregator::Count(vname!("verified")))), svnum!(6u64));
-        assert_eq!(
-            call(Aggregator::Take(SubAggregator::SumVUnwrap(vname!("pairs")))),
-            svnum!(5u64 + 1 + 2 + 3 + 4 + 5)
-        );
+        assert_eq!(call(Aggregator::Take(SubAggregator::SumUnwrap(vname!("pairs")))), svnum!(5u64 + 1 + 2 + 3 + 4 + 5));
         assert_eq!(
             call(Aggregator::Take(SubAggregator::SetV(vname!("pairs")))),
             svset!([5u64, 1u64, 2u64, 3u64, 4u64])
