@@ -1,5 +1,5 @@
 {-
-  Id: stl:XYSvyYlE-exuTRwa-LExvrDM-Emv6Mek-AoHY1bX-K2iwJ9M#escort-betty-grace
+  Id: stl:MaPAknhf-bKLyB9L-eGdRIYN-N3SUvEu-zxSFPbC-kc_99E0#congo-whiskey-germany
   Name: SONIC
   Version: 0.12.0
   Description: Standard library for formally-verifiable distributed contracts
@@ -13,21 +13,22 @@
 @context
 typelib SONIC
 
-import UltraSONIC#stuart-memphis-english
-  use Issue#exotic-profit-diet
-  use Genesis#network-erosion-trade
+import UltraSONIC#korea-helena-moral
+  use StateData#mission-first-owner
   use Consensus#nissan-congo-clark
-  use Codex#panther-royal-pandora
   use ContractName#value-reform-lesson
-  use StateData#amigo-igor-panel
-  use ContractMeta#tornado-fractal-cement
+  use Genesis#minute-prism-small
+  use ContractMeta#element-novel-salute
+  use CellLock#jasmine-demo-resume
+  use StateValue#kiwi-million-ford
+  use Codex#adam-mega-analyze
+  use Issue#finance-peru-havana
   use Opid#storm-dragon-brain
   use ContractId#uniform-welcome-papa
-  use StateValue#bamboo-morgan-edition
   use AuthToken#western-america-patrol
   use CodexId#cargo-season-impact
   use Identity#smart-pioneer-nominal
-  use StateCell#storm-martin-jump
+  use StateCell#tarzan-jordan-camera
   use CellAddr#lecture-vincent-carbon
   use RawData#lima-anvil-karate
 
@@ -52,6 +53,8 @@ import AluVM#reward-accent-swim
 import CommitVerify#biology-news-adam
   use ReservedBytes1#origin-roger-relax
   use ReservedBytes2#florida-libra-circus
+  use ReservedBytes6#joker-peru-brave
+  use ReservedBytes4#young-goblin-academy
 
 import StrictTypes#henry-heart-survive
   use VariantName#theory-austin-before
@@ -90,7 +93,7 @@ data Api               : codexId UltraSONIC.CodexId
 @mnemonic(viva-index-tempo)
 data ApisChecksum      : [Byte ^ 4]
 
-@mnemonic(mirage-bronze-regular)
+@mnemonic(project-freddie-oasis)
 data Articles          : semantics Semantics
                        , sig SigBlob?
                        , issue UltraSONIC.Issue
@@ -111,7 +114,7 @@ data GlobalApi         : semId StrictTypes.SemId
                        , rawConvertor RawConvertor
                        , rawBuilder RawBuilder
 
-@mnemonic(peace-film-video)
+@mnemonic(salon-record-hope)
 data Issuer            : codex UltraSONIC.Codex
                        , semantics Semantics
                        , sig SigBlob?
@@ -169,7 +172,7 @@ data StateConvertor    : unit ()
 data StateSelector     : global (StrictTypes.VariantName, Std.Bool)
                        | aggregated StrictTypes.VariantName
 
-@mnemonic(table-origami-shrink)
+@mnemonic(panel-permit-distant)
 data SubAggregator     : const (StrictTypes.SemId, [Byte ^ ..0xff])
                        | theOnly StrictTypes.VariantName
                        | copy StrictTypes.VariantName
@@ -180,13 +183,12 @@ data SubAggregator     : const (StrictTypes.SemId, [Byte ^ ..0xff])
                        | sum (StateSelector, StateSelector)
                        | diff (StateSelector, StateSelector)
                        | count#32 StrictTypes.VariantName
-                       | listV StrictTypes.VariantName
-                       | setV StrictTypes.VariantName
+                       | setV#34 StrictTypes.VariantName
                        | mapV2u StrictTypes.VariantName
                        | sumVUnwrap#48 StrictTypes.VariantName
                        | sumVDefault StrictTypes.VariantName
 
-@mnemonic(explore-locate-zoom)
+@mnemonic(weekend-street-channel)
 data Transition        : opid UltraSONIC.Opid, destroyed {UltraSONIC.CellAddr -> UltraSONIC.StateCell}
 
 

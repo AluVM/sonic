@@ -288,7 +288,6 @@ impl SubAggregator {
             | Self::Neg(_)
             | Self::Sum(_, _)
             | Self::Diff(_, _)
-            | Self::ListV(_)
             | Self::SetV(_)
             | Self::MapV2U(_)
             | Self::SumVUnwrap(_)
@@ -398,14 +397,6 @@ impl SubAggregator {
                 Some(svnum!(count as u64))
             }
 
-            Self::ListV(name) => Some(StrictVal::List(
-                global
-                    .get(name)
-                    .into_iter()
-                    .flat_map(BTreeMap::values)
-                    .map(|atom| atom.verified.clone())
-                    .collect(),
-            )),
             Self::SetV(name) => {
                 let mut set = Vec::new();
                 for state in global.get(name).into_iter().flat_map(BTreeMap::values) {
@@ -508,10 +499,6 @@ mod test {
             svnum!(5u64 + 1 + 2 + 3 + 4 + 5)
         );
         assert_eq!(
-            call(Aggregator::Take(SubAggregator::ListV(vname!("verified")))),
-            svlist!([5u64, 1u64, 2u64, 3u64, 4u64, 5u64])
-        );
-        assert_eq!(
             call(Aggregator::Take(SubAggregator::SetV(vname!("verified")))),
             svset!([5u64, 1u64, 2u64, 3u64, 4u64])
         );
@@ -521,10 +508,6 @@ mod test {
     #[test]
     fn unverified_readers() {
         assert_eq!(call(Aggregator::Take(SubAggregator::Count(vname!("verified")))), svnum!(6u64));
-        assert_eq!(
-            call(Aggregator::Take(SubAggregator::ListV(vname!("unverified")))),
-            svlist!([(), (), (), (), (), ()])
-        );
         assert_eq!(call(Aggregator::Take(SubAggregator::SetV(vname!("unverified")))), svset!([()]));
         assert_eq!(
             call(Aggregator::Take(SubAggregator::MapV2U(vname!("unverified")))),
@@ -542,10 +525,6 @@ mod test {
         assert_eq!(
             call(Aggregator::Take(SubAggregator::SumVUnwrap(vname!("pairs")))),
             svnum!(5u64 + 1 + 2 + 3 + 4 + 5)
-        );
-        assert_eq!(
-            call(Aggregator::Take(SubAggregator::ListV(vname!("pairs")))),
-            svlist!([5u64, 1u64, 2u64, 3u64, 4u64, 5u64])
         );
         assert_eq!(
             call(Aggregator::Take(SubAggregator::SetV(vname!("pairs")))),

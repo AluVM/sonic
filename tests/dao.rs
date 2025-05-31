@@ -51,6 +51,7 @@ fn codex() -> Codex {
         developer: Identity::default(),
         version: default!(),
         timestamp: 1732529307,
+        features: none!(),
         field_order: FIELD_ORDER_SECP,
         input_config: CoreConfig::default(),
         verification_config: CoreConfig::default(),

@@ -24,15 +24,14 @@
 use std::convert::Infallible;
 use std::ops::{Deref, DerefMut};
 
-use aluvm::LibSite;
 use amplify::confinement::SmallVec;
 use amplify::num::u256;
 use chrono::{DateTime, Utc};
 use strict_encoding::TypeName;
 use strict_types::{StrictVal, TypeSystem};
 use ultrasonic::{
-    fe256, AuthToken, CallId, CellAddr, CodexId, Consensus, ContractId, ContractMeta, ContractName, Genesis, Identity,
-    Input, Issue, Operation, StateCell, StateData, StateValue,
+    fe256, AuthToken, CallId, CellAddr, CellLock, CodexId, Consensus, ContractId, ContractMeta, ContractName, Genesis,
+    Identity, Input, Issue, Operation, StateCell, StateData, StateValue,
 };
 
 use crate::{Api, Articles, DataCell, Issuer, IssuerId, MethodName, StateAtom, StateName};
@@ -225,7 +224,7 @@ impl IssueBuilder {
         name: impl Into<StateName>,
         auth: AuthToken,
         data: StrictVal,
-        lock: Option<LibSite>,
+        lock: Option<CellLock>,
     ) -> Self {
         self.builder = self
             .builder
@@ -238,6 +237,7 @@ impl IssueBuilder {
             consensus: self.consensus,
             testnet: self.testnet,
             timestamp,
+            features: default!(),
             name: ContractName::Named(name.into()),
             issuer: Identity::default(),
         };
@@ -282,7 +282,7 @@ impl Builder {
         name: impl Into<StateName>,
         auth: AuthToken,
         data: StrictVal,
-        lock: Option<LibSite>,
+        lock: Option<CellLock>,
         api: &Api,
         sys: &TypeSystem,
     ) -> Self {
@@ -302,6 +302,7 @@ impl Builder {
             codex_id,
             call_id: self.call_id,
             nonce: fe256::from(u256::ZERO),
+            blank0: zero!(),
             blank1: zero!(),
             blank2: zero!(),
             destructible_out: self.destructible_out,
@@ -334,7 +335,7 @@ impl<'c> BuilderRef<'c> {
         name: impl Into<StateName>,
         auth: AuthToken,
         data: StrictVal,
-        lock: Option<LibSite>,
+        lock: Option<CellLock>,
     ) -> Self {
         self.inner = self
             .inner
@@ -381,7 +382,7 @@ impl OpBuilder {
         name: impl Into<StateName>,
         auth: AuthToken,
         data: StrictVal,
-        lock: Option<LibSite>,
+        lock: Option<CellLock>,
         api: &Api,
         sys: &TypeSystem,
     ) -> Self {
@@ -428,6 +429,7 @@ impl OpBuilder {
             contract_id: self.contract_id,
             call_id: self.inner.call_id,
             nonce: fe256::from(u256::ZERO),
+            witness: none!(),
             destructible_in: self.destructible_in,
             immutable_in: self.immutable_in,
             destructible_out: self.inner.destructible_out,
@@ -461,7 +463,7 @@ impl<'c> OpBuilderRef<'c> {
         name: impl Into<StateName>,
         auth: AuthToken,
         data: StrictVal,
-        lock: Option<LibSite>,
+        lock: Option<CellLock>,
     ) -> Self {
         self.inner = self
             .inner
