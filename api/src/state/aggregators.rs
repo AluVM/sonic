@@ -58,16 +58,10 @@ pub enum StateSelector {
 #[strict_type(lib = LIB_NAME_SONIC, tags = custom, dumb = Self::Some(strict_dumb!()))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub enum Aggregator {
-    /// Takes the underlying aggregated state and applies nothing on top.
-    ///
-    /// If the underlying aggregator fails, the aggregated state is not produced.
+    /// Produces constant value of `Option::None` type.
     #[strict_type(tag = 0)]
-    // https://github.com/dtolnay/serde-yaml/issues/363
-    // We should repeat this if we encounter any other nested enums.
-    #[cfg_attr(feature = "serde", serde(with = "serde_yaml::with::singleton_map"))]
-    Take(SubAggregator),
+    None,
 
-    // TODO: Add `None`
     /// Wrap into an optional value.
     ///
     /// If the underlying aggregated state fails, sets the aggregated state to `None`.
@@ -75,8 +69,17 @@ pub enum Aggregator {
     #[cfg_attr(feature = "serde", serde(with = "serde_yaml::with::singleton_map"))]
     Some(SubAggregator),
 
-    /// If the underlying aggregated state fails, returns the provided constant value.
+    /// Takes the underlying aggregated state and applies nothing on top.
+    ///
+    /// If the underlying aggregator fails, the aggregated state is not produced.
     #[strict_type(tag = 2)]
+    // https://github.com/dtolnay/serde-yaml/issues/363
+    // We should repeat this if we encounter any other nested enums.
+    #[cfg_attr(feature = "serde", serde(with = "serde_yaml::with::singleton_map"))]
+    Take(SubAggregator),
+
+    /// If the underlying aggregated state fails, returns the provided constant value.
+    #[strict_type(tag = 3)]
     Or(#[cfg_attr(feature = "serde", serde(with = "serde_yaml::with::singleton_map"))] SubAggregator, SemId, TinyBlob),
 
     /// Execute a custom function on the state.
@@ -94,7 +97,7 @@ impl Aggregator {
     pub fn depends_on(&self) -> impl Iterator<Item = &StateName> {
         match self {
             Self::Take(sub) | Self::Some(sub) | Self::Or(sub, _, _) => sub.depends_on(),
-            Self::AluVM(_) => vec![],
+            Self::None | Self::AluVM(_) => vec![],
         }
         .into_iter()
     }
@@ -112,6 +115,8 @@ impl Aggregator {
         types: &TypeSystem,
     ) -> Option<StrictVal> {
         match self {
+            Self::None => Some(StrictVal::none()),
+
             Self::Take(sub) => sub.aggregate(global, aggregated, types),
 
             Self::Some(sub) => Some(match sub.aggregate(global, aggregated, types) {
