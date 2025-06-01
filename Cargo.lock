@@ -255,9 +255,9 @@ checksum = "1628fb46dfa0b37568d12e5edd512553eccf6a22a78e8bde00bb4aed84d5bdbf"
 
 [[package]]
 name = "cc"
-version = "1.2.24"
+version = "1.2.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16595d3be041c03b09d08d0858631facccee9221e579704070e6e9e4915d3bc7"
+checksum = "d0fc897dc1e865cc67c0e05a836d9d3f1df3cbe442aa4a9473b18e12624a4951"
 dependencies = [
  "shlex",
 ]
@@ -285,9 +285,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.38"
+version = "4.5.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed93b9805f8ba930df42c2590f05453d5ec36cbb85d018868a5b24d31f6ac000"
+checksum = "fd60e63e9be68e5fb56422e397cf9baddded06dae1d2e523401542383bc72a9f"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -295,9 +295,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.38"
+version = "4.5.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "379026ff283facf611b0ea629334361c4211d1b12ee01024eec1591133b04120"
+checksum = "89cc6392a1f72bbeb820d71f32108f61fdaf18bc526e1d23954168a67759ef51"
 dependencies = [
  "anstream",
  "anstyle",
@@ -480,7 +480,7 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "hypersonic"
-version = "0.12.0-rc.1"
+version = "0.12.0-rc.2"
 dependencies = [
  "aluvm",
  "amplify",
@@ -834,7 +834,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
 name = "sonic-api"
-version = "0.12.0-rc.1"
+version = "0.12.0-rc.2"
 dependencies = [
  "aluvm",
  "amplify",
@@ -858,7 +858,7 @@ dependencies = [
 
 [[package]]
 name = "sonic-callreq"
-version = "0.12.0-rc.1"
+version = "0.12.0-rc.2"
 dependencies = [
  "amplify",
  "baid64",
@@ -879,7 +879,7 @@ dependencies = [
 
 [[package]]
 name = "sonic-persist-fs"
-version = "0.12.0-rc.1"
+version = "0.12.0-rc.2"
 dependencies = [
  "amplify",
  "aora",
@@ -893,7 +893,7 @@ dependencies = [
 
 [[package]]
 name = "sonix"
-version = "0.12.0-rc.1"
+version = "0.12.0-rc.2"
 dependencies = [
  "amplify",
  "anyhow",
@@ -1062,8 +1062,9 @@ checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 
 [[package]]
 name = "ultrasonic"
-version = "0.12.0-rc.1"
-source = "git+https://github.com/AluVM/ultrasonic?branch=feat/opwitness#342c6746635af97bdd4843283faa729264a88811"
+version = "0.12.0-rc.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7aa6c05b420ef6c867cbcc08c99bc7a429d93808dad8a3f65fb856a96c0cf79f"
 dependencies = [
  "amplify",
  "baid64",
@@ -1422,9 +1423,9 @@ dependencies = [
 
 [[package]]
 name = "zk-aluvm"
-version = "0.12.0-rc.1"
+version = "0.12.0-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7cf36dc73e2b1f5b173e44924b8e4822fe81fc5c9d5ab7a2570b6b9d0debbfb"
+checksum = "91226187d08b7ce594c0a633e33cd192a1cfacc7fb88e90010836963b71d8a9c"
 dependencies = [
  "aluvm",
  "amplify",

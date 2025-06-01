@@ -4,7 +4,7 @@ default-members = [".", "api", "callreq", "persistence/fs"]
 resolver = "2"
 
 [workspace.package]
-version = "0.12.0-rc.1"
+version = "0.12.0-rc.2"
 authors = ["Dr Maxim Orlovsky <orlovsky@ubideco.org>"]
 repository = "https://github.com/AluVM/sonare"
 homepage = "https://ubideco.org/SONARE"
@@ -20,11 +20,11 @@ strict_encoding = "~2.9.1"
 strict_types = "~2.9.0"
 commit_verify = "0.12.0-rc.1"
 aluvm = "0.12.0-rc.1"
-ultrasonic = "0.12.0-rc.1"
-sonic-api = { version = "0.12.0-rc.1", path = "api" }
-sonic-callreq = { version = "0.12.0-rc.1", path = "callreq" }
-sonic-persist-fs = { version = "0.12.0-rc.1", path = "persistence/fs" }
-hypersonic = { version = "0.12.0-rc.1", path = "." }
+ultrasonic = "0.12.0-rc.2"
+sonic-api = { version = "0.12.0-rc.2", path = "api" }
+sonic-callreq = { version = "0.12.0-rc.2", path = "callreq" }
+sonic-persist-fs = { version = "0.12.0-rc.2", path = "persistence/fs" }
+hypersonic = { version = "0.12.0-rc.2", path = "." }
 aora = ">=0.6.4"
 binfile = "0.2.0"
 baid64 = "0.4.1"
@@ -117,6 +117,3 @@ features = ["all"]
 
 [lints.rust]
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(coverage_nightly)'] }
-
-[patch.crates-io]
-ultrasonic = { git = "https://github.com/AluVM/ultrasonic", branch = "feat/opwitness" }
