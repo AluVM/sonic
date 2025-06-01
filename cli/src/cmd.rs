@@ -146,7 +146,7 @@ fn call(dir: PathBuf, form: PathBuf) -> anyhow::Result<()> {
 }
 
 fn export(dir: PathBuf, terminals: impl IntoIterator<Item = AuthToken>, output: PathBuf) -> anyhow::Result<()> {
-    let mut ledger = LedgerDir::load(dir)?;
+    let ledger = LedgerDir::load(dir)?;
     ledger.export_to_file(terminals, output)?;
     Ok(())
 }

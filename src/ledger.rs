@@ -413,10 +413,11 @@ impl<S: Stock> Ledger<S> {
     ) -> Result<(), MultiError<AcceptError, S::Error>> {
         // We need this closure to avoid multiple `map_err`.
         let count = (|| -> Result<u32, AcceptError> {
-            let contract_id = ContractId::strict_decode(reader)?;
-
             // Check version number
             let _ = ReservedBytes::<1, { DEEDS_VERSION as u8 }>::strict_decode(reader)?;
+
+            let contract_id = ContractId::strict_decode(reader)?;
+
             // Read and ignore the extension block
             let ext_blocks = u8::strict_decode(reader)?;
             for _ in 0..ext_blocks {
@@ -651,8 +652,14 @@ mod _fs {
     pub const DEEDS_MAGIC_NUMBER: u64 = u64::from_be_bytes(*b"DEEDLDGR");
 
     impl<S: Stock> Ledger<S> {
+        pub fn export_all_to_file(&self, output: impl AsRef<Path>) -> io::Result<()> {
+            let file = BinFile::<DEEDS_MAGIC_NUMBER, DEEDS_VERSION>::create_new(output)?;
+            let writer = StrictWriter::with(StreamWriter::new::<{ usize::MAX }>(file));
+            self.export_all(writer)
+        }
+
         pub fn export_to_file(
-            &mut self,
+            &self,
             terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
             output: impl AsRef<Path>,
         ) -> io::Result<()> {

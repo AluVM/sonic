@@ -28,6 +28,7 @@ extern crate amplify;
 #[macro_use]
 extern crate strict_types;
 
+use std::convert::Infallible;
 use std::fs;
 use std::path::Path;
 
@@ -123,6 +124,7 @@ fn api() -> Api {
     }
 }
 
+#[test]
 fn main() {
     let types = stl::DaoTypes::new();
     let codex = codex();
@@ -172,12 +174,12 @@ fn main() {
         .finish("WonderlandDAO", 1732529307);
     let opid = articles.genesis_opid();
 
-    let contract_path = Path::new("examples/dao/data/WonderlandDAO.contract");
+    let contract_path = Path::new("tests/data/WonderlandDAO.contract");
     if contract_path.exists() {
         fs::remove_dir_all(contract_path).expect("Unable to remove a contract file");
     }
     fs::create_dir_all(contract_path).expect("Unable to create a contract folder");
-    let mut ledger = LedgerDir::new(articles, contract_path.to_path_buf()).expect("Can't issue contract");
+    let mut ledger = LedgerDir::new(articles.clone(), contract_path.to_path_buf()).expect("Can't issue contract");
 
     // Proposing vote
     let votings = ledger
@@ -236,14 +238,28 @@ fn main() {
     }
 
     // Now anybody accessing this file can figure out who is on duty today, by the decision of DAO.
-    let deeds_path = Path::new("examples/dao/data/voting.deeds");
+    let deeds_path = Path::new("tests/data/voting.deeds");
     if deeds_path.exists() {
         fs::remove_file(deeds_path).expect("unable to remove contract file");
     }
 
     ledger
-        .export_to_file([alice_auth2, bob_auth2, carol_auth2], "examples/dao/data/voting.deeds")
+        .export_to_file([alice_auth2, bob_auth2, carol_auth2], deeds_path)
         .expect("unable to save deeds to a file");
+
+    let contract_path = Path::new("tests/data/WonderlandDAO-2.contract");
+    if contract_path.exists() {
+        fs::remove_dir_all(contract_path).expect("Unable to remove a contract file");
+    }
+    fs::create_dir_all(contract_path).expect("Unable to create a contract folder");
+    let mut ledger2 = LedgerDir::new(articles, contract_path.to_path_buf()).expect("Can't issue contract");
+    ledger2
+        .accept_from_file(deeds_path, |_, _, _| Result::<_, Infallible>::Ok(()))
+        .unwrap();
+
+    ledger2
+        .export_all_to_file("tests/data/votings-all.deeds")
+        .unwrap();
 }
 
 mod libs {
