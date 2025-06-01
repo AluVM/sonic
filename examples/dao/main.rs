@@ -36,9 +36,11 @@ use std::path::Path;
 use aluvm::{CoreConfig, LibSite};
 use amplify::num::u256;
 use commit_verify::{Digest, Sha256};
-use hypersonic::{Api, DestructibleApi, ImmutableApi};
+use hypersonic::{Api, GlobalApi, OwnedApi};
 use sonic_persist_fs::LedgerDir;
-use sonicapi::{Issuer, RawBuilder, RawConvertor, StateAggregator, StateArithm, StateBuilder, StateConvertor};
+use sonicapi::{
+    Aggregator, Issuer, RawBuilder, RawConvertor, Semantics, StateArithm, StateBuilder, StateConvertor, SubAggregator,
+};
 use strict_types::{SemId, StrictVal};
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
 use ultrasonic::{AuthToken, CellAddr, Codex, Consensus, Identity};
@@ -51,6 +53,7 @@ fn codex() -> Codex {
         developer: Identity::default(),
         version: default!(),
         timestamp: 1732529307,
+        features: none!(),
         field_order: FIELD_ORDER_SECP,
         input_config: CoreConfig::default(),
         verification_config: CoreConfig::default(),
@@ -68,13 +71,11 @@ fn api() -> Api {
     let codex = codex();
 
     Api {
-        version: default!(),
         codex_id: codex.codex_id(),
-        developer: Identity::default(),
-        conforms: None,
+        conforms: none!(),
         default_call: None,
-        immutable: tiny_bmap! {
-            vname!("_parties") => ImmutableApi {
+        global: tiny_bmap! {
+            vname!("_parties") => GlobalApi {
                 published: true,
                 sem_id: types.get("DAO.PartyId"),
                 convertor: StateConvertor::TypedEncoder(u256::ZERO),
@@ -82,7 +83,7 @@ fn api() -> Api {
                 raw_convertor: RawConvertor::StrictDecode(types.get("DAO.Party")),
                 raw_builder: RawBuilder::StrictEncode(types.get("DAO.Party")),
             },
-            vname!("_votings") => ImmutableApi {
+            vname!("_votings") => GlobalApi {
                 published: true,
                 sem_id: types.get("DAO.VoteId"),
                 convertor: StateConvertor::TypedEncoder(u256::ONE),
@@ -90,7 +91,7 @@ fn api() -> Api {
                 raw_convertor: RawConvertor::StrictDecode(types.get("DAO.Voting")),
                 raw_builder: RawBuilder::StrictEncode(types.get("DAO.Voting")),
             },
-            vname!("_votes") => ImmutableApi {
+            vname!("_votes") => GlobalApi {
                 published: true,
                 sem_id: types.get("DAO.CastVote"),
                 convertor: StateConvertor::TypedEncoder(u256::from(2u8)),
@@ -99,8 +100,8 @@ fn api() -> Api {
                 raw_builder: RawBuilder::StrictEncode(SemId::unit()),
             },
         },
-        destructible: tiny_bmap! {
-            vname!("signers") => DestructibleApi {
+        owned: tiny_bmap! {
+            vname!("signers") => OwnedApi {
                 sem_id: types.get("DAO.PartyId"),
                 arithmetics: StateArithm::NonFungible,
                 convertor: StateConvertor::TypedEncoder(u256::ZERO),
@@ -110,10 +111,10 @@ fn api() -> Api {
             }
         },
         aggregators: tiny_bmap! {
-            vname!("parties") => StateAggregator::MapV2U(vname!("_parties")),
-            vname!("votings") => StateAggregator::MapV2U(vname!("_votings")),
-            vname!("votes") => StateAggregator::SetV(vname!("_votes")),
-            vname!("votingCount") => StateAggregator::Count(vname!("_votings")),
+            vname!("parties") => Aggregator::Take(SubAggregator::MapV2U(vname!("_parties"))),
+            vname!("votings") => Aggregator::Take(SubAggregator::MapV2U(vname!("_votings"))),
+            vname!("votes") => Aggregator::Take(SubAggregator::SetV(vname!("_votes"))),
+            vname!("votingCount") => Aggregator::Take(SubAggregator::Count(vname!("_votings"))),
         },
         verifiers: tiny_bmap! {
             vname!("setup") => 0,
@@ -121,7 +122,6 @@ fn api() -> Api {
             vname!("castVote") => 2,
         },
         errors: Default::default(),
-        reserved: Default::default(),
     }
 }
 
@@ -132,7 +132,15 @@ fn main() {
     let api = api();
 
     // Creating DAO with three participants
-    let issuer = Issuer::new(codex, api, [libs::success()], types.type_system());
+    let semantics = Semantics {
+        version: 0,
+        default: api,
+        custom: none!(),
+        codex_libs: small_bset![libs::success()],
+        api_libs: none!(),
+        types: types.type_system(),
+    };
+    let issuer = Issuer::new(codex, semantics).unwrap();
     let filename = "examples/dao/data/SimpleDAO.issuer";
     fs::remove_file(filename).ok();
     issuer

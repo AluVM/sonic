@@ -21,10 +21,9 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use aluvm::LibSite;
 use amplify::num::u256;
 use strict_types::StrictVal;
-use ultrasonic::AuthToken;
+use ultrasonic::{AuthToken, CellLock};
 
 pub type StateTy = u256;
 
@@ -58,7 +57,7 @@ impl StateAtom {
 pub struct DataCell {
     pub data: StrictVal,
     pub auth: AuthToken,
-    pub lock: Option<LibSite>,
+    pub lock: Option<CellLock>,
 }
 
 impl DataCell {

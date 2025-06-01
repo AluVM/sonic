@@ -28,15 +28,19 @@ extern crate amplify;
 #[macro_use]
 extern crate strict_types;
 
+use std::convert::Infallible;
 use std::fs;
 use std::path::Path;
 
 use aluvm::{CoreConfig, LibSite};
 use amplify::num::u256;
-use commit_verify::{Digest, Sha256};
-use hypersonic::{Api, DestructibleApi, ImmutableApi};
+use commit_verify::{Digest, Sha256, StrictHash};
+use hypersonic::{Api, GlobalApi, OwnedApi};
 use sonic_persist_fs::LedgerDir;
-use sonicapi::{Issuer, RawBuilder, RawConvertor, StateAggregator, StateArithm, StateBuilder, StateConvertor};
+use sonicapi::{
+    Aggregator, Issuer, RawBuilder, RawConvertor, Semantics, SigBlob, StateArithm, StateBuilder, StateConvertor,
+    SubAggregator,
+};
 use strict_types::{SemId, StrictVal};
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
 use ultrasonic::{AuthToken, CellAddr, Codex, Consensus, Identity};
@@ -49,6 +53,7 @@ fn codex() -> Codex {
         developer: Identity::default(),
         version: default!(),
         timestamp: 1732529307,
+        features: none!(),
         field_order: FIELD_ORDER_SECP,
         input_config: CoreConfig::default(),
         verification_config: CoreConfig::default(),
@@ -66,13 +71,11 @@ fn api() -> Api {
     let codex = codex();
 
     Api {
-        version: default!(),
         codex_id: codex.codex_id(),
-        developer: Identity::default(),
-        conforms: None,
+        conforms: none!(),
         default_call: None,
-        immutable: tiny_bmap! {
-            vname!("_parties") => ImmutableApi {
+        global: tiny_bmap! {
+            vname!("_parties") => GlobalApi {
                 published: true,
                 sem_id: types.get("DAO.PartyId"),
                 convertor: StateConvertor::TypedEncoder(u256::ZERO),
@@ -80,7 +83,7 @@ fn api() -> Api {
                 raw_convertor: RawConvertor::StrictDecode(types.get("DAO.Party")),
                 raw_builder: RawBuilder::StrictEncode(types.get("DAO.Party")),
             },
-            vname!("_votings") => ImmutableApi {
+            vname!("_votings") => GlobalApi {
                 published: true,
                 sem_id: types.get("DAO.VoteId"),
                 convertor: StateConvertor::TypedEncoder(u256::ONE),
@@ -88,7 +91,7 @@ fn api() -> Api {
                 raw_convertor: RawConvertor::StrictDecode(types.get("DAO.Voting")),
                 raw_builder: RawBuilder::StrictEncode(types.get("DAO.Voting")),
             },
-            vname!("_votes") => ImmutableApi {
+            vname!("_votes") => GlobalApi {
                 published: true,
                 sem_id: types.get("DAO.CastVote"),
                 convertor: StateConvertor::TypedEncoder(u256::from(2u8)),
@@ -97,8 +100,8 @@ fn api() -> Api {
                 raw_builder: RawBuilder::StrictEncode(SemId::unit()),
             },
         },
-        destructible: tiny_bmap! {
-            vname!("signers") => DestructibleApi {
+        owned: tiny_bmap! {
+            vname!("signers") => OwnedApi {
                 sem_id: types.get("DAO.PartyId"),
                 arithmetics: StateArithm::NonFungible,
                 convertor: StateConvertor::TypedEncoder(u256::ZERO),
@@ -108,10 +111,10 @@ fn api() -> Api {
             }
         },
         aggregators: tiny_bmap! {
-            vname!("parties") => StateAggregator::MapV2U(vname!("_parties")),
-            vname!("votings") => StateAggregator::MapV2U(vname!("_votings")),
-            vname!("votes") => StateAggregator::SetV(vname!("_votes")),
-            vname!("votingCount") => StateAggregator::Count(vname!("_votings")),
+            vname!("parties") => Aggregator::Take(SubAggregator::MapV2U(vname!("_parties"))),
+            vname!("votings") => Aggregator::Take(SubAggregator::MapV2U(vname!("_votings"))),
+            vname!("votes") => Aggregator::Take(SubAggregator::SetV(vname!("_votes"))),
+            vname!("votingCount") => Aggregator::Take(SubAggregator::Count(vname!("_votings"))),
         },
         verifiers: tiny_bmap! {
             vname!("setup") => 0,
@@ -119,22 +122,50 @@ fn api() -> Api {
             vname!("castVote") => 2,
         },
         errors: Default::default(),
-        reserved: Default::default(),
     }
 }
 
+#[test]
 fn main() {
     let types = stl::DaoTypes::new();
     let codex = codex();
     let api = api();
 
     // Creating DAO with three participants
-    let issuer = Issuer::new(codex, api, [libs::success()], types.type_system());
+    let semantics = Semantics {
+        version: 0,
+        default: api,
+        custom: none!(),
+        codex_libs: small_bset![libs::success()],
+        api_libs: none!(),
+        types: types.type_system(),
+    };
+
+    let sig = SigBlob::from_slice_checked(*b"me");
+    fn sig_validator(_: StrictHash, _: &Identity, s: &SigBlob) -> Result<(), ()> {
+        if s.as_slice() == b"me" {
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+    let issuer = Issuer::with(codex, semantics, sig, sig_validator).unwrap();
     let filename = "examples/dao/data/SimpleDAO.issuer";
     fs::remove_file(filename).ok();
     issuer
         .save(filename)
         .expect("unable to save an issuer to a file");
+
+    let issuer2 = Issuer::load(filename, sig_validator).unwrap();
+    assert_eq!(issuer.issuer_id(), issuer2.issuer_id());
+    assert_eq!(issuer.codex_id(), issuer2.codex_id());
+    assert_eq!(issuer.codex_name(), issuer2.codex_name());
+    assert_eq!(issuer.codex(), issuer2.codex());
+    assert_eq!(issuer.types(), issuer2.types());
+    assert_eq!(issuer.semantics(), issuer2.semantics());
+    assert_eq!(issuer.default_api(), issuer2.default_api());
+    assert_eq!(issuer.custom_apis().collect::<Vec<_>>(), issuer2.custom_apis().collect::<Vec<_>>());
+    assert_eq!(issuer.codex_libs().collect::<Vec<_>>(), issuer2.codex_libs().collect::<Vec<_>>());
 
     let seed = &[0xCA; 30][..];
     let mut auth = Sha256::digest(seed);
@@ -164,12 +195,12 @@ fn main() {
         .finish("WonderlandDAO", 1732529307);
     let opid = articles.genesis_opid();
 
-    let contract_path = Path::new("examples/dao/data/WonderlandDAO.contract");
+    let contract_path = Path::new("tests/data/WonderlandDAO.contract");
     if contract_path.exists() {
         fs::remove_dir_all(contract_path).expect("Unable to remove a contract file");
     }
     fs::create_dir_all(contract_path).expect("Unable to create a contract folder");
-    let mut ledger = LedgerDir::new(articles, contract_path.to_path_buf()).expect("Can't issue contract");
+    let mut ledger = LedgerDir::new(articles.clone(), contract_path.to_path_buf()).expect("Can't issue contract");
 
     // Proposing vote
     let votings = ledger
@@ -228,14 +259,28 @@ fn main() {
     }
 
     // Now anybody accessing this file can figure out who is on duty today, by the decision of DAO.
-    let deeds_path = Path::new("examples/dao/data/voting.deeds");
+    let deeds_path = Path::new("tests/data/voting.deeds");
     if deeds_path.exists() {
         fs::remove_file(deeds_path).expect("unable to remove contract file");
     }
 
     ledger
-        .export_to_file([alice_auth2, bob_auth2, carol_auth2], "examples/dao/data/voting.deeds")
+        .export_to_file([alice_auth2, bob_auth2, carol_auth2], deeds_path)
         .expect("unable to save deeds to a file");
+
+    let contract_path = Path::new("tests/data/WonderlandDAO-2.contract");
+    if contract_path.exists() {
+        fs::remove_dir_all(contract_path).expect("Unable to remove a contract file");
+    }
+    fs::create_dir_all(contract_path).expect("Unable to create a contract folder");
+    let mut ledger2 = LedgerDir::new(articles, contract_path.to_path_buf()).expect("Can't issue contract");
+    ledger2
+        .accept_from_file(deeds_path, |_, _, _| Result::<_, Infallible>::Ok(()))
+        .unwrap();
+
+    let deeds_path = "tests/data/votings-all.deeds";
+    fs::remove_file(deeds_path).ok();
+    ledger2.export_all_to_file(deeds_path).unwrap();
 }
 
 mod libs {

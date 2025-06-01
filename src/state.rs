@@ -22,10 +22,10 @@
 // the License.
 
 use alloc::collections::BTreeMap;
-use std::mem;
 
-use amplify::confinement::{LargeOrdMap, SmallOrdMap};
-use sonicapi::{Api, ApiDescriptor, Articles, StateAtom, StateName};
+use aluvm::Lib;
+use amplify::confinement::{LargeOrdMap, SmallOrdMap, SmallOrdSet};
+use sonicapi::{Api, Articles, Semantics, StateAtom, StateName};
 use strict_encoding::{StrictDeserialize, StrictSerialize, TypeName};
 use strict_types::{StrictVal, TypeSystem};
 use ultrasonic::{AuthToken, CallError, CellAddr, Memory, Opid, StateCell, StateData, StateValue, VerifiedOperation};
@@ -66,7 +66,7 @@ impl EffectiveState {
             .verify(contract_id, genesis, &state.raw, articles)?;
 
         // We do not need state transition for genesis.
-        let _ = state.apply(verified, articles.apis());
+        let _ = state.apply(verified, articles.semantics());
 
         Ok(state)
     }
@@ -79,7 +79,7 @@ impl EffectiveState {
             let state = ProcessedState::with(&me.raw, api, articles.types());
             me.aux.insert(name.clone(), state);
         }
-        me.recompute(articles.apis());
+        me.recompute(articles.semantics());
         me
     }
 
@@ -95,18 +95,19 @@ impl EffectiveState {
     }
 
     /// Re-evaluates computable part of the state
-    pub fn recompute(&mut self, apis: &ApiDescriptor) {
-        self.main.aggregate(&apis.default);
+    pub fn recompute(&mut self, apis: &Semantics) {
+        self.main
+            .aggregate(&apis.default, &apis.api_libs, &apis.types);
         self.aux = bmap! {};
         for (name, api) in &apis.custom {
             let mut state = ProcessedState::default();
-            state.aggregate(api);
+            state.aggregate(api, &apis.api_libs, &apis.types);
             self.aux.insert(name.clone(), state);
         }
     }
 
     #[must_use]
-    pub(crate) fn apply(&mut self, op: VerifiedOperation, apis: &ApiDescriptor) -> Transition {
+    pub(crate) fn apply(&mut self, op: VerifiedOperation, apis: &Semantics) -> Transition {
         self.main.apply(&op, &apis.default, &apis.types);
         for (name, api) in &apis.custom {
             let state = self.aux.entry(name.clone()).or_default();
@@ -115,7 +116,7 @@ impl EffectiveState {
         self.raw.apply(op)
     }
 
-    pub(crate) fn rollback(&mut self, transition: Transition, apis: &ApiDescriptor) {
+    pub(crate) fn rollback(&mut self, transition: Transition, apis: &Semantics) {
         self.main.rollback(&transition, &apis.default, &apis.types);
         let mut count = 0usize;
         for (name, api) in &apis.custom {
@@ -199,16 +200,8 @@ impl RawState {
     pub(self) fn rollback(&mut self, transition: Transition) {
         let opid = transition.opid;
 
-        let mut immutable = mem::take(&mut self.global);
-        let mut owned = mem::take(&mut self.owned);
-        immutable = LargeOrdMap::from_iter_checked(immutable.into_iter().filter(|(addr, _)| addr.opid != opid));
-        owned = LargeOrdMap::from_iter_checked(owned.into_iter().filter(|(addr, _)| addr.opid != opid));
-        self.global = immutable;
-        self.owned = owned;
-
-        // TODO: Use `retain` instead of the above workaround once supported by amplify
-        // self.immutable.retain(|addr, _| addr.opid != opid);
-        // self.owned.retain(|addr, _| addr.opid != opid);
+        self.global.retain(|addr, _| addr.opid != opid);
+        self.owned.retain(|addr, _| addr.opid != opid);
 
         for (addr, cell) in transition.destroyed {
             self.owned
@@ -221,40 +214,55 @@ impl RawState {
 #[derive(Clone, Eq, PartialEq, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase"))]
 pub struct ProcessedState {
-    pub immutable: BTreeMap<StateName, BTreeMap<CellAddr, StateAtom>>,
-    pub destructible: BTreeMap<StateName, BTreeMap<CellAddr, StrictVal>>,
+    pub global: BTreeMap<StateName, BTreeMap<CellAddr, StateAtom>>,
+    pub owned: BTreeMap<StateName, BTreeMap<CellAddr, StrictVal>>,
     pub aggregated: BTreeMap<StateName, StrictVal>,
-    pub invalid_immutable: BTreeMap<CellAddr, StateData>,
-    pub invalid_destructible: BTreeMap<CellAddr, StateValue>,
+    pub invalid_global: BTreeMap<CellAddr, StateData>,
+    pub invalid_owned: BTreeMap<CellAddr, StateValue>,
 }
 
 impl ProcessedState {
     pub fn with(raw: &RawState, api: &Api, sys: &TypeSystem) -> Self {
         let mut me = ProcessedState::default();
         for (addr, state) in &raw.global {
-            me.process_immutable(*addr, state, api, sys);
+            me.process_global(*addr, state, api, sys);
         }
         for (addr, state) in &raw.owned {
-            me.process_destructible(*addr, state, api, sys);
+            me.process_owned(*addr, state, api, sys);
         }
         me
     }
 
-    pub fn immutable(&self, name: &StateName) -> Option<&BTreeMap<CellAddr, StateAtom>> { self.immutable.get(name) }
+    pub fn global(&self, name: &StateName) -> Option<&BTreeMap<CellAddr, StateAtom>> { self.global.get(name) }
 
-    pub fn destructible(&self, name: &StateName) -> Option<&BTreeMap<CellAddr, StrictVal>> {
-        self.destructible.get(name)
-    }
+    pub fn owned(&self, name: &StateName) -> Option<&BTreeMap<CellAddr, StrictVal>> { self.owned.get(name) }
 
-    pub(super) fn aggregate(&mut self, api: &Api) {
-        let empty = bmap![];
+    /// Computes aggregated state.
+    ///
+    /// Ignores cycle dependencies between aggregators; the computed state with them is not
+    /// produced.
+    pub(super) fn aggregate(&mut self, api: &Api, libs: &SmallOrdSet<Lib>, types: &TypeSystem) {
         self.aggregated = bmap! {};
-        for (name, aggregator) in api.aggregators() {
-            let val = aggregator.read(|state_name| match self.immutable(state_name) {
-                None => empty.values(),
-                Some(src) => src.values(),
-            });
-            self.aggregated.insert(name.clone(), val);
+        let mut computed = 0usize;
+        loop {
+            for (name, aggregator) in api.aggregators() {
+                if aggregator
+                    .depends_on()
+                    .any(|s| !self.global.contains_key(s) && !self.aggregated.contains_key(s))
+                {
+                    break;
+                }
+                let val = aggregator.aggregate(&self.global, &self.aggregated, libs, types);
+                if let Some(val) = val {
+                    if self.aggregated.insert(name.clone(), val).is_none() {
+                        computed += 1;
+                    }
+                }
+            }
+            if computed == 0 {
+                break;
+            }
+            computed = 0;
         }
     }
 
@@ -263,59 +271,56 @@ impl ProcessedState {
         let op = op.as_operation();
         for (no, state) in op.immutable_out.iter().enumerate() {
             let addr = CellAddr::new(opid, no as u16);
-            self.process_immutable(addr, state, api, sys);
+            self.process_global(addr, state, api, sys);
         }
         for input in &op.destructible_in {
-            for map in self.destructible.values_mut() {
+            for map in self.owned.values_mut() {
                 map.remove(&input.addr);
             }
         }
         for (no, state) in op.destructible_out.iter().enumerate() {
             let addr = CellAddr::new(opid, no as u16);
-            self.process_destructible(addr, state, api, sys);
+            self.process_owned(addr, state, api, sys);
         }
     }
 
     pub(self) fn rollback(&mut self, transition: &Transition, api: &Api, sys: &TypeSystem) {
         let opid = transition.opid;
 
-        self.immutable
+        self.global
             .values_mut()
             .for_each(|state| state.retain(|addr, _| addr.opid != opid));
-        self.destructible
+        self.owned
             .values_mut()
             .for_each(|state| state.retain(|addr, _| addr.opid != opid));
 
         for (addr, cell) in &transition.destroyed {
-            self.process_destructible(*addr, cell, api, sys);
+            self.process_owned(*addr, cell, api, sys);
         }
     }
 
-    fn process_immutable(&mut self, addr: CellAddr, state: &StateData, api: &Api, sys: &TypeSystem) {
-        match api.convert_immutable(state, sys) {
+    fn process_global(&mut self, addr: CellAddr, state: &StateData, api: &Api, sys: &TypeSystem) {
+        match api.convert_global(state, sys) {
             // This means this state is unrelated to this API
             Ok(None) => {}
             Ok(Some((name, atom))) => {
-                self.immutable.entry(name).or_default().insert(addr, atom);
+                self.global.entry(name).or_default().insert(addr, atom);
             }
             Err(_) => {
-                self.invalid_immutable.insert(addr, state.clone());
+                self.invalid_global.insert(addr, state.clone());
             }
         }
     }
 
-    fn process_destructible(&mut self, addr: CellAddr, state: &StateCell, api: &Api, sys: &TypeSystem) {
-        match api.convert_destructible(state.data, sys) {
+    fn process_owned(&mut self, addr: CellAddr, state: &StateCell, api: &Api, sys: &TypeSystem) {
+        match api.convert_owned(state.data, sys) {
             // This means this state is unrelated to this API
             Ok(None) => {}
             Ok(Some((name, atom))) => {
-                self.destructible
-                    .entry(name)
-                    .or_default()
-                    .insert(addr, atom);
+                self.owned.entry(name).or_default().insert(addr, atom);
             }
             Err(_) => {
-                self.invalid_destructible.insert(addr, state.data);
+                self.invalid_owned.insert(addr, state.data);
             }
         }
     }

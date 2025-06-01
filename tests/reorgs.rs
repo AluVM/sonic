@@ -35,7 +35,7 @@ use std::path::PathBuf;
 use aluvm::{CoreConfig, LibSite};
 use amplify::num::u256;
 use commit_verify::{Digest, Sha256};
-use hypersonic::{Api, DestructibleApi};
+use hypersonic::{Api, OwnedApi};
 use indexmap::{indexset, IndexSet};
 use petgraph::dot::{Config, Dot};
 use petgraph::graph::EdgeReference;
@@ -44,7 +44,7 @@ use petgraph::Graph;
 use rand::rng;
 use rand::seq::SliceRandom;
 use sonic_persist_fs::LedgerDir;
-use sonicapi::{IssueParams, Issuer, StateArithm, StateBuilder, StateConvertor};
+use sonicapi::{IssueParams, Issuer, Semantics, StateArithm, StateBuilder, StateConvertor};
 use sonix::dump_ledger;
 use strict_types::SemId;
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
@@ -125,6 +125,7 @@ fn codex() -> Codex {
         developer: Identity::default(),
         version: default!(),
         timestamp: 1732529307,
+        features: none!(),
         field_order: FIELD_ORDER_SECP,
         input_config: CoreConfig::default(),
         verification_config: CoreConfig::default(),
@@ -141,14 +142,12 @@ fn api() -> Api {
     let codex = codex();
 
     Api {
-        version: default!(),
         codex_id: codex.codex_id(),
-        developer: Identity::default(),
-        conforms: None,
+        conforms: none!(),
         default_call: None,
-        immutable: none!(),
-        destructible: tiny_bmap! {
-            vname!("amount") => DestructibleApi {
+        global: none!(),
+        owned: tiny_bmap! {
+            vname!("amount") => OwnedApi {
                 sem_id: types.get("Fungible.Amount"),
                 arithmetics: StateArithm::Fungible,
                 convertor: StateConvertor::TypedEncoder(u256::ZERO),
@@ -163,7 +162,6 @@ fn api() -> Api {
             vname!("transfer") => 1,
         },
         errors: Default::default(),
-        reserved: Default::default(),
     }
 }
 
@@ -172,7 +170,16 @@ fn setup(name: &str) -> LedgerDir {
     let codex = codex();
     let api = api();
 
-    let issuer = Issuer::new(codex, api, [libs::success()], types.type_system());
+    let semantics = Semantics {
+        version: 0,
+        default: api,
+        custom: none!(),
+        codex_libs: small_bset![libs::success()],
+        api_libs: none!(),
+        types: types.type_system(),
+    };
+    let issuer = Issuer::new(codex, semantics).unwrap();
+    issuer.save("tests/data/Test.issuer").ok();
 
     let seed = &[0xCA; 30][..];
     let mut auth = Sha256::digest(seed);
@@ -183,7 +190,7 @@ fn setup(name: &str) -> LedgerDir {
         AuthToken::from(buf)
     };
 
-    let mut issue = IssueParams::new_testnet("FungibleTest", Consensus::None);
+    let mut issue = IssueParams::new_testnet(issuer.codex_id(), "FungibleTest", Consensus::None);
     for _ in 0u16..10 {
         issue.push_owned_unlocked("amount", next_auth(), svnum!(100u64));
         issue.push_owned_unlocked("amount", next_auth(), svnum!(100u64));
@@ -198,7 +205,7 @@ fn setup(name: &str) -> LedgerDir {
     fs::create_dir_all(&contract_path).expect("Unable to create a contract folder");
     let mut ledger = LedgerDir::new(articles, contract_path).expect("Can't issue a contract");
 
-    let owned = &ledger.state().main.destructible;
+    let owned = &ledger.state().main.owned;
     assert_eq!(owned.len(), 1);
     let owned = owned.get("amount").unwrap();
     assert_eq!(owned.len(), 20);
@@ -230,7 +237,7 @@ fn setup(name: &str) -> LedgerDir {
         prev = new_prev;
     }
 
-    let owned = &ledger.state().main.destructible;
+    let owned = &ledger.state().main.owned;
     assert_eq!(owned.len(), 1);
     assert_eq!(prev.len(), 20);
     let owned = owned.get("amount").unwrap();
@@ -320,7 +327,7 @@ fn check_rollback(ledger: LedgerDir, mut removed: IndexSet<Operation>) -> IndexS
     }
 
     // Now we check that no outputs of the rolled-back ops participate in the valid state
-    let state = ledger.state().main.destructible.get("amount").unwrap();
+    let state = ledger.state().main.owned.get("amount").unwrap();
     eprintln!("Not rolled back outputs:");
     for addr in state.keys() {
         assert!(!removed_opids.contains(&addr.opid));

@@ -21,20 +21,20 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+use std::convert::Infallible;
 use std::ops::{Deref, DerefMut};
 
-use aluvm::LibSite;
 use amplify::confinement::SmallVec;
 use amplify::num::u256;
 use chrono::{DateTime, Utc};
 use strict_encoding::TypeName;
 use strict_types::{StrictVal, TypeSystem};
 use ultrasonic::{
-    fe256, AuthToken, CallId, CellAddr, CodexId, Consensus, ContractId, ContractMeta, ContractName, Genesis, Identity,
-    Input, Issue, Operation, StateCell, StateData, StateValue,
+    fe256, AuthToken, CallId, CellAddr, CellLock, CodexId, Consensus, ContractId, ContractMeta, ContractName, Genesis,
+    Identity, Input, Issue, Operation, StateCell, StateData, StateValue,
 };
 
-use crate::{Api, ApiDescriptor, Articles, DataCell, Issuer, MethodName, StateAtom, StateName};
+use crate::{Api, Articles, DataCell, Issuer, IssuerId, MethodName, StateAtom, StateName};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -78,9 +78,64 @@ impl CoreParams {
     }
 }
 
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase", untagged))]
+pub enum VersionRange {
+    Range { min: u16, max: u16 },
+    After { min: u16 },
+    Before { max: u16 },
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, From)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase", untagged))]
+pub enum IssuerSpec {
+    #[from]
+    Exact(IssuerId),
+
+    #[from]
+    Latest(CodexId),
+
+    #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+    ExactVer { codex_id: CodexId, version: u16 },
+
+    #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
+    VersionRange { codex_id: CodexId, version: VersionRange },
+}
+
+impl IssuerSpec {
+    pub fn check(&self, issuer_id: IssuerId) -> bool {
+        match self {
+            IssuerSpec::Exact(id) => *id == issuer_id,
+            IssuerSpec::Latest(codex_id) => *codex_id == issuer_id.codex_id,
+            IssuerSpec::ExactVer { codex_id, version } => {
+                *codex_id == issuer_id.codex_id && *version == issuer_id.version
+            }
+            IssuerSpec::VersionRange { codex_id, version: VersionRange::After { min } } => {
+                *codex_id == issuer_id.codex_id && issuer_id.version >= *min
+            }
+            IssuerSpec::VersionRange { codex_id, version: VersionRange::Before { max } } => {
+                *codex_id == issuer_id.codex_id && issuer_id.version < *max
+            }
+            IssuerSpec::VersionRange { codex_id, version: VersionRange::Range { min, max } } => {
+                *codex_id == issuer_id.codex_id && (*min..*max).contains(&issuer_id.version)
+            }
+        }
+    }
+
+    pub fn codex_id(&self) -> CodexId {
+        match self {
+            IssuerSpec::Exact(id) => id.codex_id,
+            IssuerSpec::Latest(codex_id) => *codex_id,
+            IssuerSpec::ExactVer { codex_id, .. } => *codex_id,
+            IssuerSpec::VersionRange { codex_id, .. } => *codex_id,
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct IssueParams {
+    pub issuer: IssuerSpec,
     pub name: TypeName,
     pub consensus: Consensus,
     pub testnet: bool,
@@ -100,8 +155,9 @@ impl DerefMut for IssueParams {
 }
 
 impl IssueParams {
-    pub fn new_testnet(name: impl Into<TypeName>, consensus: Consensus) -> Self {
+    pub fn new_testnet(codex_id: CodexId, name: impl Into<TypeName>, consensus: Consensus) -> Self {
         Self {
+            issuer: IssuerSpec::Latest(codex_id),
             name: name.into(),
             consensus,
             testnet: true,
@@ -129,6 +185,10 @@ impl Issuer {
     }
 
     pub fn issue(self, params: IssueParams) -> Articles {
+        if !params.issuer.check(self.issuer_id()) {
+            panic!("issuer version does not match requested version");
+        }
+
         let mut builder = self.start_issue(params.core.method, params.consensus, params.testnet);
 
         for NamedState { name, state } in params.core.global {
@@ -155,7 +215,7 @@ impl IssueBuilder {
     pub fn append(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
         self.builder = self
             .builder
-            .add_immutable(name, data, raw, &self.issuer.api, &self.issuer.types);
+            .add_global(name, data, raw, self.issuer.default_api(), self.issuer.types());
         self
     }
 
@@ -164,11 +224,11 @@ impl IssueBuilder {
         name: impl Into<StateName>,
         auth: AuthToken,
         data: StrictVal,
-        lock: Option<LibSite>,
+        lock: Option<CellLock>,
     ) -> Self {
         self.builder = self
             .builder
-            .add_destructible(name, auth, data, lock, &self.issuer.api, &self.issuer.types);
+            .add_owned(name, auth, data, lock, self.issuer.default_api(), self.issuer.types());
         self
     }
 
@@ -177,19 +237,15 @@ impl IssueBuilder {
             consensus: self.consensus,
             testnet: self.testnet,
             timestamp,
+            features: default!(),
             name: ContractName::Named(name.into()),
             issuer: Identity::default(),
         };
-        let genesis = self.builder.issue_genesis(self.issuer.codex.codex_id());
-        let issue = Issue { version: default!(), meta, codex: self.issuer.codex, genesis };
-        let apis = ApiDescriptor {
-            default: self.issuer.api,
-            custom: none!(),
-            libs: self.issuer.libs,
-            types: self.issuer.types,
-            sig: None,
-        };
-        Articles::with(apis, issue).expect("broken issue builder")
+        let genesis = self.builder.issue_genesis(self.issuer.codex_id());
+        let (codex, semantics) = self.issuer.dismember();
+        let issue = Issue { version: default!(), meta, codex, genesis };
+        Articles::with(semantics, issue, None, |_, _, _| -> Result<_, Infallible> { unreachable!() })
+            .expect("broken issue builder")
     }
 }
 
@@ -203,7 +259,7 @@ pub struct Builder {
 impl Builder {
     pub fn new(call_id: CallId) -> Self { Builder { call_id, destructible_out: none!(), immutable_out: none!() } }
 
-    pub fn add_immutable(
+    pub fn add_global(
         mut self,
         name: impl Into<StateName>,
         data: StrictVal,
@@ -211,21 +267,22 @@ impl Builder {
         api: &Api,
         sys: &TypeSystem,
     ) -> Self {
+        let name = name.into();
         let data = api
-            .build_immutable(name, data, raw, sys)
-            .expect("invalid immutable state");
+            .build_immutable(name.clone(), data, raw, sys)
+            .unwrap_or_else(|e| panic!("invalid immutable state '{name}'; {e}"));
         self.immutable_out
             .push(data)
             .expect("too many state elements");
         self
     }
 
-    pub fn add_destructible(
+    pub fn add_owned(
         mut self,
         name: impl Into<StateName>,
         auth: AuthToken,
         data: StrictVal,
-        lock: Option<LibSite>,
+        lock: Option<CellLock>,
         api: &Api,
         sys: &TypeSystem,
     ) -> Self {
@@ -245,6 +302,7 @@ impl Builder {
             codex_id,
             call_id: self.call_id,
             nonce: fe256::from(u256::ZERO),
+            blank0: zero!(),
             blank1: zero!(),
             blank2: zero!(),
             destructible_out: self.destructible_out,
@@ -265,23 +323,23 @@ impl<'c> BuilderRef<'c> {
         BuilderRef { type_system: sys, api, inner: Builder::new(call_id) }
     }
 
-    pub fn add_immutable(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
+    pub fn add_global(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
         self.inner = self
             .inner
-            .add_immutable(name, data, raw, self.api, self.type_system);
+            .add_global(name, data, raw, self.api, self.type_system);
         self
     }
 
-    pub fn add_destructible(
+    pub fn add_owned(
         mut self,
         name: impl Into<StateName>,
         auth: AuthToken,
         data: StrictVal,
-        lock: Option<LibSite>,
+        lock: Option<CellLock>,
     ) -> Self {
         self.inner = self
             .inner
-            .add_destructible(name, auth, data, lock, self.api, self.type_system);
+            .add_owned(name, auth, data, lock, self.api, self.type_system);
         self
     }
 
@@ -307,7 +365,7 @@ impl OpBuilder {
         }
     }
 
-    pub fn add_immutable(
+    pub fn add_global(
         mut self,
         name: impl Into<StateName>,
         data: StrictVal,
@@ -315,22 +373,20 @@ impl OpBuilder {
         api: &Api,
         sys: &TypeSystem,
     ) -> Self {
-        self.inner = self.inner.add_immutable(name, data, raw, api, sys);
+        self.inner = self.inner.add_global(name, data, raw, api, sys);
         self
     }
 
-    pub fn add_destructible(
+    pub fn add_owned(
         mut self,
         name: impl Into<StateName>,
         auth: AuthToken,
         data: StrictVal,
-        lock: Option<LibSite>,
+        lock: Option<CellLock>,
         api: &Api,
         sys: &TypeSystem,
     ) -> Self {
-        self.inner = self
-            .inner
-            .add_destructible(name, auth, data, lock, api, sys);
+        self.inner = self.inner.add_owned(name, auth, data, lock, api, sys);
         self
     }
 
@@ -373,6 +429,7 @@ impl OpBuilder {
             contract_id: self.contract_id,
             call_id: self.inner.call_id,
             nonce: fe256::from(u256::ZERO),
+            witness: none!(),
             destructible_in: self.destructible_in,
             immutable_in: self.immutable_in,
             destructible_out: self.inner.destructible_out,
@@ -394,23 +451,23 @@ impl<'c> OpBuilderRef<'c> {
         Self { api, type_system: sys, inner }
     }
 
-    pub fn add_immutable(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
+    pub fn add_global(mut self, name: impl Into<StateName>, data: StrictVal, raw: Option<StrictVal>) -> Self {
         self.inner = self
             .inner
-            .add_immutable(name, data, raw, self.api, self.type_system);
+            .add_global(name, data, raw, self.api, self.type_system);
         self
     }
 
-    pub fn add_destructible(
+    pub fn add_owned(
         mut self,
         name: impl Into<StateName>,
         auth: AuthToken,
         data: StrictVal,
-        lock: Option<LibSite>,
+        lock: Option<CellLock>,
     ) -> Self {
         self.inner = self
             .inner
-            .add_destructible(name, auth, data, lock, self.api, self.type_system);
+            .add_owned(name, auth, data, lock, self.api, self.type_system);
         self
     }
 
@@ -437,4 +494,121 @@ impl<'c> OpBuilderRef<'c> {
     }
 
     pub fn finalize(self) -> Operation { self.inner.finalize() }
+}
+
+#[cfg(test)]
+mod test {
+    #![cfg_attr(coverage_nightly, coverage(off))]
+
+    use core::str::FromStr;
+
+    use super::*;
+    use crate::ApisChecksum;
+
+    #[test]
+    fn issuer_spec_yaml_latest() {
+        let val = IssuerSpec::Latest(strict_dumb!());
+        let s = "AAAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA#origami-bruno-life
+";
+        assert_eq!(serde_yaml::to_string(&val).unwrap(), s);
+        assert_eq!(serde_yaml::from_str::<IssuerSpec>(s).unwrap(), val);
+    }
+
+    #[test]
+    fn issuer_spec_yaml_exact() {
+        let val = IssuerSpec::Exact(strict_dumb!());
+        let s = "\
+codexId: AAAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA#origami-bruno-life
+version: 0
+checksum: AAAAAA
+";
+        assert_eq!(serde_yaml::to_string(&val).unwrap(), s);
+        assert_eq!(serde_yaml::from_str::<IssuerSpec>(s).unwrap(), val);
+    }
+
+    #[test]
+    fn issuer_spec_yaml_ver_nosum() {
+        let val = IssuerSpec::ExactVer { codex_id: strict_dumb!(), version: 0 };
+        let s = "\
+codexId: AAAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA#origami-bruno-life
+version: 0
+";
+        assert_eq!(serde_yaml::to_string(&val).unwrap(), s);
+        assert_eq!(serde_yaml::from_str::<IssuerSpec>(s).unwrap(), val);
+    }
+
+    #[test]
+    fn issuer_spec_yaml_min() {
+        let val = IssuerSpec::VersionRange {
+            codex_id: strict_dumb!(),
+            version: VersionRange::After { min: 0 },
+        };
+        let s = "\
+codexId: AAAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA#origami-bruno-life
+version:
+  min: 0
+";
+        assert_eq!(serde_yaml::to_string(&val).unwrap(), s);
+        assert_eq!(serde_yaml::from_str::<IssuerSpec>(s).unwrap(), val);
+    }
+
+    #[test]
+    fn issuer_spec_yaml_max() {
+        let val = IssuerSpec::VersionRange {
+            codex_id: strict_dumb!(),
+            version: VersionRange::Before { max: 1 },
+        };
+        let s = "\
+codexId: AAAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA#origami-bruno-life
+version:
+  max: 1
+";
+        assert_eq!(serde_yaml::to_string(&val).unwrap(), s);
+        assert_eq!(serde_yaml::from_str::<IssuerSpec>(s).unwrap(), val);
+    }
+
+    #[test]
+    fn issuer_spec_yaml_range() {
+        let val = IssuerSpec::VersionRange {
+            codex_id: strict_dumb!(),
+            version: VersionRange::Range { min: 0, max: 1 },
+        };
+        let s = "\
+codexId: AAAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA-AAAAAAA#origami-bruno-life
+version:
+  min: 0
+  max: 1
+";
+        assert_eq!(serde_yaml::to_string(&val).unwrap(), s);
+        assert_eq!(serde_yaml::from_str::<IssuerSpec>(s).unwrap(), val);
+    }
+
+    #[test]
+    fn issuer_display_fromstr() {
+        let s = "nmThRWDr-0hOJgJt-OFVCZTA-XX8aOWj-bkqWzK7-_jAtdhQ/0#NRIsWA";
+        let issuer_id = IssuerId::from_str(s).unwrap();
+        assert_eq!(issuer_id.to_string(), s);
+        assert_eq!(issuer_id.codex_id, CodexId::from_str(s.split_once("/").unwrap().0).unwrap());
+        assert_eq!(issuer_id.checksum, ApisChecksum::from_str(s.split_once("#").unwrap().1).unwrap());
+        assert_eq!(issuer_id.version, 0);
+    }
+
+    #[test]
+    fn issuer_check() {
+        let s = "nmThRWDr-0hOJgJt-OFVCZTA-XX8aOWj-bkqWzK7-_jAtdhQ/0#NRIsWA";
+        let issuer_id = IssuerId::from_str(s).unwrap();
+        assert!(IssuerSpec::Exact(issuer_id).check(issuer_id));
+
+        let mut changed_ver = issuer_id;
+        changed_ver.version += 1;
+        assert!(!IssuerSpec::Exact(issuer_id).check(changed_ver));
+        assert!(IssuerSpec::Latest(issuer_id.codex_id).check(changed_ver));
+        assert!(!IssuerSpec::ExactVer { codex_id: issuer_id.codex_id, version: issuer_id.version }.check(changed_ver));
+
+        let mut changed_sum = issuer_id;
+        changed_sum.checksum = ApisChecksum::from_str("rLAuRQ").unwrap();
+        assert!(!IssuerSpec::Exact(issuer_id).check(changed_sum));
+        assert!(IssuerSpec::Latest(issuer_id.codex_id).check(changed_sum));
+        assert!(IssuerSpec::ExactVer { codex_id: issuer_id.codex_id, version: issuer_id.version }.check(changed_sum));
+    }
 }

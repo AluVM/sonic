@@ -25,21 +25,20 @@ use alloc::collections::BTreeSet;
 use core::borrow::Borrow;
 use std::io;
 
-use amplify::hex::ToHex;
 use amplify::MultiError;
+use commit_verify::{ReservedBytes, StrictHash};
 use indexmap::IndexSet;
 use sonic_callreq::MethodName;
-use sonicapi::{Api, ApiDescriptor, ArticlesError, NamedState, OpBuilder, SigValidator};
+use sonicapi::{Api, NamedState, OpBuilder, SemanticError, Semantics, SigBlob};
 use strict_encoding::{
-    DecodeError, ReadRaw, SerializeError, StrictDecode, StrictEncode, StrictReader, StrictWriter, WriteRaw,
+    DecodeError, ReadRaw, SerializeError, StrictDecode, StrictEncode, StrictReader, StrictWriter, TypedRead, WriteRaw,
 };
-use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Issue, Operation, Opid, VerifiedOperation};
+use ultrasonic::{AuthToken, CallError, CellAddr, ContractId, Identity, Issue, Operation, Opid, VerifiedOperation};
 
 use crate::deed::{CallParams, DeedBuilder};
 use crate::{Articles, EffectiveState, IssueError, ProcessedState, Stock, Transition};
 
-pub const LEDGER_MAGIC_NUMBER: [u8; 8] = *b"DEEDLDGR";
-pub const LEDGER_VERSION: [u8; 2] = [0x00, 0x01];
+pub const DEEDS_VERSION: u16 = 0;
 
 /// Contract with all its state and operations, supporting updates and rollbacks.
 // We need this structure to hide internal persistence methods and not to expose them.
@@ -278,38 +277,38 @@ impl<S: Stock> Ledger<S> {
         chain.into_iter()
     }
 
-    pub fn export_all(&self, mut writer: StrictWriter<impl WriteRaw>) -> io::Result<()> {
-        // Write articles
-        writer = self.0.articles().strict_encode(writer)?;
-        // Stream operations
-        for (_, op) in self.0.operations() {
-            writer = op.strict_encode(writer)?;
-        }
-        Ok(())
+    /// Exports contract with all known operations.
+    pub fn export_all(&self, writer: StrictWriter<impl WriteRaw>) -> io::Result<()> {
+        self.export_internal(self.0.operation_count() as u32, writer, |_| true, |_, _, w| Ok(w))
     }
 
+    /// Exports contract with all known operations with some auxiliary information returned by
+    /// `aux`.
+    pub fn export_all_aux<W: WriteRaw>(
+        &self,
+        writer: StrictWriter<W>,
+        aux: impl FnMut(Opid, &Operation, StrictWriter<W>) -> io::Result<StrictWriter<W>>,
+    ) -> io::Result<()> {
+        self.export_internal(self.0.operation_count() as u32, writer, |_| true, aux)
+    }
+
+    /// Export a part of a contract history: a graph between a set of terminals and genesis.
     pub fn export(
         &self,
         terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
-        mut writer: StrictWriter<impl WriteRaw>,
+        writer: StrictWriter<impl WriteRaw>,
     ) -> io::Result<()> {
-        // This is compatible with BinFile
-        writer = LEDGER_MAGIC_NUMBER.strict_encode(writer)?;
-        // Version
-        writer = LEDGER_VERSION.strict_encode(writer)?;
-        writer = self.contract_id().strict_encode(writer)?;
         self.export_aux(terminals, writer, |_, _, w| Ok(w))
     }
 
-    // TODO: (v0.13) Return statistics
+    /// Exports contract and operations to a stream, extending operation data with some auxiliary
+    /// information returned by `aux`.
     pub fn export_aux<W: WriteRaw>(
         &self,
         terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
-        mut writer: StrictWriter<W>,
-        mut aux: impl FnMut(Opid, &Operation, StrictWriter<W>) -> io::Result<StrictWriter<W>>,
+        writer: StrictWriter<W>,
+        aux: impl FnMut(Opid, &Operation, StrictWriter<W>) -> io::Result<StrictWriter<W>>,
     ) -> io::Result<()> {
-        let contract_id = self.contract_id();
-
         let mut queue = terminals
             .into_iter()
             .map(|terminal| self.0.state().addr(*terminal.borrow()).opid)
@@ -331,17 +330,17 @@ impl<S: Stock> Ledger<S> {
         // Include all operations defining published state
         let state = self.state();
         let mut collect = |api: &Api, state: &ProcessedState| {
-            for (state_name, immutable) in &api.immutable {
-                if immutable.published {
-                    let Some(cells) = state.immutable.get(state_name) else {
+            for (state_name, owned) in &api.global {
+                if owned.published {
+                    let Some(cells) = state.global.get(state_name) else {
                         continue;
                     };
                     opids.extend(cells.keys().map(|addr| addr.opid));
                 }
             }
         };
-        collect(&articles.apis().default, &state.main);
-        for (api_name, api) in &articles.apis().custom {
+        collect(&articles.semantics().default, &state.main);
+        for (api_name, api) in &articles.semantics().custom {
             let Some(state) = state.aux.get(api_name) else {
                 continue;
             };
@@ -349,17 +348,7 @@ impl<S: Stock> Ledger<S> {
         }
         opids.remove(&genesis_opid);
 
-        // Write articles
-        writer = articles.strict_encode(writer)?;
-        writer = aux(genesis_opid, &articles.genesis().to_operation(contract_id), writer)?;
-        // Stream operations
-        for (opid, op) in self.0.operations() {
-            if !opids.remove(&opid) {
-                continue;
-            }
-            writer = op.strict_encode(writer)?;
-            writer = aux(opid, &op, writer)?;
-        }
+        self.export_internal(opids.len() as u32, writer, |opid| opids.remove(opid), aux)?;
 
         debug_assert!(
             opids.is_empty(),
@@ -374,56 +363,88 @@ impl<S: Stock> Ledger<S> {
         Ok(())
     }
 
-    pub fn merge_articles<V: SigValidator>(
-        &mut self,
-        new_articles: Articles,
-        sig_validator: V,
-    ) -> Result<(), MultiError<ArticlesError, S::Error>> {
-        self.0.update_articles(|articles| {
-            articles.merge(new_articles, sig_validator)?;
-            Ok(())
-        })
+    /// Exports only operations for which `should_include` returns `true`.
+    ///
+    /// # Nota bene
+    ///
+    /// Does not write the contract id.
+    pub fn export_internal<W: WriteRaw>(
+        &self,
+        count: u32,
+        mut writer: StrictWriter<W>,
+        mut should_include: impl FnMut(&Opid) -> bool,
+        mut aux: impl FnMut(Opid, &Operation, StrictWriter<W>) -> io::Result<StrictWriter<W>>,
+    ) -> io::Result<()> {
+        let articles = self.articles();
+        let genesis_opid = articles.genesis_opid();
+
+        // Write version number
+        writer = (DEEDS_VERSION as u8).strict_encode(writer)?;
+        // Write contract id
+        let contract_id = self.contract_id();
+        writer = self.contract_id().strict_encode(writer)?;
+        // Write an empty extension block
+        writer = 0u8.strict_encode(writer)?;
+        // Write articles
+        writer = articles.strict_encode(writer)?;
+        writer = aux(genesis_opid, &articles.genesis().to_operation(contract_id), writer)?;
+        // Write no of operations
+        writer = count.strict_encode(writer)?;
+        // Stream operations
+        for (opid, op) in self.0.operations() {
+            if !should_include(&opid) {
+                continue;
+            }
+            writer = op.strict_encode(writer)?;
+            writer = aux(opid, &op, writer)?;
+        }
+        Ok(())
     }
 
-    pub fn accept(
+    pub fn upgrade_apis(&mut self, new_articles: Articles) -> Result<bool, MultiError<SemanticError, S::Error>> {
+        self.0
+            .update_articles(|articles| articles.upgrade_apis(new_articles))
+    }
+
+    pub fn accept<E>(
         &mut self,
         reader: &mut StrictReader<impl ReadRaw>,
-        sig_validator: impl SigValidator,
+        sig_validator: impl FnOnce(StrictHash, &Identity, &SigBlob) -> Result<(), E>,
     ) -> Result<(), MultiError<AcceptError, S::Error>> {
         // We need this closure to avoid multiple `map_err`.
-        (|| -> Result<(), AcceptError> {
-            let magic_bytes = <[u8; 8]>::strict_decode(reader)?;
-            if magic_bytes != LEDGER_MAGIC_NUMBER {
-                return Err(DecodeError::DataIntegrityError(format!(
-                    "wrong contract ledger magic bytes {}",
-                    magic_bytes.to_hex()
-                ))
-                .into());
-            }
-            let version = <[u8; 2]>::strict_decode(reader)?;
-            if version != LEDGER_VERSION {
-                return Err(DecodeError::DataIntegrityError(format!(
-                    "unsupported contract ledger version {}",
-                    u16::from_be_bytes(version)
-                ))
-                .into());
-            }
+        let count = (|| -> Result<u32, AcceptError> {
+            // Check version number
+            let _ = ReservedBytes::<1, { DEEDS_VERSION as u8 }>::strict_decode(reader)?;
 
             let contract_id = ContractId::strict_decode(reader)?;
-            let apis = ApiDescriptor::strict_decode(reader)?;
-            let issue = Issue::strict_decode(reader)?;
-            let articles = Articles::with(apis, issue)?;
-            if articles.contract_id() != contract_id {
-                return Err(AcceptError::Articles(ArticlesError::ContractMismatch));
+
+            // Read and ignore the extension block
+            let ext_blocks = u8::strict_decode(reader)?;
+            for _ in 0..ext_blocks {
+                let len = u16::strict_decode(reader)?;
+                let r = unsafe { reader.raw_reader() };
+                let _ = r.read_raw::<{ u16::MAX as usize }>(len as usize)?;
             }
 
-            self.merge_articles(articles, sig_validator)
+            // Read articles
+            let semantics = Semantics::strict_decode(reader)?;
+            let sig = Option::<SigBlob>::strict_decode(reader)?;
+            let issue = Issue::strict_decode(reader)?;
+            let articles = Articles::with(semantics, issue, sig, sig_validator)?;
+            if articles.contract_id() != contract_id {
+                return Err(AcceptError::Articles(SemanticError::ContractMismatch));
+            }
+
+            self.upgrade_apis(articles)
                 .map_err(|e| AcceptError::Persistence(e.to_string()))?;
-            Ok(())
+
+            let count = u32::strict_decode(reader)?;
+            Ok(count)
         })()
         .map_err(MultiError::A)?;
 
-        loop {
+        // We need to account for genesis, which is not included in the `count`
+        for _ in 0..=count {
             let op = match Operation::strict_decode(reader) {
                 Ok(operation) => operation,
                 Err(DecodeError::Io(e)) if e.kind() == io::ErrorKind::UnexpectedEof => break,
@@ -431,6 +452,9 @@ impl<S: Stock> Ledger<S> {
             };
             self.apply_verify(op, false)?;
         }
+        // Here we do not check for the end of the stream,
+        // so in the future we can have arbitrary extensions
+        // put here with no backward compatibility issues.
         self.commit_transaction();
         Ok(())
     }
@@ -451,7 +475,7 @@ impl<S: Stock> Ledger<S> {
                 }
             }
             self.0.update_state(|state, articles| {
-                state.rollback(transition, articles.apis());
+                state.rollback(transition, articles.semantics());
             })?;
             self.0.mark_invalid(opid);
         }
@@ -523,7 +547,7 @@ impl<S: Stock> Ledger<S> {
         force: bool,
     ) -> Result<bool, MultiError<AcceptError, S::Error>> {
         if operation.contract_id != self.contract_id() {
-            return Err(MultiError::A(AcceptError::Articles(ArticlesError::ContractMismatch)));
+            return Err(MultiError::A(AcceptError::Articles(SemanticError::ContractMismatch)));
         }
 
         let opid = operation.opid();
@@ -581,7 +605,7 @@ impl<S: Stock> Ledger<S> {
 
         let transition = self
             .0
-            .update_state(|state, articles| state.apply(operation, articles.apis()))?;
+            .update_state(|state, articles| state.apply(operation, articles.semantics()))?;
 
         self.0.add_transition(opid, &transition);
         self.0.mark_valid(opid);
@@ -598,7 +622,7 @@ pub enum AcceptError {
     Io(io::Error),
 
     #[from]
-    Articles(ArticlesError),
+    Articles(SemanticError),
 
     #[from]
     Verify(CallError),
@@ -610,4 +634,52 @@ pub enum AcceptError {
     Serialize(SerializeError),
 
     Persistence(String),
+
+    #[cfg(feature = "binfile")]
+    #[display("Invalid file format")]
+    InvalidFileFormat,
 }
+
+#[cfg(feature = "binfile")]
+mod _fs {
+    use std::path::Path;
+
+    use binfile::BinFile;
+    use strict_encoding::{StreamReader, StreamWriter};
+
+    use super::*;
+
+    pub const DEEDS_MAGIC_NUMBER: u64 = u64::from_be_bytes(*b"DEEDLDGR");
+
+    impl<S: Stock> Ledger<S> {
+        pub fn export_all_to_file(&self, output: impl AsRef<Path>) -> io::Result<()> {
+            let file = BinFile::<DEEDS_MAGIC_NUMBER, DEEDS_VERSION>::create_new(output)?;
+            let writer = StrictWriter::with(StreamWriter::new::<{ usize::MAX }>(file));
+            self.export_all(writer)
+        }
+
+        pub fn export_to_file(
+            &self,
+            terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
+            output: impl AsRef<Path>,
+        ) -> io::Result<()> {
+            let file = BinFile::<DEEDS_MAGIC_NUMBER, DEEDS_VERSION>::create_new(output)?;
+            let writer = StrictWriter::with(StreamWriter::new::<{ usize::MAX }>(file));
+            self.export(terminals, writer)
+        }
+
+        pub fn accept_from_file<E>(
+            &mut self,
+            input: impl AsRef<Path>,
+            sig_validator: impl FnOnce(StrictHash, &Identity, &SigBlob) -> Result<(), E>,
+        ) -> Result<(), MultiError<AcceptError, S::Error>> {
+            let file = BinFile::<DEEDS_MAGIC_NUMBER, DEEDS_VERSION>::open(input)
+                .map_err(|_| AcceptError::InvalidFileFormat)
+                .map_err(MultiError::from_a)?;
+            let mut reader = StrictReader::with(StreamReader::new::<{ usize::MAX }>(file));
+            self.accept(&mut reader, sig_validator)
+        }
+    }
+}
+#[cfg(feature = "binfile")]
+pub use _fs::*;

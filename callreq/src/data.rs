@@ -21,9 +21,9 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
+use core::convert::Infallible;
 use core::fmt::{self, Display, Formatter};
 use core::str::FromStr;
-use std::convert::Infallible;
 
 use amplify::confinement::{ConfinedVec, TinyBlob};
 use baid64::Baid64ParseError;
@@ -38,23 +38,20 @@ pub type StateName = VariantName;
 pub type MethodName = VariantName;
 
 /// Combination of a method name and an optional state name used in API requests.
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 #[derive(StrictType, StrictDumb, StrictEncode, StrictDecode)]
 #[strict_type(lib = LIB_NAME_SONIC)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(rename_all = "camelCase", bound = ""))]
 pub struct CallState {
     pub method: MethodName,
-    pub destructible: Option<StateName>,
+    pub owned: Option<StateName>,
 }
 
 impl CallState {
-    pub fn new(method: impl Into<MethodName>) -> Self { Self { method: method.into(), destructible: None } }
+    pub fn new(method: impl Into<MethodName>) -> Self { Self { method: method.into(), owned: None } }
 
-    pub fn with(method: impl Into<MethodName>, destructible: impl Into<StateName>) -> Self {
-        Self {
-            method: method.into(),
-            destructible: Some(destructible.into()),
-        }
+    pub fn with(method: impl Into<MethodName>, owned: impl Into<StateName>) -> Self {
+        Self { method: method.into(), owned: Some(owned.into()) }
     }
 }
 

@@ -22,12 +22,11 @@
 // the License.
 
 use std::convert::Infallible;
-use std::error::Error;
 use std::fs::File;
 use std::path::PathBuf;
 
 use clap::ValueHint;
-use hypersonic::{AuthToken, CallParams, Identity, IssueParams, Issuer, SigBlob, SigValidator};
+use hypersonic::{AuthToken, CallParams, IssueParams, Issuer};
 use sonic_persist_fs::LedgerDir;
 
 use crate::dump::dump_ledger;
@@ -115,7 +114,7 @@ impl Cmd {
 }
 
 fn issue(issuer_file: PathBuf, form: PathBuf, output: Option<PathBuf>) -> anyhow::Result<()> {
-    let issuer = Issuer::load(issuer_file)?;
+    let issuer = Issuer::load(issuer_file, |_, _, _| -> Result<_, Infallible> { todo!("signature validation") })?;
     let file = File::open(&form)?;
     let params = serde_yaml::from_reader::<_, IssueParams>(file)?;
 
@@ -147,21 +146,14 @@ fn call(dir: PathBuf, form: PathBuf) -> anyhow::Result<()> {
 }
 
 fn export(dir: PathBuf, terminals: impl IntoIterator<Item = AuthToken>, output: PathBuf) -> anyhow::Result<()> {
-    let mut ledger = LedgerDir::load(dir)?;
+    let ledger = LedgerDir::load(dir)?;
     ledger.export_to_file(terminals, output)?;
     Ok(())
 }
 
 fn accept(dir: PathBuf, input: PathBuf) -> anyhow::Result<()> {
-    // TODO: (v0.13) Use some real signature validator
-    pub struct DumbValidator;
-    impl SigValidator for DumbValidator {
-        fn validate_sig(&self, _: impl Into<[u8; 32]>, _: &Identity, _: &SigBlob) -> Result<u64, impl Error> {
-            Result::<_, Infallible>::Ok(0)
-        }
-    }
     let mut ledger = LedgerDir::load(dir)?;
-    ledger.accept_from_file(input, DumbValidator)?;
+    ledger.accept_from_file(input, |_, _, _| Err("signature validation is not implemented yet"))?;
     Ok(())
 }
 

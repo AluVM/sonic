@@ -25,14 +25,14 @@ sonic-api = { version = "0.12.0-rc.1", path = "api" }
 sonic-callreq = { version = "0.12.0-rc.1", path = "callreq" }
 sonic-persist-fs = { version = "0.12.0-rc.1", path = "persistence/fs" }
 hypersonic = { version = "0.12.0-rc.1", path = "." }
-aora = ">=0.6.3"
+aora = ">=0.6.4"
 binfile = "0.2.0"
 baid64 = "0.4.1"
 indexmap = "2.9.0"
 chrono = "0.4.38"
 serde = { version = "1", features = ["derive"] }
-toml = "0.8.22"
 serde_yaml = "0.9.34"
+toml = "0.8.22"
 
 [package]
 name = "hypersonic"
@@ -74,6 +74,7 @@ aluvm.workspace = true
 ultrasonic.workspace = true
 sonic-api.workspace = true
 sonic-callreq.workspace = true
+binfile = { workspace = true, optional = true }
 indexmap.workspace = true
 serde = { workspace = true, optional = true }
 
@@ -87,7 +88,7 @@ petgraph = "0.8.1"
 default = ["std"]
 all = ["stl", "vesper", "binfile", "std", "serde"]
 
-binfile = ["sonic-api/binfile"]
+binfile = ["sonic-api/binfile", "dep:binfile"]
 std = ["sonic-api/std", "sonic-callreq/std"]
 vesper = ["ultrasonic/vesper"]
 stl = ["commit_verify/stl", "ultrasonic/stl", "strict_types/armor"]
@@ -116,3 +117,6 @@ features = ["all"]
 
 [lints.rust]
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(coverage_nightly)'] }
+
+[patch.crates-io]
+ultrasonic = { git = "https://github.com/AluVM/ultrasonic", branch = "feat/opwitness" }

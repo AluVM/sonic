@@ -24,7 +24,8 @@
 // TODO: Activate once StrictEncoding will be no_std
 // #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(
-    unsafe_code,
+    // TODO: Activate once StrictEncoding removes invalid unsafe fn modifiers from the raw reader
+    // unsafe_code,
     dead_code,
     // TODO: Complete documentation
     // missing_docs,
@@ -63,6 +64,8 @@ mod ledger;
 pub mod stl;
 
 pub use deed::{CallParams, DeedBuilder, Satisfaction};
-pub use ledger::{AcceptError, Ledger, LEDGER_MAGIC_NUMBER, LEDGER_VERSION};
+pub use ledger::{AcceptError, Ledger};
+#[cfg(feature = "binfile")]
+pub use ledger::{DEEDS_MAGIC_NUMBER, DEEDS_VERSION};
 pub use state::{EffectiveState, ProcessedState, RawState, Transition};
 pub use stock::{IssueError, Stock};

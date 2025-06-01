@@ -31,7 +31,7 @@ use commit_verify::stl::commit_verify_stl;
 use commit_verify::CommitmentLayout;
 use hypersonic::aluvm::zkstl::finite_field_stl;
 use hypersonic::stl::sonic_stl;
-use sonicapi::ArticlesCommitment;
+use sonicapi::Semantics;
 use strict_types::stl::{std_stl, strict_types_stl};
 use strict_types::{parse_args, SystemBuilder};
 use ultrasonic::stl::usonic_stl;
@@ -100,9 +100,11 @@ fn main() {
     .unwrap();
 
     writeln!(file, "\n-- Contract Articles\n").unwrap();
-    let layout = ArticlesCommitment::commitment_layout();
+    let layout = Semantics::commitment_layout();
     writeln!(file, "{layout}").unwrap();
-    let tt = sys.type_tree("SONIC.ArticlesCommitment").unwrap();
+    let tt = sys.type_tree("SONIC.Semantics").unwrap();
+    writeln!(file, "{tt}").unwrap();
+    let tt = sys.type_tree("SONIC.Issuer").unwrap();
     writeln!(file, "{tt}").unwrap();
     let tt = sys.type_tree("SONIC.Articles").unwrap();
     writeln!(file, "{tt}").unwrap();

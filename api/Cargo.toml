@@ -26,7 +26,9 @@ aluvm.workspace = true
 ultrasonic.workspace = true
 sonic-callreq.workspace = true
 binfile = { workspace = true, optional = true }
+indexmap.workspace = true
 serde = { workspace = true, optional = true }
+serde_yaml = { workspace = true, optional = true }
 chrono.workspace = true
 
 [features]
@@ -38,6 +40,7 @@ binfile = ["dep:binfile", "std"]
 stl = ["commit_verify/stl", "ultrasonic/stl", "strict_types/armor"]
 serde = [
     "dep:serde",
+    "dep:serde_yaml",
     "chrono/serde",
     "amplify/serde",
     "strict_encoding/serde",

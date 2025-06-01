@@ -24,7 +24,7 @@
 use core::error::Error;
 
 use amplify::MultiError;
-use sonicapi::ArticlesError;
+use sonicapi::SemanticError;
 use ultrasonic::{CallError, CellAddr, ContractName, Operation, Opid};
 
 use crate::{Articles, EffectiveState, Transition};
@@ -116,6 +116,17 @@ pub trait Stock {
     ///
     /// This call MAY BE blocking.
     fn has_operation(&self, opid: Opid) -> bool;
+
+    /// Count the number of all known operations in the contract.
+    ///
+    /// # Nota bene
+    ///
+    /// Does not include genesis operation.
+    ///
+    /// # Blocking I/O
+    ///
+    /// This call MAY BE blocking.
+    fn operation_count(&self) -> u64;
 
     /// Returns an operation ([`Operation`]) with a given `opid` from the set of known contract
     /// operations ("stash").
@@ -236,7 +247,7 @@ pub trait Stock {
     /// transitions that were ever provided via [`Self::add_transition`].
     fn trace(&self) -> impl Iterator<Item = (Opid, Transition)>;
 
-    /// Returns an id of an operation reading a provided address (operation immutable state
+    /// Returns an id of an operation reading a provided address (operation global state
     /// output).
     ///
     /// # Nota bene
@@ -255,8 +266,7 @@ pub trait Stock {
     /// [`Self::add_reading`] as an `addr` argument.
     fn read_by(&self, addr: CellAddr) -> impl Iterator<Item = Opid>;
 
-    /// Returns an id of an operation spending a provided address (operation destructible state
-    /// output).
+    /// Returns an id of an operation spending a provided address (operation-owned state output).
     ///
     /// # Nota bene
     ///
@@ -286,8 +296,8 @@ pub trait Stock {
     /// updated state after calling the callback `f` method.
     fn update_articles(
         &mut self,
-        f: impl FnOnce(&mut Articles) -> Result<(), ArticlesError>,
-    ) -> Result<(), MultiError<ArticlesError, Self::Error>>;
+        f: impl FnOnce(&mut Articles) -> Result<bool, SemanticError>,
+    ) -> Result<bool, MultiError<SemanticError, Self::Error>>;
 
     /// Updates contract effective state inside a callback method.
     ///
@@ -339,7 +349,7 @@ pub trait Stock {
     ///   the `transition` itself matches the known data for it.
     fn add_transition(&mut self, opid: Opid, transition: &Transition);
 
-    /// Registers a given operation immutable output (`addr`) to be read (used as an input) in
+    /// Registers a given operation global output (`addr`) to be read (used as an input) in
     /// operation `reader`.
     ///
     /// # Blocking I/O
@@ -352,7 +362,7 @@ pub trait Stock {
     /// - add the `reader` to the list of readers who had accessed the address.
     fn add_reading(&mut self, addr: CellAddr, reader: Opid);
 
-    /// Registers a given operation destructible output (`spent`) to be spent (used as an input) in
+    /// Registers a given operation-owned output (`spent`) to be spent (used as an input) in
     /// operation `spender`.
     ///
     /// # Blocking I/O

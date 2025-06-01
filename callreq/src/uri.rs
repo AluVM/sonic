@@ -74,7 +74,7 @@ where
         }
         if let Some(call) = &self.call {
             write!(f, "{}/", call.method)?;
-            if let Some(state) = &call.destructible {
+            if let Some(state) = &call.owned {
                 write!(f, "{state}/")?;
             }
         }
@@ -175,12 +175,12 @@ where
         let mut call = None;
         if let Some(method) = method {
             let method = method.as_str().parse().map_err(ParseError::MethodInvalid)?;
-            let destructible = if let Some(state) = state {
+            let owned = if let Some(state) = state {
                 Some(state.as_str().parse().map_err(ParseError::StateInvalid)?)
             } else {
                 None
             };
-            call = Some(CallState { method, destructible });
+            call = Some(CallState { method, owned });
         }
 
         let mut query_params: IndexMap<String, String> = IndexMap::new();

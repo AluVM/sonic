@@ -21,7 +21,7 @@
 // or implied. See the License for the specific language governing permissions and limitations under
 // the License.
 
-use std::borrow::Borrow;
+use std::convert::Infallible;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -32,12 +32,10 @@ use aora::file::{FileAoraIndex, FileAoraMap, FileAuraMap};
 use aora::{AoraIndex, AoraMap, AuraMap, TransactionalMap};
 use binfile::BinFile;
 use hypersonic::{
-    AcceptError, ApiDescriptor, Articles, ArticlesError, AuthToken, CellAddr, EffectiveState, Genesis, Issue,
-    IssueError, Ledger, Operation, Opid, RawState, SigValidator, Stock, Transition,
+    Articles, CellAddr, EffectiveState, Genesis, Issue, IssueError, Ledger, Operation, Opid, RawState, SemanticError,
+    Semantics, SigBlob, Stock, Transition,
 };
-use strict_encoding::{
-    DecodeError, StreamReader, StreamWriter, StrictDecode, StrictEncode, StrictReader, StrictWriter,
-};
+use strict_encoding::{DecodeError, StreamReader, StreamWriter, StrictDecode, StrictEncode, StrictWriter};
 
 #[derive(Wrapper, WrapperMut, Debug, From)]
 #[wrapper(Deref)]
@@ -50,11 +48,11 @@ const SPENT_MAGIC: u64 = u64::from_be_bytes(*b"OPSPENT ");
 const READ_MAGIC: u64 = u64::from_be_bytes(*b"OPREADBY");
 const VALID_MAGIC: u64 = u64::from_be_bytes(*b"OPVALID ");
 
-const APIS_MAGIC: u64 = u64::from_be_bytes(*b"CONAPIS ");
+const SEMANTICS_MAGIC: u64 = u64::from_be_bytes(*b"SEMANTIC");
 const STATE_MAGIC: u64 = u64::from_be_bytes(*b"CONSTATE");
 const GENESIS_MAGIC: u64 = u64::from_be_bytes(*b"CGENESIS");
 
-const VERSION_0: u16 = 0;
+const PERSISTENCE_VERSION_0: u16 = 0;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum OpValidity {
@@ -105,7 +103,7 @@ impl StockFs {
     const FILENAME_CODEX: &'static str = "codex.yaml";
     const FILENAME_META: &'static str = "meta.toml";
     const FILENAME_GENESIS: &'static str = "genesis.dat";
-    const FILENAME_APIS: &'static str = "apis.dat";
+    const FILENAME_SEMANTICS: &'static str = "semantics.dat";
     const FILENAME_STATE_RAW: &'static str = "state.dat";
 }
 
@@ -127,15 +125,16 @@ impl Stock for StockFs {
         let file = File::create_new(path.join(Self::FILENAME_CODEX))?;
         serde_yaml::to_writer(file, articles.codex())?;
 
-        let file = BinFile::<GENESIS_MAGIC, VERSION_0>::create_new(path.join(Self::FILENAME_GENESIS))?;
+        let file = BinFile::<GENESIS_MAGIC, PERSISTENCE_VERSION_0>::create_new(path.join(Self::FILENAME_GENESIS))?;
         let writer = StreamWriter::new::<{ usize::MAX }>(file);
         articles.genesis().strict_write(writer)?;
 
-        let file = BinFile::<APIS_MAGIC, VERSION_0>::create_new(path.join(Self::FILENAME_APIS))?;
-        let writer = StreamWriter::new::<{ usize::MAX }>(file);
-        articles.apis().strict_write(writer)?;
+        let file = BinFile::<SEMANTICS_MAGIC, PERSISTENCE_VERSION_0>::create_new(path.join(Self::FILENAME_SEMANTICS))?;
+        let mut writer = StreamWriter::new::<{ usize::MAX }>(file);
+        articles.semantics().strict_write(&mut writer)?;
+        articles.sig().strict_write(writer)?;
 
-        let file = BinFile::<STATE_MAGIC, VERSION_0>::create_new(path.join(Self::FILENAME_STATE_RAW))?;
+        let file = BinFile::<STATE_MAGIC, PERSISTENCE_VERSION_0>::create_new(path.join(Self::FILENAME_STATE_RAW))?;
         let writer = StreamWriter::new::<{ usize::MAX }>(file);
         state.raw.strict_write(writer)?;
 
@@ -157,20 +156,23 @@ impl Stock for StockFs {
         let file = File::open(path.join(Self::FILENAME_CODEX))?;
         let codex = serde_yaml::from_reader(file)?;
 
-        let file = BinFile::<GENESIS_MAGIC, VERSION_0>::open(path.join(Self::FILENAME_GENESIS))?;
+        // TODO: Check there is no content left at the end of reading
+        let file = BinFile::<GENESIS_MAGIC, PERSISTENCE_VERSION_0>::open(path.join(Self::FILENAME_GENESIS))?;
         let reader = StreamReader::new::<{ usize::MAX }>(file);
         let genesis = Genesis::strict_read(reader)?;
 
-        let file = BinFile::<APIS_MAGIC, VERSION_0>::open(path.join(Self::FILENAME_APIS))?;
-        let reader = StreamReader::new::<{ usize::MAX }>(file);
-        let apis = ApiDescriptor::strict_read(reader)?;
+        let file = BinFile::<SEMANTICS_MAGIC, PERSISTENCE_VERSION_0>::open(path.join(Self::FILENAME_SEMANTICS))?;
+        let mut reader = StreamReader::new::<{ usize::MAX }>(file);
+        let semantics = Semantics::strict_read(&mut reader)?;
+        let sig = Option::<SigBlob>::strict_read(reader)?;
 
-        let file = BinFile::<STATE_MAGIC, VERSION_0>::open(path.join(Self::FILENAME_STATE_RAW))?;
+        let file = BinFile::<STATE_MAGIC, PERSISTENCE_VERSION_0>::open(path.join(Self::FILENAME_STATE_RAW))?;
         let reader = StreamReader::new::<{ usize::MAX }>(file);
         let raw = RawState::strict_read(reader)?;
 
         let issue = Issue { version: default!(), meta, codex, genesis };
-        let articles = Articles::with(apis, issue)?;
+        // We trust the storage
+        let articles = Articles::with(semantics, issue, sig, |_, _, _| -> Result<_, Infallible> { Ok(()) })?;
 
         let state = EffectiveState::with_raw_state(raw, &articles);
 
@@ -194,6 +196,8 @@ impl Stock for StockFs {
     #[inline]
     fn has_operation(&self, opid: Opid) -> bool { self.stash.contains_key(opid) }
     #[inline]
+    fn operation_count(&self) -> u64 { self.stash.len() as u64 }
+    #[inline]
     fn operation(&self, opid: Opid) -> Operation { self.stash.get_expect(opid) }
     #[inline]
     fn operations(&self) -> impl Iterator<Item = (Opid, Operation)> { self.stash.iter() }
@@ -208,29 +212,33 @@ impl Stock for StockFs {
 
     fn update_articles(
         &mut self,
-        f: impl FnOnce(&mut Articles) -> Result<(), ArticlesError>,
-    ) -> Result<(), MultiError<ArticlesError, FsError>> {
-        f(&mut self.articles).map_err(MultiError::A)?;
+        f: impl FnOnce(&mut Articles) -> Result<bool, SemanticError>,
+    ) -> Result<bool, MultiError<SemanticError, FsError>> {
+        let res = f(&mut self.articles).map_err(MultiError::A)?;
 
-        let file = BinFile::<APIS_MAGIC, VERSION_0>::create(self.path.join(Self::FILENAME_APIS))
+        let file = BinFile::<SEMANTICS_MAGIC, PERSISTENCE_VERSION_0>::create(self.path.join(Self::FILENAME_SEMANTICS))
             .map_err(MultiError::from_b)?;
-        let writer = StreamWriter::new::<{ usize::MAX }>(file);
+        let mut writer = StreamWriter::new::<{ usize::MAX }>(file);
         self.articles
-            .apis()
+            .semantics()
+            .strict_write(&mut writer)
+            .map_err(MultiError::from_b)?;
+        self.articles
+            .sig()
             .strict_write(writer)
             .map_err(MultiError::from_b)?;
 
-        Ok(())
+        Ok(res)
     }
 
     fn update_state<R>(&mut self, f: impl FnOnce(&mut EffectiveState, &Articles) -> R) -> Result<R, FsError> {
         let res = f(&mut self.state, &self.articles);
 
-        let file = BinFile::<STATE_MAGIC, VERSION_0>::create(self.path.join(Self::FILENAME_STATE_RAW))?;
+        let file = BinFile::<STATE_MAGIC, PERSISTENCE_VERSION_0>::create(self.path.join(Self::FILENAME_STATE_RAW))?;
         let writer = StreamWriter::new::<{ usize::MAX }>(file);
         self.state.raw.strict_write(writer)?;
 
-        self.state.recompute(self.articles.apis());
+        self.state.recompute(self.articles.semantics());
 
         Ok(res)
     }
@@ -263,26 +271,6 @@ impl LedgerDir {
         self.export_all(writer)
     }
 
-    pub fn export_to_file(
-        &mut self,
-        terminals: impl IntoIterator<Item = impl Borrow<AuthToken>>,
-        output: impl AsRef<Path>,
-    ) -> io::Result<()> {
-        let file = File::create_new(output)?;
-        let writer = StrictWriter::with(StreamWriter::new::<{ usize::MAX }>(file));
-        self.export(terminals, writer)
-    }
-
-    pub fn accept_from_file(
-        &mut self,
-        input: impl AsRef<Path>,
-        sig_validator: impl SigValidator,
-    ) -> Result<(), MultiError<AcceptError, FsError>> {
-        let file = File::open(input).map_err(MultiError::from_b)?;
-        let mut reader = StrictReader::with(StreamReader::new::<{ usize::MAX }>(file));
-        self.accept(&mut reader, sig_validator)
-    }
-
     pub fn path(&self) -> &Path { &self.0.stock().path }
 }
 
@@ -296,7 +284,7 @@ pub enum FsError {
     Decode(DecodeError),
 
     #[from]
-    Articles(ArticlesError),
+    Articles(SemanticError),
 
     #[from]
     Yaml(serde_yaml::Error),
