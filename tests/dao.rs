@@ -34,11 +34,12 @@ use std::path::Path;
 
 use aluvm::{CoreConfig, LibSite};
 use amplify::num::u256;
-use commit_verify::{Digest, Sha256};
+use commit_verify::{Digest, Sha256, StrictHash};
 use hypersonic::{Api, GlobalApi, OwnedApi};
 use sonic_persist_fs::LedgerDir;
 use sonicapi::{
-    Aggregator, Issuer, RawBuilder, RawConvertor, Semantics, StateArithm, StateBuilder, StateConvertor, SubAggregator,
+    Aggregator, Issuer, RawBuilder, RawConvertor, Semantics, SigBlob, StateArithm, StateBuilder, StateConvertor,
+    SubAggregator,
 };
 use strict_types::{SemId, StrictVal};
 use ultrasonic::aluvm::FIELD_ORDER_SECP;
@@ -139,12 +140,32 @@ fn main() {
         api_libs: none!(),
         types: types.type_system(),
     };
-    let issuer = Issuer::new(codex, semantics).unwrap();
+
+    let sig = SigBlob::from_slice_checked(*b"me");
+    fn sig_validator(_: StrictHash, _: &Identity, s: &SigBlob) -> Result<(), ()> {
+        if s.as_slice() == b"me" {
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+    let issuer = Issuer::with(codex, semantics, sig, sig_validator).unwrap();
     let filename = "examples/dao/data/SimpleDAO.issuer";
     fs::remove_file(filename).ok();
     issuer
         .save(filename)
         .expect("unable to save an issuer to a file");
+
+    let issuer2 = Issuer::load(filename, sig_validator).unwrap();
+    assert_eq!(issuer.issuer_id(), issuer2.issuer_id());
+    assert_eq!(issuer.codex_id(), issuer2.codex_id());
+    assert_eq!(issuer.codex_name(), issuer2.codex_name());
+    assert_eq!(issuer.codex(), issuer2.codex());
+    assert_eq!(issuer.types(), issuer2.types());
+    assert_eq!(issuer.semantics(), issuer2.semantics());
+    assert_eq!(issuer.default_api(), issuer2.default_api());
+    assert_eq!(issuer.custom_apis().collect::<Vec<_>>(), issuer2.custom_apis().collect::<Vec<_>>());
+    assert_eq!(issuer.codex_libs().collect::<Vec<_>>(), issuer2.codex_libs().collect::<Vec<_>>());
 
     let seed = &[0xCA; 30][..];
     let mut auth = Sha256::digest(seed);
@@ -257,9 +278,9 @@ fn main() {
         .accept_from_file(deeds_path, |_, _, _| Result::<_, Infallible>::Ok(()))
         .unwrap();
 
-    ledger2
-        .export_all_to_file("tests/data/votings-all.deeds")
-        .unwrap();
+    let deeds_path = "tests/data/votings-all.deeds";
+    fs::remove_file(deeds_path).ok();
+    ledger2.export_all_to_file(deeds_path).unwrap();
 }
 
 mod libs {

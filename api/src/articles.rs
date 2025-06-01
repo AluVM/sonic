@@ -242,3 +242,21 @@ impl LibRepo for Articles {
 #[strict_type(lib = LIB_NAME_SONIC, dumb = { Self(NonEmptyBlob::with(0)) })]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(transparent))]
 pub struct SigBlob(NonEmptyBlob<4096>);
+
+impl SigBlob {
+    /// Constrict sig blob from byte slice.
+    ///
+    /// # Panics
+    ///
+    /// If the slice length is zero or larger than 4096.
+    pub fn from_slice_checked(data: impl AsRef<[u8]>) -> SigBlob {
+        Self(NonEmptyBlob::from_checked(data.as_ref().to_vec()))
+    }
+
+    /// Constrict sig blob from byte vector.
+    ///
+    /// # Panics
+    ///
+    /// If the slice length is zero or larger than 4096.
+    pub fn from_vec_checked(data: Vec<u8>) -> SigBlob { Self(NonEmptyBlob::from_checked(data)) }
+}
