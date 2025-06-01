@@ -793,12 +793,12 @@ mod test {
         let code = aluasm! { ret; };
         Lib::assemble(&code).unwrap()
     }
-    fn call(aggregator: Aggregator) -> StrictVal {
+    fn call(aggregator: &Aggregator) -> StrictVal {
         aggregator
             .aggregate(&state(), &none!(), &[success_lib()], &types())
             .unwrap()
     }
-    fn call2(aggregator: Aggregator) -> StrictVal {
+    fn call2(aggregator: &Aggregator) -> StrictVal {
         let aggregated = bmap! {
             vname!("zero") => svnum!(0u64),
             vname!("two") => svnum!(2u64),
@@ -812,57 +812,60 @@ mod test {
 
     #[test]
     fn none() {
-        assert_eq!(call(Aggregator::None), svnone!());
+        let agg = Aggregator::None;
+        assert_eq!(call(&agg), svnone!());
+        assert_eq!(agg.depends_on().count(), 0);
     }
 
     #[test]
     fn some() {
-        assert_eq!(call(Aggregator::Some(SubAggregator::Count(vname!("verified")))), svsome!(6u64));
+        let agg = Aggregator::Some(SubAggregator::Count(vname!("verified")));
+        assert_eq!(call(&agg), svsome!(6u64));
+        assert_eq!(agg.depends_on().count(), 0);
     }
 
     #[test]
     fn or() {
-        assert_eq!(
-            call(Aggregator::Or(
-                SubAggregator::Unwrap(vname!("nonExisting")),
-                SubAggregator::Count(vname!("verified"))
-            )),
-            svnum!(6u64)
-        );
+        let agg =
+            Aggregator::Or(SubAggregator::Unwrap(vname!("nonExisting")), SubAggregator::Count(vname!("verified")));
+        assert_eq!(call(&agg), svnum!(6u64));
+        assert_eq!(agg.depends_on().count(), 0);
     }
 
     #[test]
     #[should_panic]
-    fn non_existing() { call(Aggregator::Take(SubAggregator::Unwrap(vname!("nonExisting")))); }
+    fn non_existing() { call(&Aggregator::Take(SubAggregator::Unwrap(vname!("nonExisting")))); }
 
     #[test]
     fn sum() {
         #![allow(clippy::identity_op)]
-        assert_eq!(
-            call(Aggregator::Take(SubAggregator::SumUnwrap(vname!("verified")))),
-            svnum!(5u64 + 1 + 2 + 3 + 4 + 5)
-        );
-        assert_eq!(
-            call(Aggregator::Take(SubAggregator::SumOrDefault(vname!("verified")))),
-            svnum!(5u64 + 1 + 2 + 3 + 4 + 5)
-        );
+        let agg = Aggregator::Take(SubAggregator::SumUnwrap(vname!("verified")));
+        assert_eq!(call(&agg), svnum!(5u64 + 1 + 2 + 3 + 4 + 5));
+        assert_eq!(agg.depends_on().count(), 0);
 
-        assert_eq!(call(Aggregator::Take(SubAggregator::SumOrDefault(vname!("unverified")))), svnum!(0u64));
+        let agg = Aggregator::Take(SubAggregator::SumOrDefault(vname!("verified")));
+        assert_eq!(call(&agg), svnum!(5u64 + 1 + 2 + 3 + 4 + 5));
+        assert_eq!(agg.depends_on().count(), 0);
+
+        let agg = Aggregator::Take(SubAggregator::SumOrDefault(vname!("unverified")));
+        assert_eq!(call(&agg), svnum!(0u64));
+        assert_eq!(agg.depends_on().count(), 0);
     }
 
     #[test]
     fn prod() {
         #![allow(clippy::identity_op)]
-        assert_eq!(
-            call(Aggregator::Take(SubAggregator::ProdUnwrap(vname!("verified")))),
-            svnum!(5u64 * 1 * 2 * 3 * 4 * 5)
-        );
-        assert_eq!(
-            call(Aggregator::Take(SubAggregator::ProdOrDefault(vname!("verified")))),
-            svnum!(5u64 * 1 * 2 * 3 * 4 * 5)
-        );
+        let agg = Aggregator::Take(SubAggregator::ProdUnwrap(vname!("verified")));
+        assert_eq!(call(&agg), svnum!(5u64 * 1 * 2 * 3 * 4 * 5));
+        assert_eq!(agg.depends_on().count(), 0);
 
-        assert_eq!(call(Aggregator::Take(SubAggregator::ProdOrDefault(vname!("unverified")))), svnum!(1u64));
+        let agg = Aggregator::Take(SubAggregator::ProdOrDefault(vname!("verified")));
+        assert_eq!(call(&agg), svnum!(5u64 * 1 * 2 * 3 * 4 * 5));
+        assert_eq!(agg.depends_on().count(), 0);
+
+        let agg = Aggregator::Take(SubAggregator::ProdOrDefault(vname!("unverified")));
+        assert_eq!(call(&agg), svnum!(1u64));
+        assert_eq!(agg.depends_on().count(), 0);
     }
 
     #[test]
@@ -872,14 +875,14 @@ mod test {
             StateSelector::Aggregated(vname!("three")),
         ));
         assert_eq!(agg.depends_on().collect::<Vec<_>>(), vec![&vname!("two"), &vname!("three")]);
-        assert_eq!(call2(agg), svnum!(5u64));
+        assert_eq!(call2(&agg), svnum!(5u64));
     }
 
     #[test]
     fn meg() {
         let agg = Aggregator::Take(SubAggregator::Neg(StateSelector::Aggregated(vname!("two"))));
         assert_eq!(agg.depends_on().collect::<Vec<_>>(), vec![&vname!("two")]);
-        assert_eq!(call2(agg), svnum!(-2i64));
+        assert_eq!(call2(&agg), svnum!(-2i64));
     }
 
     #[test]
@@ -889,7 +892,7 @@ mod test {
             StateSelector::Aggregated(vname!("two")),
         ));
         assert_eq!(agg.depends_on().collect::<Vec<_>>(), vec![&vname!("three"), &vname!("two")]);
-        assert_eq!(call2(agg), svnum!(1u64));
+        assert_eq!(call2(&agg), svnum!(1u64));
     }
 
     #[test]
@@ -899,7 +902,7 @@ mod test {
             StateSelector::Aggregated(vname!("two")),
             StateSelector::Aggregated(vname!("three")),
         ));
-        call2(agg);
+        call2(&agg);
     }
 
     #[test]
@@ -909,7 +912,7 @@ mod test {
             StateSelector::Aggregated(vname!("three")),
         ));
         assert_eq!(agg.depends_on().collect::<Vec<_>>(), vec![&vname!("two"), &vname!("three")]);
-        assert_eq!(call2(agg), svnum!(6u64));
+        assert_eq!(call2(&agg), svnum!(6u64));
     }
 
     #[test]
@@ -919,7 +922,7 @@ mod test {
             StateSelector::Aggregated(vname!("three")),
         ));
         assert_eq!(agg.depends_on().collect::<Vec<_>>(), vec![&vname!("two"), &vname!("three")]);
-        assert_eq!(call2(agg), svnum!(0u64));
+        assert_eq!(call2(&agg), svnum!(0u64));
     }
 
     #[test]
@@ -929,7 +932,7 @@ mod test {
             StateSelector::Aggregated(vname!("two")),
             StateSelector::Aggregated(vname!("zero")),
         ));
-        call2(agg);
+        call2(&agg);
     }
 
     #[test]
@@ -939,7 +942,7 @@ mod test {
             StateSelector::Aggregated(vname!("three")),
         ));
         assert_eq!(agg.depends_on().collect::<Vec<_>>(), vec![&vname!("two"), &vname!("three")]);
-        assert_eq!(call2(agg), svnum!(2u64));
+        assert_eq!(call2(&agg), svnum!(2u64));
     }
 
     #[test]
@@ -949,46 +952,48 @@ mod test {
             StateSelector::Aggregated(vname!("three")),
         ));
         assert_eq!(agg.depends_on().collect::<Vec<_>>(), vec![&vname!("two"), &vname!("three")]);
-        assert_eq!(call2(agg), svnum!(8u64));
+        assert_eq!(call2(&agg), svnum!(8u64));
     }
 
     #[test]
     #[should_panic]
-    fn math_sum_fail() { call(Aggregator::Take(SubAggregator::SumUnwrap(vname!("unverified")))); }
+    fn math_sum_fail() { call(&Aggregator::Take(SubAggregator::SumUnwrap(vname!("unverified")))); }
 
     #[test]
     #[should_panic]
-    fn math_prod_fail() { call(Aggregator::Take(SubAggregator::ProdUnwrap(vname!("unverified")))); }
+    fn math_prod_fail() { call(&Aggregator::Take(SubAggregator::ProdUnwrap(vname!("unverified")))); }
+
+    fn independent(agg: Aggregator, val: StrictVal) {
+        assert_eq!(call(&agg), val);
+        assert_eq!(agg.depends_on().count(), 0);
+    }
 
     #[test]
     fn verified_readers() {
-        assert_eq!(call(Aggregator::Take(SubAggregator::First(vname!("verified")))), svnum!(5u64));
-        assert_eq!(call(Aggregator::Take(SubAggregator::Nth(vname!("verified"), 0))), svnum!(5u64));
-        assert_eq!(call(Aggregator::Take(SubAggregator::Nth(vname!("verified"), 1))), svnum!(1u64));
-        assert_eq!(call(Aggregator::Take(SubAggregator::Last(vname!("verified")))), svnum!(5u64));
-        assert_eq!(call(Aggregator::Take(SubAggregator::NthBack(vname!("verified"), 0))), svnum!(5u64));
-        assert_eq!(call(Aggregator::Take(SubAggregator::NthBack(vname!("verified"), 1))), svnum!(4u64));
-        assert_eq!(call(Aggregator::Take(SubAggregator::Count(vname!("verified")))), svnum!(6u64));
-        assert_eq!(call(Aggregator::Take(SubAggregator::CountUnique(vname!("verified")))), svnum!(5u64));
-        assert_eq!(
-            call(Aggregator::Take(SubAggregator::SetV(vname!("verified")))),
-            svset!([5u64, 1u64, 2u64, 3u64, 4u64])
-        );
-        assert_eq!(call(Aggregator::Take(SubAggregator::MapV2U(vname!("verified")))), StrictVal::Map(none!()));
-        assert_eq!(call(Aggregator::Take(SubAggregator::MapV2ListU(vname!("verified")))), StrictVal::Map(none!()));
-        assert_eq!(call(Aggregator::Take(SubAggregator::MapV2SetU(vname!("verified")))), StrictVal::Map(none!()));
+        independent(Aggregator::Take(SubAggregator::First(vname!("verified"))), svnum!(5u64));
+        independent(Aggregator::Take(SubAggregator::Nth(vname!("verified"), 0)), svnum!(5u64));
+        independent(Aggregator::Take(SubAggregator::Nth(vname!("verified"), 1)), svnum!(1u64));
+        independent(Aggregator::Take(SubAggregator::Last(vname!("verified"))), svnum!(5u64));
+        independent(Aggregator::Take(SubAggregator::NthBack(vname!("verified"), 0)), svnum!(5u64));
+        independent(Aggregator::Take(SubAggregator::NthBack(vname!("verified"), 1)), svnum!(4u64));
+        independent(Aggregator::Take(SubAggregator::Count(vname!("verified"))), svnum!(6u64));
+        independent(Aggregator::Take(SubAggregator::CountUnique(vname!("verified"))), svnum!(5u64));
+        independent(Aggregator::Take(SubAggregator::SetV(vname!("verified"))), svset!([5u64, 1u64, 2u64, 3u64, 4u64]));
+        independent(Aggregator::Take(SubAggregator::MapV2U(vname!("verified"))), StrictVal::Map(none!()));
+        independent(Aggregator::Take(SubAggregator::MapV2ListU(vname!("verified"))), StrictVal::Map(none!()));
+        independent(Aggregator::Take(SubAggregator::MapV2SetU(vname!("verified"))), StrictVal::Map(none!()));
     }
 
     #[test]
     fn unverified_readers() {
-        assert_eq!(call(Aggregator::Take(SubAggregator::Count(vname!("verified")))), svnum!(6u64));
-        assert_eq!(call(Aggregator::Take(SubAggregator::SetV(vname!("unverified")))), svset!([()]));
-        assert_eq!(
-            call(Aggregator::Take(SubAggregator::MapV2U(vname!("unverified")))),
-            StrictVal::Map(vec![(StrictVal::Unit, svstr!("state 1"))])
+        independent(Aggregator::Take(SubAggregator::Count(vname!("verified"))), svnum!(6u64));
+        independent(Aggregator::Take(SubAggregator::SetV(vname!("unverified"))), svset!([()]));
+        independent(
+            Aggregator::Take(SubAggregator::MapV2U(vname!("unverified"))),
+            StrictVal::Map(vec![(StrictVal::Unit, svstr!("state 1"))]),
         );
-        assert_eq!(
-            call(Aggregator::Take(SubAggregator::MapV2ListU(vname!("unverified")))),
+        independent(
+            Aggregator::Take(SubAggregator::MapV2ListU(vname!("unverified"))),
             StrictVal::Map(vec![(StrictVal::Unit, svlist![[
                 svstr!("state 1"),
                 svstr!("state 2"),
@@ -996,10 +1001,10 @@ mod test {
                 svstr!("state 4"),
                 svstr!("state 5"),
                 svstr!("state 6"),
-            ]])])
+            ]])]),
         );
-        assert_eq!(
-            call(Aggregator::Take(SubAggregator::MapV2SetU(vname!("unverified")))),
+        independent(
+            Aggregator::Take(SubAggregator::MapV2SetU(vname!("unverified"))),
             StrictVal::Map(vec![(StrictVal::Unit, svset![[
                 svstr!("state 1"),
                 svstr!("state 2"),
@@ -1007,51 +1012,48 @@ mod test {
                 svstr!("state 4"),
                 svstr!("state 5"),
                 svstr!("state 6"),
-            ]])])
+            ]])]),
         );
     }
 
     #[test]
     #[should_panic]
-    fn unverified_sum() { call(Aggregator::Take(SubAggregator::SumUnwrap(vname!("unverified")))); }
+    fn unverified_sum() { call(&Aggregator::Take(SubAggregator::SumUnwrap(vname!("unverified")))); }
 
     #[test]
     fn unverified_sum_default() {
-        assert_eq!(call(Aggregator::Take(SubAggregator::SumOrDefault(vname!("unverified")))), svnum!(0u64));
+        independent(Aggregator::Take(SubAggregator::SumOrDefault(vname!("unverified"))), svnum!(0u64));
     }
 
     #[test]
     fn pair_readers() {
-        assert_eq!(call(Aggregator::Take(SubAggregator::Count(vname!("verified")))), svnum!(6u64));
-        assert_eq!(call(Aggregator::Take(SubAggregator::SumUnwrap(vname!("pairs")))), svnum!(5u64 + 1 + 2 + 3 + 4 + 5));
-        assert_eq!(
-            call(Aggregator::Take(SubAggregator::SetV(vname!("pairs")))),
-            svset!([5u64, 1u64, 2u64, 3u64, 4u64])
-        );
-        assert_eq!(
-            call(Aggregator::Take(SubAggregator::MapV2U(vname!("pairs")))),
+        independent(Aggregator::Take(SubAggregator::Count(vname!("verified"))), svnum!(6u64));
+        independent(Aggregator::Take(SubAggregator::SumUnwrap(vname!("pairs"))), svnum!(5u64 + 1 + 2 + 3 + 4 + 5));
+        independent(Aggregator::Take(SubAggregator::SetV(vname!("pairs"))), svset!([5u64, 1u64, 2u64, 3u64, 4u64]));
+        independent(
+            Aggregator::Take(SubAggregator::MapV2U(vname!("pairs"))),
             StrictVal::Map(vec![
                 (svnum!(5u64), svstr!("state 1")),
                 (svnum!(1u64), svstr!("state 2")),
                 (svnum!(2u64), svstr!("state 3")),
                 (svnum!(3u64), svstr!("state 4")),
-                (svnum!(4u64), svstr!("state 5"))
-            ])
+                (svnum!(4u64), svstr!("state 5")),
+            ]),
         );
-        assert_eq!(
-            call(Aggregator::Take(SubAggregator::MapV2ListU(vname!("pairs")))),
+        independent(
+            Aggregator::Take(SubAggregator::MapV2ListU(vname!("pairs"))),
             StrictVal::Map(vec![
                 (svnum!(5u64), svlist![[svstr!("state 1"), svstr!("state 6")]]),
                 (svnum!(1u64), svlist![[svstr!("state 2")]]),
                 (svnum!(2u64), svlist![[svstr!("state 3")]]),
                 (svnum!(3u64), svlist![[svstr!("state 4")]]),
-                (svnum!(4u64), svlist![[svstr!("state 5")]])
-            ])
+                (svnum!(4u64), svlist![[svstr!("state 5")]]),
+            ]),
         );
     }
 
     #[test]
     #[should_panic]
     // For now, the fail here indicates forward compatibility with when we allow AluVM
-    fn aluvm() { call(Aggregator::AluVM(LibSite::new(success_lib().lib_id(), 0))); }
+    fn aluvm() { call(&Aggregator::AluVM(LibSite::new(success_lib().lib_id(), 0))); }
 }
